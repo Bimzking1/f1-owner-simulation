@@ -1,0 +1,42 @@
+@import url("https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Dark (default) — pit-wall telemetry palette */
+  --bg-void: 9 11 15;
+  --bg-surface: 16 19 24;
+  --bg-raised: 21 25 32;
+  --border-hairline: 35 40 49;
+  --text-primary: 240 242 245;
+  --text-secondary: 148 156 168;
+  --text-muted: 90 98 110;
+
+  --accent-signal: 255 74 46;
+  --accent-telemetry: 41 211 255;
+  --accent-elite: 177 78 255;
+  --accent-caution: 255 201 60;
+  --accent-positive: 61 220 132;
+}
+
+html.light {
+  --bg-void: 238 240 243;
+  --bg-surface: 255 255 255;
+  --bg-raised: 255 255 255;
+  --border-hairline: 223 226 231;
+  --text-primary: 18 21 26;
+  --text-secondary: 75 85 99;
+  --text-muted: 139 147 161;
+
+  --accent-signal: 214 63 34;
+  --accent-telemetry: 4 137 168;
+  --accent-elite: 133 40 214;
+  --accent-caution: 178 122 5;
+  --accent-positive: 21 140 82;
+}
+
+html, body, #root { height: 100%; }
+body { @apply bg-void text-ink font-body antialiased; }
+.tabular { font-variant-numeric: tabular-nums; }
