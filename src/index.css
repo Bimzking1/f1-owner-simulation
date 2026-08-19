@@ -1,111 +1,82 @@
+@import url("https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap");
+@import "tailwindcss";
+
+@theme {
+  --font-display: "Rajdhani", "Segoe UI", sans-serif;
+  --font-body: "Inter", "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+
+  --color-void: rgb(var(--bg-void));
+  --color-surface: rgb(var(--bg-surface));
+  --color-raised: rgb(var(--bg-raised));
+  --color-hairline: rgb(var(--border-hairline));
+  --color-ink: rgb(var(--text-primary));
+  --color-ink-soft: rgb(var(--text-secondary));
+  --color-ink-faint: rgb(var(--text-muted));
+  --color-signal: rgb(var(--accent-signal));
+  --color-telemetry: rgb(var(--accent-telemetry));
+  --color-elite: rgb(var(--accent-elite));
+  --color-caution: rgb(var(--accent-caution));
+  --color-positive: rgb(var(--accent-positive));
+}
+
+@utility sector-stripe {
+  background-image: repeating-linear-gradient(
+    135deg,
+    transparent,
+    transparent 6px,
+    rgb(var(--border-hairline)) 6px,
+    rgb(var(--border-hairline)) 7px
+  );
+}
+
 :root {
-  --text: #6b6375;
-  --text-h: #08060d;
-  --bg: #fff;
-  --border: #e5e4e7;
-  --code-bg: #f4f3ec;
-  --accent: #aa3bff;
-  --accent-bg: rgba(170, 59, 255, 0.1);
-  --accent-border: rgba(170, 59, 255, 0.5);
-  --social-bg: rgba(244, 243, 236, 0.5);
-  --shadow:
-    rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
+  /* Dark (default) — pit-wall telemetry palette */
+  --bg-void: 9 11 15;
+  --bg-surface: 16 19 24;
+  --bg-raised: 21 25 32;
+  --border-hairline: 35 40 49;
+  --text-primary: 240 242 245;
+  --text-secondary: 148 156 168;
+  --text-muted: 90 98 110;
 
-  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --mono: ui-monospace, Consolas, monospace;
-
-  font: 18px/145% var(--sans);
-  letter-spacing: 0.18px;
-  color-scheme: light dark;
-  color: var(--text);
-  background: var(--bg);
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-
-  @media (max-width: 1024px) {
-    font-size: 16px;
-  }
+  --accent-signal: 255 74 46;
+  --accent-telemetry: 41 211 255;
+  --accent-elite: 177 78 255;
+  --accent-caution: 255 201 60;
+  --accent-positive: 61 220 132;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --text: #9ca3af;
-    --text-h: #f3f4f6;
-    --bg: #16171d;
-    --border: #2e303a;
-    --code-bg: #1f2028;
-    --accent: #c084fc;
-    --accent-bg: rgba(192, 132, 252, 0.15);
-    --accent-border: rgba(192, 132, 252, 0.5);
-    --social-bg: rgba(47, 48, 58, 0.5);
-    --shadow:
-      rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
-  }
+html.light {
+  --bg-void: 238 240 243;
+  --bg-surface: 255 255 255;
+  --bg-raised: 255 255 255;
+  --border-hairline: 223 226 231;
+  --text-primary: 18 21 26;
+  --text-secondary: 75 85 99;
+  --text-muted: 139 147 161;
 
-  #social .button-icon {
-    filter: invert(1) brightness(2);
-  }
+  --accent-signal: 214 63 34;
+  --accent-telemetry: 4 137 168;
+  --accent-elite: 133 40 214;
+  --accent-caution: 178 122 5;
+  --accent-positive: 21 140 82;
 }
 
+html,
+body,
 #root {
-  width: 1126px;
-  max-width: 100%;
-  margin: 0 auto;
-  text-align: center;
-  border-inline: 1px solid var(--border);
-  min-height: 100svh;
-  display: flex;
-  flex-direction: column;
-  box-sizing: border-box;
+  height: 100%;
 }
 
 body {
-  margin: 0;
+  @apply bg-void text-ink font-body antialiased;
 }
 
-h1,
-h2 {
-  font-family: var(--heading);
-  font-weight: 500;
-  color: var(--text-h);
+.tabular {
+  font-variant-numeric: tabular-nums;
 }
 
-h1 {
-  font-size: 56px;
-  letter-spacing: -1.68px;
-  margin: 32px 0;
-  @media (max-width: 1024px) {
-    font-size: 36px;
-    margin: 20px 0;
-  }
-}
-h2 {
-  font-size: 24px;
-  line-height: 118%;
-  letter-spacing: -0.24px;
-  margin: 0 0 8px;
-  @media (max-width: 1024px) {
-    font-size: 20px;
-  }
-}
-p {
-  margin: 0;
-}
-
-code,
-.counter {
-  font-family: var(--mono);
-  display: inline-flex;
-  border-radius: 4px;
-  color: var(--text-h);
-}
-
-code {
-  font-size: 15px;
-  line-height: 135%;
-  padding: 4px 8px;
-  background: var(--code-bg);
+::selection {
+  background: rgb(var(--accent-signal) / 0.35);
 }

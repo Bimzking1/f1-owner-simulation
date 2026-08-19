@@ -1,0 +1,547 @@
+// ============================================================================
+// F1 Owner — Season systems (spec §42-50, §53)
+// Component wear, finances, morale, sponsors, development, news, bankruptcy.
+// All functions mutate a draft SimulationState (the caller clones first).
+// ============================================================================
+
+import type {
+  RaceWeekendResult,
+  SimulationState,
+  TeamState,
+} from "./types";
+import { driverById, engineerById, sponsorById } from "@/data";
+import { DIFFICULTIES } from "@/data/config";
+import { clamp, type Rng } from "./rng";
+
+// ---------------------------------------------------------------------------
+// Championship (spec §53)
+
+export function applyStandings(state: SimulationState, weekend: RaceWeekendResult) {
+  const driverStanding = new Map(state.standingsDrivers.map((s) => [s.driverId, s]));
+  const teamStanding = new Map(state.standingsConstructors.map((s) => [s.teamId, s]));
+
+  const apply = (entries: { driverId: string; teamId: string; position: number | null; points: number }[]) => {
+    for (const e of entries) {
+      const ds = driverStanding.get(e.driverId);
+      if (ds) {
+        ds.points += e.points;
+        if (e.position === 1) ds.wins++;
+        if (e.position !== null && e.position <= 3) ds.podiums++;
+        if (e.position === null) ds.dnfs++;
+        if (e.position !== null && (ds.best === 0 || e.position < ds.best)) ds.best = e.position;
+      }
+      const ts = teamStanding.get(e.teamId);
+      if (ts) {
+        ts.points += e.points;
+        if (e.position === 1) ts.wins++;
+        if (e.position !== null && e.position <= 3) ts.podiums++;
+        if (e.position === null) ts.dnfs++;
+      }
+    }
+  };
+
+  if (weekend.sprint) {
+    apply(weekend.sprint.map((e) => ({ driverId: e.driverId, teamId: e.teamId, position: e.position, points: e.points })));
+  }
+  apply(weekend.race.map((e) => ({ driverId: e.driverId, teamId: e.teamId, position: e.position, points: e.points })));
+
+  state.standingsDrivers = [...driverStanding.values()].sort((a, b) => b.points - a.points);
+  state.standingsConstructors = [...teamStanding.values()].sort((a, b) => b.points - a.points);
+
+  if (state.team) {
+    const t = state.team;
+    const teamStand = state.standingsConstructors.find((s) => s.teamId === t.constructorId);
+    t.points = teamStand?.points ?? 0;
+    t.wins = teamStand?.wins ?? 0;
+    t.podiums = teamStand?.podiums ?? 0;
+    t.dnfs = teamStand?.dnfs ?? 0;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Component wear (spec §42)
+
+export function advanceWear(state: SimulationState, weekend: RaceWeekendResult, rng: Rng) {
+  const t = state.team;
+  if (!t) return;
+  void weekend;
+  const rel = t.car.reliability;
+  const wearMult = 1.15 - rel / 150;
+  const stress = t.car.reliability < 60 ? 1.35 : 1.0;
+  const eLoss = (2.4 + rng() * 1.6) * wearMult * stress;
+  const gLoss = (1.9 + rng() * 1.2) * wearMult * stress;
+
+  t.components.engine.condition = Math.round(clamp(t.components.engine.condition - eLoss, 5, 100) * 10) / 10;
+  t.components.gearbox.condition = Math.round(clamp(t.components.gearbox.condition - gLoss, 5, 100) * 10) / 10;
+  t.components.engine.age++;
+  t.components.gearbox.age++;
+}
+
+/** Cost in $M to replace a component; null if unavailable. */
+export function replacementCost(component: "engine" | "gearbox", state: SimulationState): number | null {
+  if (!state.team) return null;
+  if (component === "engine") return state.season === 2013 ? 4.5 : 6;
+  return state.season === 2013 ? 3 : 3.5;
+}
+
+export function replaceComponent(draft: SimulationState, component: "engine" | "gearbox") {
+  const t = draft.team;
+  if (!t) return;
+  const cost = replacementCost(component, draft);
+  if (cost === null || t.cash < cost) return;
+  t.cash = Math.round((t.cash - cost) * 100) / 100;
+  t.components[component] = {
+    condition: 100,
+    age: 0,
+    replacements: t.components[component].replacements + 1,
+  };
+  t.history.push({
+    round: draft.completedRounds + 1,
+    label: `${component === "engine" ? "Engine" : "Gearbox"} replacement`,
+    amount: -cost,
+    category: "other",
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Finances (spec §48-49 cash flow)
+
+export interface RaceFinanceBreakdown {
+  sponsorIncome: number;
+  promoterShare: number;
+  salaries: number;
+  operations: number;
+  supplier: number;
+}
+
+export function applyRaceFinance(state: SimulationState, weekend: RaceWeekendResult): RaceFinanceBreakdown {
+  const t = state.team;
+  if (!t) return { sponsorIncome: 0, promoterShare: 0, salaries: 0, operations: 0, supplier: 0 };
+  const totalRounds = state.calendar.length || 19;
+  const round = state.completedRounds + 1;
+
+  // sponsor race payments
+  let sponsorIncome = 0;
+  for (const s of t.sponsors) {
+    if (!s.active) continue;
+    const spec = sponsorById(s.sponsorId);
+    if (!spec) continue;
+    const pay = Math.round(spec.racePayment * 100) / 100;
+    sponsorIncome += pay;
+    s.totalPaid = Math.round((s.totalPaid + pay) * 100) / 100;
+  }
+
+  // promoter share from race points
+  const teamPoints = weekend.playerEntries.reduce((a, e) => a + e.points, 0);
+  const promoterShare = Math.round(teamPoints * 0.45 * 100) / 100;
+
+  const perRace = (seasonTotal: number) => Math.round((seasonTotal / totalRounds) * 100) / 100;
+  const d1 = driverById(t.driver1Id);
+  const d2 = driverById(t.driver2Id);
+  const salaries = perRace((d1?.salary ?? 4) + (d2?.salary ?? 4));
+  const operations = perRace(teamOperatingCost(t));
+  const supplier = perRace(state.season === 2013 ? 9 : 12);
+
+  const income = Math.round((sponsorIncome + promoterShare) * 100) / 100;
+  const expense = Math.round((salaries + operations + supplier) * 100) / 100;
+  t.cash = Math.round((t.cash + income - expense) * 100) / 100;
+
+  t.history.push(
+    { round, label: "Sponsor payments", amount: sponsorIncome, category: "sponsor" },
+    { round, label: "Promoter share", amount: promoterShare, category: "prize" },
+    { round, label: "Driver salaries", amount: -salaries, category: "salary" },
+    { round, label: "Team operations", amount: -operations, category: "staff" },
+    { round, label: "Power unit lease", amount: -supplier, category: "supplier" },
+  );
+  return { sponsorIncome, promoterShare, salaries, operations, supplier };
+}
+
+function teamOperatingCost(t: TeamState): number {
+  // derived from constructor size — stored implicitly via startCash tier
+  return Math.max(2.4, Math.round(t.startCash * 0.045 * 10) / 10);
+}
+
+/** Season-end prize money by projected WCC position. */
+export function prizeMoney(teamsCount: number, position: number): number {
+  const table = [60, 50, 42, 36, 30, 25, 20, 16, 12, 9, 6, 4];
+  return table[Math.min(position - 1, table.length - 1, teamsCount - 1)] ?? 3;
+}
+
+// ---------------------------------------------------------------------------
+// Driver morale (spec §22)
+
+export function applyMorale(state: SimulationState, weekend: RaceWeekendResult) {
+  const t = state.team;
+  if (!t) return;
+  const diff = DIFFICULTIES.find((d) => d.id === state.difficulty) ?? DIFFICULTIES[1];
+  const mult = diff.moraleMultiplier;
+
+  for (const ds of t.drivers) {
+    const entry = weekend.playerEntries.find((e) => e.driverId === ds.driverId);
+    if (!entry) continue;
+    const pos = entry.position;
+    let conf = 0, mor = 0, frust = 0;
+
+    if (entry.dnf) {
+      mor -= 6; frust += 7;
+    } else if (pos === 1) { conf += 9; mor += 8; frust -= 6; }
+    else if (pos <= 3) { conf += 6; mor += 5; frust -= 4; }
+    else if (pos <= 6) { conf += 3; mor += 3; frust -= 2; }
+    else if (pos <= 10) { conf += 1; mor += 1; }
+    else if (pos <= 15) { mor -= 1; }
+    else { conf -= 2; mor -= 3; frust += 2; }
+
+    const other = t.drivers.find((x) => x.driverId !== ds.driverId);
+    const otherEntry = weekend.playerEntries.find((e) => e.driverId === other?.driverId);
+    if (otherEntry && !otherEntry.dnf && !entry.dnf) {
+      if (pos < otherEntry.position) conf += 2;
+      else if (pos > otherEntry.position + 1) mor -= 2;
+    }
+
+    ds.confidence = clamp(ds.confidence + Math.round(conf * mult), 0, 100);
+    ds.morale = clamp(ds.morale + Math.round(mor * mult), 0, 100);
+    ds.frustration = clamp(ds.frustration + Math.round(frust * mult), 0, 100);
+    if (entry.dnf) ds.dnfs++;
+    ds.points += entry.points;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Sponsors (spec §46-48)
+
+export function scheduleSponsorObjectives(state: SimulationState, rng: Rng) {
+  const t = state.team;
+  if (!t) return;
+  for (const s of t.sponsors) {
+    if (!s.active || s.deadlineRound > 0) continue;
+    const spec = sponsorById(s.sponsorId);
+    if (!spec) continue;
+    switch (spec.objective) {
+      case "pointsNextRaces":
+        s.required = 3; s.deadlineRound = state.completedRounds + 4; break;
+      case "top10NextRaces":
+        s.required = 4; s.deadlineRound = state.completedRounds + 6; break;
+      case "podiumByRound":
+        s.required = 1; s.deadlineRound = state.calendar.length - (state.season === 2013 ? 4 : 8); break;
+      case "pointsConsecutive":
+        s.required = state.season === 2013 ? 2 : 3; s.deadlineRound = state.completedRounds + 12; break;
+      case "beatRival":
+        s.required = 1; s.deadlineRound = state.completedRounds + 5; break;
+      case "wccPosition":
+        s.required = state.season === 2013 ? 6 : 8;
+        s.deadlineRound = state.calendar.length;
+        break;
+    }
+    if (spec.risk === "high" && rng() < 0.15) {
+      // tougher immediate ask
+      s.required += 1;
+    }
+  }
+}
+
+export function evaluateSponsors(state: SimulationState) {
+  const t = state.team;
+  if (!t) return;
+  const diff = DIFFICULTIES.find((d) => d.id === state.difficulty) ?? DIFFICULTIES[1];
+  const specMult = diff.sponsorMultiplier;
+  const round = state.completedRounds + 1;
+  const weekend = state.lastWeekend;
+  if (!weekend) return;
+
+  const scored = (round as number) >= 0 && weekend.playerEntries.some((e) => e.points > 0);
+  const top10 = weekend.playerEntries.some((e) => !e.dnf && e.position <= 10);
+  const podium = weekend.playerEntries.some((e) => e.position !== null && e.position <= 3);
+  const isRuthless = state.difficulty === "ruthless";
+  void isRuthless;
+
+  for (const s of t.sponsors) {
+    if (!s.active || s.deadlineRound <= 0) continue;
+    const spec = sponsorById(s.sponsorId);
+    if (!spec) continue;
+
+    switch (spec.objective) {
+      case "pointsNextRaces":
+        if (scored) s.progress++;
+        break;
+      case "top10NextRaces":
+        if (top10) s.progress++;
+        break;
+      case "podiumByRound":
+        if (podium) s.progress++;
+        break;
+      case "pointsConsecutive":
+        if (scored) s.progress++;
+        else s.progress = 0;
+        break;
+      case "wccPosition":
+      case "beatRival":
+        s.progress++; // evaluated at deadline instead
+        break;
+    }
+
+    if (round >= s.deadlineRound) {
+      const targetRival = state.standingsConstructors.find((c) => c.teamId !== t.constructorId);
+      let met = s.progress >= s.required;
+      if (spec.objective === "wccPosition") {
+        const pos = state.standingsConstructors.findIndex((c) => c.teamId === t.constructorId) + 1;
+        met = pos <= s.required;
+      } else if (spec.objective === "beatRival") {
+        const my = t.points;
+        const rival = targetRival ? targetRival.points : 0;
+        met = my >= rival;
+      }
+
+      if (met) {
+        s.patience = clamp(spec.patience + 1, 1, 6);
+        t.cash = Math.round((t.cash + spec.bonus) * 100) / 100;
+        t.reputation = clamp(t.reputation + Math.round(2 * specMult), 0, 100);
+        t.history.push({ round, label: `${spec.name} bonus`, amount: spec.bonus, category: "sponsor" });
+        state.news.unshift({
+          id: `bonus-${round}-${s.sponsorId}`,
+          round,
+          tag: "sponsor",
+          title: `${spec.name} pays the bonus`,
+          body: `Objective met. +$${spec.bonus}M, reputation +${Math.round(2 * specMult)}. New objective coming.`,
+          bodyEnjoyer: `${spec.name} is thrilled and paid out. A new target appears on the contract.`,
+        });
+        s.progress = 0;
+        s.deadlineRound = round + (spec.objective === "pointsNextRaces" || spec.objective === "top10NextRaces" ? 5 : 8);
+        s.required = Math.max(1, Math.round(s.required * 0.9 * specMult));
+      } else {
+        s.patience--;
+        if (s.patience <= 0) {
+          s.active = false;
+          t.reputation = Math.max(0, t.reputation - Math.round(6 * specMult));
+          state.news.unshift({
+            id: `exit-${round}-${s.sponsorId}`,
+            round,
+            tag: "sponsor",
+            title: `${spec.name} pulls out`,
+            body: `Contract terminated. Reputation -${Math.round(6 * specMult)}.`,
+            bodyEnjoyer: `${spec.name} walked. Your reputation took a hit.`,
+          });
+        } else {
+          state.news.unshift({
+            id: `warn-${round}-${s.sponsorId}`,
+            round,
+            tag: "sponsor",
+            title: `${spec.name} is unimpressed`,
+            body: `Objective missed (${s.progress}/${s.required}). Patience ${s.patience}.`,
+            bodyEnjoyer: `They wanted ${spec.objectiveTextEnjoyer}. Patience left: ${s.patience}.`,
+          });
+        }
+        s.progress = 0;
+        s.deadlineRound = 0;
+      }
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Development (spec §43-44)
+
+export interface DevOption {
+  id: string;
+  name: string;
+  cost: number;
+  duration: number;
+  effect: number;
+  target: "aero" | "chassis" | "reliability" | "gearbox" | "pitCrew" | "driverTraining";
+  risk: number;
+  description: string;
+  driverId?: string;
+}
+
+export function generateDevOptions(state: SimulationState): DevOption[] {
+  const t = state.team;
+  if (!t) return [];
+  const season = state.season;
+  const engSpeed =
+    t.engineerIds.reduce((a, id) => a + (engineerById(id)?.developmentSpeed ?? 60), 0) /
+    Math.max(1, t.engineerIds.length);
+  const engInnov =
+    t.engineerIds.reduce((a, id) => a + (engineerById(id)?.innovation ?? 50), 0) /
+    Math.max(1, t.engineerIds.length);
+  const dur = (base: number) => Math.max(2, Math.round(base * (1.25 - engSpeed / 400)));
+  const risk = Math.max(0.03, 0.16 - engInnov / 900);
+  const k = season === 2013 ? 1 : 1.1;
+
+  const opts: DevOption[] = [];
+  if (t.car.aero < 97)
+    opts.push({ id: "dev-aero", name: "Aero Upgrade", cost: Math.round(6 * k), duration: dur(6), effect: 3, target: "aero", risk: risk * 1.1, description: "New front wing + floor. More downforce, still legal." });
+  if (t.car.chassis < 95)
+    opts.push({ id: "dev-chassis", name: "Chassis Upgrade", cost: Math.round(7 * k), duration: dur(7), effect: 3, target: "chassis", risk: risk * 1.2, description: "Revised suspension. Mechanical grip gains." });
+  if (t.car.reliability < 97)
+    opts.push({ id: "dev-rel", name: "Reliability Upgrade", cost: Math.round(4.5 * k), duration: dur(4), effect: 6, target: "reliability", risk: risk * 0.8, description: "Stronger seals and cooling. Fewer breakdowns." });
+  if (t.car.gearboxPerf < 92)
+    opts.push({ id: "dev-gb", name: "Gearbox Upgrade", cost: Math.round(5 * k), duration: dur(5), effect: 3, target: "gearbox", risk, description: "Lower internal drag. Better ratios." });
+  opts.push({ id: "dev-pit", name: "Pit Crew Training", cost: Math.round(2.2 * k), duration: dur(2), effect: 3, target: "pitCrew", risk: 0.04, description: "Pit lane practice. Faster, safer stops." });
+  for (const ds of t.drivers) {
+    const drv = driverById(ds.driverId);
+    if (drv && ds.form < 4)
+      opts.push({
+        id: `dev-train-${ds.driverId}`,
+        name: `${drv.shortName} Training`,
+        cost: Math.round(2 * k),
+        duration: dur(3),
+        effect: 2,
+        target: "driverTraining",
+        risk: 0.08,
+        description: "Simulator miles + coaching.",
+        driverId: ds.driverId,
+      });
+  }
+  return opts;
+}
+
+export function startProject(draft: SimulationState, option: DevOption): boolean {
+  const t = draft.team;
+  if (!t || t.cash < option.cost) return false;
+  t.cash = Math.round((t.cash - option.cost) * 100) / 100;
+  t.upgrades.push({
+    id: option.id,
+    name: option.name,
+    cost: option.cost,
+    remainingRaces: option.duration,
+    totalRaces: option.duration,
+    target: option.target,
+    effect: option.effect,
+    driverId: option.driverId,
+    risk: option.risk,
+  });
+  t.history.push({
+    round: draft.completedRounds + 1,
+    label: option.name,
+    amount: -option.cost,
+    category: "development",
+  });
+  return true;
+}
+
+export function advanceDevelopment(state: SimulationState) {
+  const t = state.team;
+  if (!t) return;
+  const round = state.completedRounds + 1;
+  for (const p of [...t.upgrades]) {
+    p.remainingRaces--;
+    if (p.remainingRaces > 0) continue;
+    const under = Math.random() < p.risk;
+    const gain = under ? Math.round(p.effect * 0.35) : p.effect;
+    switch (p.target) {
+      case "aero": t.car.aero = clamp(t.car.aero + gain, 30, 100); break;
+      case "chassis": t.car.chassis = clamp(t.car.chassis + gain, 30, 100); break;
+      case "reliability": t.car.reliability = clamp(t.car.reliability + gain, 30, 100); break;
+      case "gearbox": t.car.gearboxPerf = clamp(t.car.gearboxPerf + gain, 30, 100); break;
+      case "pitCrew": t.pitCrew = clamp(t.pitCrew + Math.round(gain * 2.5), 0, 100); break;
+      case "driverTraining": {
+        const ds = t.drivers.find((x) => x.driverId === p.driverId);
+        if (ds) ds.form = clamp(ds.form + gain, -10, 10);
+        break;
+      }
+    }
+    state.news.unshift({
+      id: `dev-${round}-${p.id}`,
+      round,
+      tag: "info",
+      title: `${p.name} complete${under ? " — underperformed" : ""}`,
+      body: under
+        ? `Poor correlation: only about +${gain} delivered.`
+        : `On the car and working: +${gain}.`,
+      bodyEnjoyer: under
+        ? `The upgrade arrived but it's not quite right. Partial gains only.`
+        : `The upgrade is on the car and it's real.`,
+    });
+    t.upgrades = t.upgrades.filter((u) => u.id !== p.id);
+  }
+}
+
+/** Every N races opens a development window (spec §43). */
+export function isDevWindow(state: SimulationState): boolean {
+  const interval = Math.max(3, Math.round(state.calendar.length / 4));
+  return state.completedRounds > 0 && state.completedRounds % interval === 0;
+}
+
+// ---------------------------------------------------------------------------
+// Paddock news (spec §45)
+
+export function generatePaddockNews(state: SimulationState, rng: Rng) {
+  const t = state.team;
+  if (!t) return;
+  const round = state.completedRounds + 1;
+  const roll = rng();
+  if (roll < 0.3) {
+    const cost = state.season === 2013 ? 4.5 : 6.5;
+    state.news.unshift({
+      id: `supplier-${round}`,
+      round,
+      tag: "supplier",
+      title: "Engine supplier offers an upgrade",
+      body: `Energy recovery upgrade available for $${cost}M: +3 power, +2 reliability.`,
+      bodyEnjoyer: `Your engine maker has a faster, sturdier spec ready — $${cost}M.`,
+      options: [
+        { label: "Purchase", action: "engineUpgrade" },
+        { label: "Decline", action: "dismiss" },
+      ],
+    });
+  } else if (roll < 0.48) {
+    state.news.unshift({
+      id: `rival-${round}`,
+      round,
+      tag: "rival",
+      title: "Rival development warning",
+      body: "Several midfield teams are filing new floor revisions this week.",
+      bodyEnjoyer: "Everyone in the midfield is working on a big upgrade.",
+    });
+  } else if (roll < 0.62) {
+    const other = [
+      "Your reliability engineer was approached by a rival team.",
+      "A sponsor manager is fielding calls about your contract terms.",
+      "Driver market rumors: several contracts expire this season.",
+    ][Math.floor(rng() * 3)];
+    state.news.unshift({
+      id: `paddock-${round}`,
+      round,
+      tag: "staff",
+      title: "Paddock whisper",
+      body: other,
+      bodyEnjoyer: "The paddock is gossiping. Nothing official yet.",
+    });
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Bankruptcy (spec §50)
+
+export function bankruptcyCheck(state: SimulationState): SimulationState {
+  const t = state.team;
+  if (!t) return state;
+  if (t.cash >= -8) return state;
+  const diff = DIFFICULTIES.find((d) => d.id === state.difficulty) ?? DIFFICULTIES[1];
+  const round = state.completedRounds + 1;
+
+  if (diff.bankruptcyGrace && !state.bankrupt) {
+    state.bankrupt = true;
+    t.cash = Math.round((t.cash + 25) * 100) / 100;
+    t.reputation = Math.max(0, t.reputation - 20);
+    t.history.push({ round, label: "Emergency bank guarantee", amount: 25, category: "other" });
+    state.news.unshift({
+      id: `grace-${round}`,
+      round,
+      tag: "breaking",
+      title: "BANK GUARANTEE ACTIVATED",
+      body: "The bank stepped in once: +$25M, reputation -20. There will be no second rescue.",
+      bodyEnjoyer: "Your bankers bailed you out with $25M. They won't do it again.",
+    });
+  } else {
+    state.phase = "bankrupt";
+    state.news.unshift({
+      id: `collapse-${round}`,
+      round,
+      tag: "breaking",
+      title: "TEAM COLLAPSE",
+      body: "You could no longer finance the operation. Season terminated.",
+      bodyEnjoyer: "The money ran out. The season is over.",
+    });
+  }
+  return state;
+}
