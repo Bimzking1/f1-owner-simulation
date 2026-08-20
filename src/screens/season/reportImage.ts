@@ -159,7 +159,7 @@ function drawReport(
     highlight: s.teamId === t.constructorId,
   }));
   const wdcRows: StandRow[] = state.standingsDrivers.map((s) => ({
-    name: driverById(s.driverId)?.name ?? s.driverId,
+    name: driverById(s.driverId, state.season)?.name ?? s.driverId,
     pts: s.points,
     highlight: s.driverId === t.driver1Id || s.driverId === t.driver2Id,
   }));
@@ -258,7 +258,7 @@ function drawPortrait(
   const driverTop = wdcTop + 40 + 10 * 42 + 34;
   fillText(ctx, "YOUR DRIVERS", pad, driverTop, 24, C.muted, { weight: 700 });
   myStandings.forEach(({ s, i }, idx) => {
-    const d = driverById(s.driverId);
+    const d = driverById(s.driverId, state.season);
     const dx = pad + idx * ((W - pad * 2 - 16) / 2 + 8);
     const dw = (W - pad * 2 - 16) / 2;
     roundRect(ctx, dx, driverTop + 40, dw, 78, 10);

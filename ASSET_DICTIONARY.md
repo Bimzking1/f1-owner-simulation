@@ -95,6 +95,7 @@ Real art already dropped in for: `dummy021.png`, `dummy022.png`, `dummy023.png`,
 | `dummy130.png` | drivers | Lewis Hamilton photo (2025) | 2025 | hamilton |
 | `dummy131.png` | drivers | Fernando Alonso photo (2025) | 2025 | alonso |
 | `dummy132.png` | drivers | Nico Hulkenberg photo (2025) | 2025 | hulkenberg |
+| `dummy133.png` | drivers | Franco Colapinto photo (Alpine reserve) | 2025 | colapinto |
 | `dummy166.png` | engines | Renault RS27 V8 (2013) | 2013 | renault13 |
 | `dummy167.png` | engines | Ferrari 056 V8 (2013) | 2013 | ferrari13 |
 | `dummy168.png` | engines | Mercedes FO108F V8 (2013) | 2013 | mercedes13 |

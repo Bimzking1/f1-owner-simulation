@@ -15,6 +15,7 @@ import type {
 } from "./types";
 import { computeCarStats, carRating, driverAbility, trackWeights } from "./perf";
 import { simulateRaceWeekend, type Competitor, type RaceInput } from "./race";
+import { buildGridLineups } from "./grid";
 import {
   advanceDevelopment,
   advanceWear,
@@ -30,7 +31,6 @@ import { createRng, rand, type Rng } from "./rng";
 import {
   constructorById,
   driverById,
-  driversByTeam,
   engineerById,
   engineById,
   enginesForSeason,
@@ -98,23 +98,27 @@ export function createSeason(draft: SimulationState, seed: string): SimulationSt
   t.pitCrew = Math.round(mechanicsPitSkill(t) * 100);
   scheduleSponsorObjectives(draft, rng0);
 
-  // championship scaffolding (spec §53)
-  const seasonDrivers = driversByTeam(season);
-  const driverList = Object.values(seasonDrivers)
-    .flat()
-    .map(driverById)
-    .filter(Boolean) as Driver[];
-  draft.standingsDrivers = driverList.map((d) => ({
+  // championship scaffolding (spec §53): the grid is a solved line-up where
+  // only the player's two seats are customized — displaced drivers were
+  // re-seated randomly into the vacancies their signings created.
+  const gridRng = createRng(seed + ":grid");
+  const grid = buildGridLineups(season, t.constructorId, [t.driver1Id, t.driver2Id], gridRng);
+  draft.lineups = grid.lineups;
+  draft.unattachedDrivers = grid.unattached;
+  const driverList = Object.entries(grid.lineups)
+    .flatMap(([teamId, ids]) => ids.map((id) => ({ id, teamId })))
+    .map(({ id, teamId }) => ({ d: driverById(id, season), teamId }))
+    .filter((x): x is { d: Driver; teamId: string } => !!x.d);
+  draft.standingsDrivers = driverList.map(({ d, teamId }) => ({
     driverId: d.id,
-    teamId: d.teamId,
+    teamId,
     points: 0,
     wins: 0,
     podiums: 0,
     dnfs: 0,
     best: 0,
   }));
-  const teamIds = new Set(driverList.map((d) => d.teamId));
-  draft.standingsConstructors = [...teamIds].map((teamId) => ({
+  draft.standingsConstructors = Object.keys(grid.lineups).map((teamId) => ({
     teamId,
     points: 0,
     wins: 0,
@@ -208,7 +212,6 @@ function buildCompetitors(state: SimulationState, rng: Rng): Competitor[] {
   const t = state.team!;
   const season = state.season;
   const factor = teamStrengthFactor(state.difficulty);
-  const byTeam = driversByTeam(season);
   const list: Competitor[] = [];
 
   // player cars
@@ -226,7 +229,7 @@ function buildCompetitors(state: SimulationState, rng: Rng): Competitor[] {
     : 70;
 
   for (const did of [t.driver1Id, t.driver2Id]) {
-    const driver = driverById(did);
+    const driver = driverById(did, season);
     if (!driver) continue;
     list.push({
       driverId: did,
@@ -253,7 +256,7 @@ function buildCompetitors(state: SimulationState, rng: Rng): Competitor[] {
   const techPkg = techs[1] ?? techs[0];
   if (!engine || !gearbox || !techPkg) return list;
 
-  for (const teamId of Object.keys(byTeam)) {
+  for (const teamId of Object.keys(state.lineups ?? {})) {
     if (teamId === t.constructorId) continue;
     const ctor = constructorById(teamId, season);
     if (!ctor || ctor.season !== season) continue;
@@ -274,7 +277,7 @@ function buildCompetitors(state: SimulationState, rng: Rng): Competitor[] {
       power: scale(scalable.power),
       gearboxPerf: scale(scalable.gearboxPerf),
     };
-    const drivers = (byTeam[teamId] ?? []).map(driverById).filter(Boolean) as Driver[];
+    const drivers = (state.lineups?.[teamId] ?? []).map(driverById).filter(Boolean) as Driver[];
     for (const d of drivers) {
       const stable = (d.id.charCodeAt(0) * 31 + d.id.charCodeAt(1) * 7) % 10;
       list.push({
@@ -395,7 +398,7 @@ export function traceHelpers(state: SimulationState) {
   if (!track) return null;
   const w = trackWeights(track);
   const rated = t.drivers.map((ds) => {
-    const d = driverById(ds.driverId);
+    const d = driverById(ds.driverId, state.season);
     return { driverId: ds.driverId, rating: d ? Math.round(driverAbility(d, ds, w)) : 0 };
   });
   return { carRating: carRating(t.car, w), rated };

@@ -80,7 +80,7 @@ export function MarketTab({ state, act }: Props) {
           <div className="grid gap-3 sm:grid-cols-2">
             {([1, 2] as const).map((slot) => {
               const id = slot === 1 ? t.driver1Id : t.driver2Id;
-              const cur = driverById(id);
+              const cur = driverById(id, state.season);
               return (
                 <div key={slot} className="rounded-md border border-hairline p-3">
                   <div className="mb-2 flex items-center gap-2">
@@ -264,7 +264,7 @@ function SwapConfirm({
   const t = state.team!;
   const quote = swapQuote(state, slot, driverId);
   if (!quote) return null;
-  const cur = driverById(quote.currentId);
+  const cur = driverById(quote.currentId, state.season);
   const otherId = slot === 1 ? t.driver2Id : t.driver1Id;
   const onTeam = driverId === otherId;
 

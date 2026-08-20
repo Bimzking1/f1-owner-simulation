@@ -121,6 +121,7 @@ export const assetManifest: AssetEntry[] = [
   { filename: "dummy130.png", category: "drivers", description: "Lewis Hamilton photo (2025)", seasons: "2025", usedBy: ["hamilton"] },
   { filename: "dummy131.png", category: "drivers", description: "Fernando Alonso photo (2025)", seasons: "2025", usedBy: ["alonso"] },
   { filename: "dummy132.png", category: "drivers", description: "Nico Hulkenberg photo (2025)", seasons: "2025", usedBy: ["hulkenberg"] },
+  { filename: "dummy133.png", category: "drivers", description: "Franco Colapinto photo (Alpine reserve)", seasons: "2025", usedBy: ["colapinto"] },
 
   // 141–165 Car images
   { filename: "dummy141.png", category: "cars", description: "Ferrari car image", seasons: "2025", usedBy: ["ferrari"] },
@@ -260,6 +261,7 @@ export const assetPaths = {
     hamilton2025: A("drivers", "dummy130.png"),
     alonso2025: A("drivers", "dummy131.png"),
     hulkenberg2025: A("drivers", "dummy132.png"),
+    colapinto: A("drivers", "dummy133.png"),
   },
   tracks: {
     melbourne: A("tracks", "dummy051.png"),

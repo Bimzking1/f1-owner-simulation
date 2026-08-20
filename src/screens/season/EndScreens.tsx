@@ -81,7 +81,7 @@ export function EndScreens({ state, onReset }: Props) {
           <Card title="Drivers">
             <div className="space-y-1 text-sm">
               {myDrivers.map(({ s, i }) => {
-                const d = driverById(s.driverId);
+                const d = driverById(s.driverId, state.season);
                 if (!d) return null;
                 return (
                   <div key={s.driverId} className="flex items-center justify-between">
@@ -95,7 +95,7 @@ export function EndScreens({ state, onReset }: Props) {
               })}
               <div className="mt-2 space-y-1 border-t border-hairline pt-2">
                 {t.drivers.map((ds) => {
-                  const d = driverById(ds.driverId);
+                  const d = driverById(ds.driverId, state.season);
                   if (!d) return null;
                   return (
                     <div key={ds.driverId} className="flex justify-between text-xs text-ink-soft">
@@ -125,7 +125,7 @@ export function EndScreens({ state, onReset }: Props) {
                 {state.standingsDrivers.slice(0, 10).map((s, i) => (
                   <div key={s.driverId} className={`flex items-center gap-2 py-1 text-sm ${s.driverId === t.driver1Id || s.driverId === t.driver2Id ? "font-semibold text-ink" : "text-ink-soft"}`}>
                     <span className="w-5 tabular text-ink-faint">{i + 1}</span>
-                    <span className="min-w-0 flex-1 truncate">{driverById(s.driverId)?.shortName ?? s.driverId}</span>
+                    <span className="min-w-0 flex-1 truncate">{driverById(s.driverId, state.season)?.shortName ?? s.driverId}</span>
                     <span className="tabular">{s.points}</span>
                   </div>
                 ))}

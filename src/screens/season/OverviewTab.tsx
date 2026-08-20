@@ -55,7 +55,7 @@ export function OverviewTab({ state, onNewsAction, onRunRound }: Props) {
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             {t.drivers.map((ds) => {
-              const d = driverById(ds.driverId);
+              const d = driverById(ds.driverId, state.season);
               if (!d) return null;
               return (
                 <div key={ds.driverId} className="flex items-center gap-3 rounded-md border border-hairline bg-raised/50 p-2">

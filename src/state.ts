@@ -10,7 +10,7 @@ import type {
   TeamState,
 } from "@/simulation/types";
 import { DIFFICULTIES } from "@/data/config";
-import { constructorById, engineById, gearboxById, techPackageById } from "@/data";
+import { constructorById, driverById, driversByTeam, engineById, gearboxById, techPackageById } from "@/data";
 import { createSeason } from "@/simulation/sim";
 
 export interface DraftConfig {
@@ -45,6 +45,8 @@ export function buildSimulation(spec: DraftSpec, seed: string): SimulationState 
     round: 0,
     standingsDrivers: [],
     standingsConstructors: [],
+    lineups: {},
+    unattachedDrivers: [],
     lastWeekend: null,
     news: [],
     testing: [],
@@ -86,6 +88,7 @@ export function loadState(): SimulationState | null {
     const s = JSON.parse(raw) as SimulationState;
     if (!s || s.version !== 1 || !s.team) return null;
     sanitizeRoster(s);
+    backfillLineups(s);
     return s;
   } catch {
     return null;
@@ -109,6 +112,25 @@ function sanitizeRoster(s: SimulationState): void {
     kept.push({ driverId: id, confidence: 50, morale: 55, frustration: 25, form: 0, dnfs: 0, points: 0 });
   }
   t.drivers = kept;
+}
+
+/** Old saves predate grid solving: rebuild a legal every-team-2-cars line-up. */
+function backfillLineups(s: SimulationState): void {
+  const t = s.team;
+  if (!t) return;
+  if (s.lineups && Object.keys(s.lineups).length >= 2) {
+    s.unattachedDrivers ??= [];
+    return;
+  }
+  const byTeam = driversByTeam(s.season);
+  const lineups: Record<string, string[]> = {};
+  lineups[t.constructorId] = [t.driver1Id, t.driver2Id].filter((id) => !!driverById(id, s.season));
+  for (const [teamId, ids] of Object.entries(byTeam)) {
+    if (teamId === t.constructorId) continue;
+    lineups[teamId] = ids.slice(0, 2);
+  }
+  s.lineups = lineups;
+  s.unattachedDrivers = [];
 }
 
 // ---------------------------------------------------------------------------

@@ -61,7 +61,7 @@ export function StandingsCard({ state, rows = 10 }: { state: SimulationState; ro
           {state.standingsDrivers.slice(0, rows).map((s, i) => (
             <div key={s.driverId} className="flex items-center gap-2 py-1 text-sm text-ink-soft">
               <span className="w-5 tabular text-ink-faint">{i + 1}</span>
-              <span className="min-w-0 flex-1 truncate">{driverById(s.driverId)?.shortName ?? s.driverId}</span>
+              <span className="min-w-0 flex-1 truncate">{driverById(s.driverId, state.season)?.shortName ?? s.driverId}</span>
               <span className="tabular">{s.points}</span>
             </div>
           ))}
@@ -76,7 +76,7 @@ export function TrackName({ id }: { id: string }) {
 }
 
 export function DriverChip({ driverId, size = 24, season }: { driverId: string; size?: number; season?: number }) {
-  const d = driverById(driverId);
+  const d = driverById(driverId, season);
   if (!d) return null;
   return (
     <span className="inline-flex items-center gap-2">

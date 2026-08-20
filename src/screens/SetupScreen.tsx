@@ -75,10 +75,24 @@ export default function SetupScreen({ cfg, onStart, onBack }: Props) {
     mechanicIds.reduce((a, id) => a + costOf(mechanicById(id)?.cost ?? 0), 0);
   const remaining = Math.round((startCash - equipmentCost - sponsorCost - staffCost) * 100) / 100;
 
-  const d1 = driverById(driver1Id);
-  const d2 = driverById(driver2Id);
+  const d1 = driverById(driver1Id, cfg.season);
+  const d2 = driverById(driver2Id, cfg.season);
   const engineerPool = ENGINEER_IDS[cfg.season].map(engineerById).filter((e) => !!e).map((e) => e!);
   const mechanicPool = MECHANIC_IDS[cfg.season].map(mechanicById).filter((m) => !!m).map((m) => m!);
+
+  const assignDriver = (slot: 1 | 2, id: string) => {
+    const other = slot === 1 ? driver2Id : driver1Id;
+    if (id === other) return; // can't drive twice
+    if (slot === 1) setDriver1Id(id); else setDriver2Id(id);
+  };
+  const removeDriver = (slot: 1 | 2) => {
+    if (slot === 1) setDriver1Id(""); else setDriver2Id("");
+  };
+  const swapSeats = () => {
+    const a = driver1Id;
+    setDriver1Id(driver2Id);
+    setDriver2Id(a);
+  };
 
   const stepIndex = STEPS.indexOf(step);
   const overBudget = remaining < 0;
@@ -211,64 +225,80 @@ export default function SetupScreen({ cfg, onStart, onBack }: Props) {
 
       {/* DRIVERS */}
       {step === "Drivers" && (
-        <div className="grid gap-4 lg:grid-cols-2">
-          {([1, 2] as const).map((slot) => (
-            <Card key={slot} title={`Seat ${slot}`}>
-              <div className="grid gap-2">
-                {!ctor && <div className="text-xs text-ink-faint">Pick a constructor first.</div>}
-                {(drivers[ctor?.id ?? ""] ?? []).map((id) => {
-                  const d = driverById(id);
-                  if (!d) return null;
-                  const sel = slot === 1 ? driver1Id : driver2Id;
-                  const other = slot === 1 ? driver2Id : driver1Id;
-                  const taken = other === d.id;
-                  return (
-                    <button
-                      key={d.id}
-                      type="button"
-                      disabled={taken}
-                      onClick={() => (slot === 1 ? setDriver1Id(d.id) : setDriver2Id(d.id))}
-                      className={`flex items-center gap-3 rounded-md border p-2 text-left transition ${
-                        sel === d.id
-                          ? "border-signal bg-signal/10"
-                          : taken
-                            ? "cursor-not-allowed border-hairline opacity-40"
-                            : "border-hairline bg-surface hover:border-ink-faint"
-                      }`}
-                    >
-                      <Img
-                        src={driverImage(d.id, cfg.season)}
-                        alt={d.shortName}
-                        className="h-20 w-20 shrink-0 rounded-sm object-cover md:h-24 md:w-24"
-                      />
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                          <span className="font-display font-bold">{d.name}</span>
-                          <Tag tone={d.rookie ? "positive" : "ink"}>{d.rookie ? "Rookie" : d.personality}</Tag>
-                        </div>
-                        <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-ink-faint">
-                          <span>#{d.number}</span>
-                          <span>OVR {d.overall}</span>
-                          <span>${d.salary}M/yr</span>
-                          <span>{d.attributes.pressure} pressure</span>
-                        </div>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            </Card>
-          ))}
-          <div className="lg:col-span-2">
-            <Card title="Line-up">
-              <div className="flex flex-wrap items-center gap-4 text-sm">
-                <div className="font-display text-lg font-bold">{d1 ? `${d1.name} (P1)` : "—"}</div>
-                <span className="text-ink-faint">+</span>
-                <div className="font-display text-lg font-bold">{d2 ? `${d2.name} (P2)` : "—"}</div>
-                {d1 && d2 && <Tag tone="telemetry">Salary {d1.salary + d2.salary}M/yr</Tag>}
-              </div>
-            </Card>
-          </div>
+        <div className="grid gap-4">
+          <Card title="Your line-up" right={d1 && d2 ? <Tag tone="telemetry">Salaries {d1.salary + d2.salary}M/yr</Tag> : undefined}>
+            <div className="flex flex-wrap items-center gap-3">
+              <SeatChip label="Seat 1" d={d1} season={cfg.season} onClear={driver1Id ? () => removeDriver(1) : undefined} />
+              <button
+                type="button"
+                onClick={swapSeats}
+                disabled={!d1 || !d2}
+                className="rounded-sm border border-hairline px-2 py-1 text-xs font-semibold uppercase tracking-wider text-ink-soft hover:border-signal hover:text-signal disabled:opacity-40"
+              >
+                ⇄ Swap
+              </button>
+              <SeatChip label="Seat 2" d={d2} season={cfg.season} onClear={driver2Id ? () => removeDriver(2) : undefined} />
+            </div>
+            <p className="mt-3 text-xs leading-relaxed text-ink-faint">
+              Sign any driver from any team for either seat — drivers leaving another team open a vacancy there.
+              The rest of the grid rebalances automatically: displaced drivers are re-seated at random, and reserve
+              drivers left without a seat (like Alpine's Colapinto) sit out as the factory's third. Wages are paid
+              across the season from race earnings.
+            </p>
+          </Card>
+
+          <Card title="Available drivers">
+            <div className="grid gap-3 lg:grid-cols-2">
+              {teams.map((team) => {
+                const ids = [...(drivers[team.id] ?? [])].sort((a, b) => (driverById(b, cfg.season)?.overall ?? 0) - (driverById(a, cfg.season)?.overall ?? 0));
+                if (!ids.length) return null;
+                const signed = ids.filter((id) => id === driver1Id || id === driver2Id).length;
+                return (
+                  <div key={team.id} className="rounded-md border border-hairline">
+                    <div className="flex items-center gap-2 border-b border-hairline/60 px-2 py-1.5">
+                      <Img src={team.image} alt={team.name} className="h-6 w-6 shrink-0 rounded-sm object-cover" />
+                      <span className="font-display text-sm font-bold">{team.name}</span>
+                      <span className="ml-auto text-[11px] text-ink-faint">{signed}/2 signed</span>
+                    </div>
+                    <div className="space-y-1 p-2">
+                      {ids.map((id) => {
+                        const d = driverById(id, cfg.season);
+                        if (!d) return null;
+                        const in1 = id === driver1Id;
+                        const in2 = id === driver2Id;
+                        const taken = in1 || in2;
+                        return (
+                          <div key={id} className={`flex items-center gap-3 rounded-md border p-2 ${taken ? "border-signal/40 bg-signal/5" : "border-hairline bg-surface"}`}>
+                            <Img
+                              src={driverImage(d.id, cfg.season)}
+                              alt={d.shortName}
+                              className="h-14 w-14 shrink-0 rounded-sm object-cover md:h-16 md:w-16"
+                            />
+                            <div className="min-w-0 flex-1">
+                              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                                <span className="font-display text-sm font-bold">{d.name}</span>
+                                {d.reserve && <Tag tone="ink">Reserve</Tag>}
+                                {d.rookie && <Tag tone="positive">Rookie</Tag>}
+                              </div>
+                              <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-ink-faint">
+                                <span>OVR {d.overall}</span>
+                                <span>${d.salary}M/yr</span>
+                                <span>#{d.number}</span>
+                              </div>
+                            </div>
+                            <div className="flex shrink-0 gap-1.5">
+                              <SeatButton active={in1} disabled={in2} label="S1" onClick={() => (in1 ? removeDriver(1) : assignDriver(1, d.id))} />
+                              <SeatButton active={in2} disabled={in1} label="S2" onClick={() => (in2 ? removeDriver(2) : assignDriver(2, d.id))} />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </Card>
         </div>
       )}
 
@@ -482,7 +512,9 @@ export default function SetupScreen({ cfg, onStart, onBack }: Props) {
             )}
             <div className="space-y-1 text-sm">
               <Row k="Constructor" v={ctor?.name ?? "—"} />
-              <Row k="Drivers" v={`${d1?.name ?? "—"} / ${d2?.name ?? "—"}`} />
+              <Row k="Seat 1" v={d1 ? `${d1.name} (${d1.teamId === constructorId ? "your team" : "from " + d1.teamId}, $${d1.salary}M/yr)` : "—"} />
+              <Row k="Seat 2" v={d2 ? `${d2.name} (${d2.teamId === constructorId ? "your team" : "from " + d2.teamId}, $${d2.salary}M/yr)` : "—"} />
+              <Row k="Driver wages" v={d1 && d2 ? `$${d1.salary + d2.salary}M/yr` : "—"} />
               <Row k="Engine" v={eng?.name ?? "—"} />
               <Row k="Gearbox" v={gb?.name ?? "—"} />
               <Row k="Package" v={tech?.name ?? "—"} />
@@ -491,6 +523,10 @@ export default function SetupScreen({ cfg, onStart, onBack }: Props) {
               <Row k="Staff" v={`${engineerIds.length} engineers, ${mechanicIds.length} mechanics`} />
               <Row k="Sponsors" v={sponsorIds.map((id) => sponsorById(id)?.name).join(", ") || "none"} />
             </div>
+            <p className="mt-3 text-[11px] leading-relaxed text-ink-faint">
+              The grid rebalances at season start: vacancies created by cross-team signings are filled at random by the
+              displaced drivers; unseated reserves (e.g. Alpine's Colapinto) sit out the season.
+            </p>
           </Card>
           <Card title="Budget">
             <div className="space-y-2 text-sm">
@@ -578,4 +614,41 @@ function Row({ k, v, bold, inline }: { k: string; v: string; bold?: boolean; inl
 
 function money(v: number): string {
   return `$${Math.round(v * 100) / 100}M`;
+}
+
+function SeatChip({ label, d, season, onClear }: { label: string; d?: ReturnType<typeof driverById>; season: number; onClear?: () => void }) {
+  return (
+    <div className="flex min-w-0 flex-1 items-center gap-3 rounded-md border border-hairline bg-raised/40 p-2 sm:flex-none">
+      <Img src={d ? driverImage(d.id, season) : ""} alt={d?.shortName ?? ""} className="h-12 w-12 shrink-0 rounded-sm object-cover" />
+      <div className="min-w-0">
+        <div className="text-[10px] font-semibold uppercase tracking-widest text-ink-faint">{label}</div>
+        {d ? (
+          <div className="truncate font-display text-sm font-bold">{d.name}</div>
+        ) : (
+          <div className="text-sm text-ink-faint">Empty</div>
+        )}
+        {d && <div className="text-[11px] text-ink-faint">OVR {d.overall} · ${d.salary}M/yr</div>}
+      </div>
+      {d && onClear && (
+        <button type="button" onClick={onClear} className="ml-auto shrink-0 rounded-sm border border-hairline px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-ink-faint hover:text-signal">
+          Clear
+        </button>
+      )}
+    </div>
+  );
+}
+
+function SeatButton({ active, disabled, label, onClick }: { active: boolean; disabled: boolean; label: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      disabled={disabled || active}
+      onClick={onClick}
+      className={`rounded-sm border px-2 py-1 text-[11px] font-semibold uppercase tracking-wider ${
+        active ? "border-signal bg-signal/15 text-signal" : disabled ? "border-hairline text-ink-faint opacity-40" : "border-hairline text-ink-soft hover:border-signal hover:text-signal"
+      }`}
+    >
+      {label}
+    </button>
+  );
 }

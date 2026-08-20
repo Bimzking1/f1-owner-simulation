@@ -89,7 +89,7 @@ function ResultCard({ weekend, season }: { weekend: RaceWeekendResult; season: n
     >
       <div className="grid gap-2 text-sm sm:grid-cols-2">
         {weekend.playerEntries.map((p) => {
-          const d = driverById(p.driverId);
+          const d = driverById(p.driverId, season);
           return (
             <div key={p.driverId} className="flex items-center gap-2 rounded-md border border-hairline bg-raised/50 px-2 py-1.5">
               <Img src={d ? driverImage(d.id, season) : ""} alt={d?.shortName ?? p.driverId} className="h-6 w-6 rounded-sm object-cover" />
@@ -113,11 +113,11 @@ function ResultCard({ weekend, season }: { weekend: RaceWeekendResult; season: n
           Car {weekend.breakdown.car} · Driver {weekend.breakdown.driver} · Luck {weekend.breakdown.luck}
         </span>
       </div>
-      {open && <RaceResultReplay weekend={weekend} onClose={() => setOpen(false)} />}
+      {open && <RaceResultReplay weekend={weekend} season={season} onClose={() => setOpen(false)} />}
     </Card>
   );
 }
-function RaceResultReplay({ weekend, onClose }: { weekend: RaceWeekendResult; onClose: () => void }) {
+function RaceResultReplay({ weekend, season, onClose }: { weekend: RaceWeekendResult; season: number; onClose: () => void }) {
   const events = [...weekend.events].sort((a, b) => a.lap - b.lap);
   const [idx, setIdx] = useState(0);
   const [playing, setPlaying] = useState(false);
@@ -200,7 +200,7 @@ function RaceResultReplay({ weekend, onClose }: { weekend: RaceWeekendResult; on
           <Card title="Race classification" pad={false}>
             <div className="max-h-[26rem] divide-y divide-hairline/60 overflow-auto">
               {weekend.race.map((r) => {
-                const d = driverById(r.driverId);
+                const d = driverById(r.driverId, season);
                 return (
                   <div key={r.driverId} className="flex items-center gap-2 px-3 py-1.5 text-sm">
                     <span className="w-6 tabular text-ink-faint">{r.position ?? "DNF"}</span>
@@ -216,7 +216,7 @@ function RaceResultReplay({ weekend, onClose }: { weekend: RaceWeekendResult; on
             <Card title="Sprint" pad={false} className="mt-3">
               <div className="divide-y divide-hairline/60">
                 {weekend.sprint.slice(0, 8).map((r) => {
-                  const d = driverById(r.driverId);
+                  const d = driverById(r.driverId, season);
                   return (
                     <div key={r.driverId} className="flex items-center gap-2 px-3 py-1 text-sm">
                       <span className="w-6 tabular text-ink-faint">{r.position ?? "DNF"}</span>

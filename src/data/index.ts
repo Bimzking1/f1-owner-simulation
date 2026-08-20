@@ -22,7 +22,11 @@ export const ALL_MECHANICS = MECHANICS;
 export const ALL_SPONSORS = SPONSORS;
 export const ALL_TRACKS = [...TRACKS_2013, ...TRACKS_2025];
 
-export function driverById(id: string) {
+export function driverById(id: string, season?: number) {
+  if (season !== undefined) {
+    const hit = ALL_DRIVERS.find((d) => d.id === id && d.season === season);
+    if (hit) return hit;
+  }
   return ALL_DRIVERS.find((d) => d.id === id);
 }
 export function constructorById(id: string, season?: number) {

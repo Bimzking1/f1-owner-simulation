@@ -136,8 +136,8 @@ export function applyRaceFinance(state: SimulationState, weekend: RaceWeekendRes
   const promoterShare = Math.round(teamPoints * 0.45 * 100) / 100;
 
   const perRace = (seasonTotal: number) => Math.round((seasonTotal / totalRounds) * 100) / 100;
-  const d1 = driverById(t.driver1Id);
-  const d2 = driverById(t.driver2Id);
+  const d1 = driverById(t.driver1Id, state.season);
+  const d2 = driverById(t.driver2Id, state.season);
   const salaries = perRace((d1?.salary ?? 4) + (d2?.salary ?? 4));
   const operations = perRace(teamOperatingCost(t));
   const supplier = perRace(state.season === 2013 ? 9 : 12);
@@ -377,7 +377,7 @@ export function generateDevOptions(state: SimulationState): DevOption[] {
     opts.push({ id: "dev-gb", name: "Gearbox Upgrade", cost: Math.round(5 * k), duration: dur(5), effect: 3, target: "gearbox", risk, description: "Lower internal drag. Better ratios." });
   opts.push({ id: "dev-pit", name: "Pit Crew Training", cost: Math.round(2.2 * k), duration: dur(2), effect: 3, target: "pitCrew", risk: 0.04, description: "Pit lane practice. Faster, safer stops." });
   for (const ds of t.drivers) {
-    const drv = driverById(ds.driverId);
+    const drv = driverById(ds.driverId, state.season);
     if (drv && ds.form < 4)
       opts.push({
         id: `dev-train-${ds.driverId}`,

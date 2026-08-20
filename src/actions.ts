@@ -91,9 +91,9 @@ export interface SwapQuote {
 export function swapQuote(state: SimulationState, slot: 1 | 2, driverId: string): SwapQuote | null {
   const t = state.team!;
   const currentId = slot === 1 ? t.driver1Id : t.driver2Id;
-  const target = driverById(driverId);
+  const target = driverById(driverId, state.season);
   if (!target) return null;
-  const old = driverById(currentId);
+  const old = driverById(currentId, state.season);
   const roundsLeft = Math.max(1, state.calendar.length - state.round);
   const prorated = Math.max(0, ((target.salary - (old?.salary ?? 4)) / state.calendar.length) * roundsLeft);
   const fee = 2; // $M break fee
@@ -108,16 +108,17 @@ export function swapDriver(state: SimulationState, slot: 1 | 2, driverId: string
   const currentId = slot === 1 ? t.driver1Id : t.driver2Id;
   const otherId = slot === 1 ? t.driver2Id : t.driver1Id;
   if (currentId === driverId) return msg(result, false, "Already driving.");
-  if (driverId === otherId) return msg(result, false, `${driverById(driverId)?.shortName ?? driverId} already drives for the team.`);
-  const target = driverById(driverId);
+  if (driverId === otherId) return msg(result, false, `${driverById(driverId, state.season)?.shortName ?? driverId} already drives for the team.`);
+  const target = driverById(driverId, state.season);
   if (!target) return msg(result, false, "Unknown driver.");
-  const old = driverById(currentId);
+  const old = driverById(currentId, state.season);
   const quote = swapQuote(state, slot, driverId)!;
   const total = quote.total;
   if (t.cash < total) return msg(result, false, `Need $${total}M for the transfer.`);
   t.cash = Math.round((t.cash - total) * 100) / 100;
   const previousState = t.drivers.find((d) => d.driverId === currentId) ?? null;
   if (slot === 1) t.driver1Id = driverId; else t.driver2Id = driverId;
+  if (state.lineups) state.lineups[t.constructorId] = [t.driver1Id, t.driver2Id];
   t.drivers = t.drivers.filter((d) => d.driverId !== currentId);
   const newState: DriverState = {
     driverId,
@@ -163,8 +164,9 @@ export function undoDriverSwap(state: SimulationState): ActionResult {
   if (!log) return msg(result, false, "Nothing to undo.");
   const currentId = log.slot === 1 ? t.driver1Id : t.driver2Id;
   if (currentId !== log.newDriverId) return msg(result, false, "Line-up changed since the swap.");
-  const target = driverById(log.newDriverId);
+  const target = driverById(log.newDriverId, state.season);
   if (log.slot === 1) t.driver1Id = log.previousDriverId; else t.driver2Id = log.previousDriverId;
+  if (state.lineups) state.lineups[t.constructorId] = [t.driver1Id, t.driver2Id];
   const newsIdx = state.news.findIndex((n) => n.id.startsWith(`swap-${log.round}-`));
   if (newsIdx >= 0) state.news.splice(newsIdx, 1);
   const histIdx = [...t.history].reverse().findIndex((h) => (h.amount + log.fee) < 0.001 && h.label.includes("out, "));
@@ -269,7 +271,7 @@ function buildTestReport(state: SimulationState, type: TestType, rng: () => numb
   const t = state.team!;
   let value: number;
   if (type === "driver") {
-    const d = t.drivers[0] ? driverById(t.drivers[0].driverId) : undefined;
+    const d = t.drivers[0] ? driverById(t.drivers[0].driverId, state.season) : undefined;
     value = Math.round((d ? d.overall + t.drivers[0].form * 2 : 70) * (0.94 + rng() * 0.12));
   } else {
     const base = {

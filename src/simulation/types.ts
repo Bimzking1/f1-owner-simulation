@@ -72,6 +72,7 @@ export interface Driver {
   personality: PersonalityId;
   variance: number; // mood variance (gacha), spec §21
   rookie: boolean;
+  reserve: boolean; // third/reserve driver — not guaranteed a grid seat
   image: string;
 }
 
@@ -458,6 +459,8 @@ export interface SimulationState {
   round: number; // 0-based index of next round
   standingsDrivers: DriverStanding[];
   standingsConstructors: ConstructorStanding[];
+  lineups: Record<string, string[]>; // teamId → seated driver ids (all teams, incl. player)
+  unattachedDrivers: string[]; // contracted but not seated (e.g. reserved 3rd drivers)
   lastWeekend: RaceWeekendResult | null;
   news: NewsItem[];
   testing: TestReport[];

@@ -24,6 +24,7 @@ interface DrInput {
   personality: PersonalityId;
   variance: number;
   rookie: boolean;
+  reserve?: boolean;
   a: DriverAttributes;
 }
 
@@ -49,6 +50,7 @@ function dr(season: SeasonId, i: DrInput): Driver {
     personality: i.personality,
     variance: i.variance,
     rookie: i.rookie,
+    reserve: i.reserve ?? false,
     image: driverImage(i.id),
   };
 }
@@ -116,6 +118,7 @@ export const DRIVERS_2025: Driver[] = [
   // Alpine
   dr(2025, { id: "gasly", name: "Pierre Gasly", number: 10, nationality: "France", age: 29, teamId: "alpine", overall: 87, careerValue: 86, seasonForm: 2, potential: 88, experience: 86, reputation: 82, salary: 10, sponsorAppeal: 78, personality: "competitive", variance: 7, rookie: false, a: A(87, 86, 86, 86, 87, 86, 86, 87, 85, 87) }),
   dr(2025, { id: "doohan", name: "Jack Doohan", number: 7, nationality: "Australia", age: 22, teamId: "alpine", overall: 78, careerValue: 76, seasonForm: 1, potential: 88, experience: 58, reputation: 62, salary: 3, sponsorAppeal: 55, personality: "calm", variance: 14, rookie: true, a: A(79, 78, 76, 74, 76, 75, 80, 82, 74, 81) }),
+  dr(2025, { id: "colapinto", name: "Franco Colapinto", number: 43, nationality: "Argentina", age: 22, teamId: "alpine", overall: 80, careerValue: 79, seasonForm: 3, potential: 88, experience: 58, reputation: 62, salary: 2, sponsorAppeal: 70, personality: "riskTaker", variance: 13, rookie: true, reserve: true, a: A(81, 80, 79, 77, 77, 78, 81, 82, 76, 88) }),
   // Haas
   dr(2025, { id: "ocon", name: "Esteban Ocon", number: 31, nationality: "France", age: 29, teamId: "haas", overall: 85, careerValue: 84, seasonForm: 2, potential: 86, experience: 86, reputation: 79, salary: 9, sponsorAppeal: 74, personality: "calm", variance: 8, rookie: false, a: A(85, 84, 86, 84, 85, 87, 83, 86, 85, 85) }),
   dr(2025, { id: "bearman", name: "Oliver Bearman", number: 87, nationality: "United Kingdom", age: 20, teamId: "haas", overall: 82, careerValue: 80, seasonForm: 2, potential: 93, experience: 60, reputation: 72, salary: 5, sponsorAppeal: 72, personality: "riskTaker", variance: 13, rookie: true, a: A(83, 82, 81, 78, 80, 82, 84, 86, 80, 87) }),
