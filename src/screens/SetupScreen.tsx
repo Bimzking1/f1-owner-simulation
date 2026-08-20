@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import type {
   DifficultyId,
   GameLengthId,
@@ -230,17 +230,17 @@ export default function SetupScreen({ cfg, onStart, onBack }: Props) {
       {step === "Drivers" && (
         <div className="grid gap-4">
           <Card title="Your line-up" right={d1 && d2 ? <Tag tone="telemetry">Salaries {d1.salary + d2.salary}M/yr</Tag> : undefined}>
-            <div className="flex flex-wrap items-center gap-3">
-              <SeatChip label="Seat 1" d={d1} season={cfg.season} onClear={driver1Id ? () => removeDriver(1) : undefined} />
+            <div className="flex flex-col items-stretch gap-3 md:flex-row md:items-center">
+              <div className="order-1 md:order-1"><SeatChip label="Seat 1" d={d1} season={cfg.season} onClear={driver1Id ? () => removeDriver(1) : undefined} /></div>
+              <div className="order-3 md:order-2"><SeatChip label="Seat 2" d={d2} season={cfg.season} onClear={driver2Id ? () => removeDriver(2) : undefined} /></div>
               <button
                 type="button"
                 onClick={swapSeats}
                 disabled={!d1 || !d2}
-                className="rounded-sm border border-hairline px-2 py-1 text-xs font-semibold uppercase tracking-wider text-ink-soft hover:border-signal hover:text-signal disabled:opacity-40"
+                className="order-2 w-full rounded-sm border border-hairline px-2 py-1 text-xs font-semibold uppercase tracking-wider text-ink-soft hover:border-signal hover:text-signal disabled:opacity-40 md:order-3 md:w-auto md:shrink-0"
               >
-                ⇄ Swap
+                ⇄ Swap seats
               </button>
-              <SeatChip label="Seat 2" d={d2} season={cfg.season} onClear={driver2Id ? () => removeDriver(2) : undefined} />
             </div>
             <p className="mt-3 text-xs leading-relaxed text-ink-faint">
               Sign any driver from any team for either seat — drivers leaving another team open a vacancy there.
@@ -271,25 +271,27 @@ export default function SetupScreen({ cfg, onStart, onBack }: Props) {
                         const in2 = id === driver2Id;
                         const taken = in1 || in2;
                         return (
-                          <div key={id} className={`flex items-center gap-3 rounded-md border p-2 ${taken ? "border-signal/40 bg-signal/5" : "border-hairline bg-surface"}`}>
-                            <Img
-                              src={driverImage(d.id, cfg.season)}
-                              alt={d.shortName}
-                              className="h-14 w-14 shrink-0 rounded-sm object-cover md:h-16 md:w-16"
-                            />
-                            <div className="min-w-0 flex-1">
-                              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                                <span className="font-display text-sm font-bold">{d.name}</span>
-                                {d.reserve && <Tag tone="ink">Reserve</Tag>}
-                                {d.rookie && <Tag tone="positive">Rookie</Tag>}
-                              </div>
-                              <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-ink-faint">
-                                <span>OVR {d.overall}</span>
-                                <span>${d.salary}M/yr</span>
-                                <span>#{d.number}</span>
+                          <div key={id} className={`flex flex-col gap-2 rounded-md border p-2 md:flex-row md:items-center ${taken ? "border-signal/40 bg-signal/5" : "border-hairline bg-surface"}`}>
+                            <div className="flex items-center gap-3">
+                              <Img
+                                src={driverImage(d.id, cfg.season)}
+                                alt={d.shortName}
+                                className="h-14 w-14 shrink-0 rounded-sm object-cover md:h-16 md:w-16"
+                              />
+                              <div className="min-w-0 flex-1">
+                                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                                  <span className="font-display text-sm font-bold">{d.name}</span>
+                                  {d.reserve && <Tag tone="ink">Reserve</Tag>}
+                                  {d.rookie && <Tag tone="positive">Rookie</Tag>}
+                                </div>
+                                <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-ink-faint">
+                                  <span>OVR {d.overall}</span>
+                                  <span>${d.salary}M/yr</span>
+                                  <span>#{d.number}</span>
+                                </div>
                               </div>
                             </div>
-                            <div className="flex shrink-0 gap-1.5">
+                            <div className="flex gap-2 md:ml-auto md:shrink-0">
                               <SeatButton active={in1} disabled={in2} label="S1" onClick={() => (in1 ? removeDriver(1) : assignDriver(1, d.id))} />
                               <SeatButton active={in2} disabled={in1} label="S2" onClick={() => (in2 ? removeDriver(2) : assignDriver(2, d.id))} />
                             </div>
@@ -497,23 +499,47 @@ export default function SetupScreen({ cfg, onStart, onBack }: Props) {
         <div className="grid gap-4 lg:grid-cols-2">
           <Card title="Team">
             {ctor && (
-              <div className="mb-3 flex flex-col items-start gap-3">
-                <div className="flex flex-wrap items-center gap-3">
-                  <Img src={ctor.image} alt={ctor.name} className="h-14 w-14 shrink-0 rounded-sm object-cover" />
-                  <Img src={ctor.carImage} alt={`${ctor.name} car`} className="h-14 w-auto shrink-0 rounded-sm" />
+              <div className="mb-3">
+                {/* mobile: logo inline with name/year/origin, car below */}
+                <div className="flex flex-col gap-3 lg:hidden">
+                  <div className="flex items-center gap-3">
+                    <Img src={ctor.image} alt={ctor.name} className="h-14 w-14 shrink-0 rounded-sm object-cover" />
+                    <div className="min-w-0 text-sm">
+                      <div className="font-display font-bold">{ctor.fullName}</div>
+                      <div className="text-[11px] text-ink-faint">
+                        {cfg.season === 2013 ? "2013" : "2025"} · {ctor.nationality}
+                      </div>
+                    </div>
+                  </div>
+                  <Img src={ctor.carImage} alt={`${ctor.name} car`} className="h-14 w-auto rounded-sm" />
                 </div>
-                <div className="min-w-0 text-sm">
-                  <div className="font-display font-bold">{ctor.fullName}</div>
-                  <div className="text-[11px] text-ink-faint">
-                    {cfg.season === 2013 ? "2013" : "2025"} · {ctor.nationality}
+                {/* desktop: logo + car row, details below */}
+                <div className="hidden lg:flex lg:flex-col lg:items-start lg:gap-3">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <Img src={ctor.image} alt={ctor.name} className="h-14 w-14 shrink-0 rounded-sm object-cover" />
+                    <Img src={ctor.carImage} alt={`${ctor.name} car`} className="h-14 w-auto shrink-0 rounded-sm" />
+                  </div>
+                  <div className="min-w-0 text-sm">
+                    <div className="font-display font-bold">{ctor.fullName}</div>
+                    <div className="text-[11px] text-ink-faint">
+                      {cfg.season === 2013 ? "2013" : "2025"} · {ctor.nationality}
+                    </div>
                   </div>
                 </div>
               </div>
             )}
             <div className="space-y-1 text-sm">
               <Row k="Constructor" v={ctor?.name ?? "—"} />
-              <Row k="Seat 1" v={d1 ? `${d1.name} (${d1.teamId === constructorId ? "your team" : "from " + d1.teamId}, $${d1.salary}M/yr)` : "—"} />
-              <Row k="Seat 2" v={d2 ? `${d2.name} (${d2.teamId === constructorId ? "your team" : "from " + d2.teamId}, $${d2.salary}M/yr)` : "—"} />
+              <Row
+                k="Seat 1"
+                v={d1 ? `${d1.name} (${d1.teamId === constructorId ? "your team" : "from " + d1.teamId}, $${d1.salary}M/yr)` : "—"}
+                thumb={d1 ? <Img src={driverImage(d1.id, cfg.season)} alt={d1.shortName} className="h-8 w-8 rounded-sm object-cover" /> : undefined}
+              />
+              <Row
+                k="Seat 2"
+                v={d2 ? `${d2.name} (${d2.teamId === constructorId ? "your team" : "from " + d2.teamId}, $${d2.salary}M/yr)` : "—"}
+                thumb={d2 ? <Img src={driverImage(d2.id, cfg.season)} alt={d2.shortName} className="h-8 w-8 rounded-sm object-cover" /> : undefined}
+              />
               <Row k="Driver wages" v={d1 && d2 ? `$${d1.salary + d2.salary}M/yr` : "—"} />
               <Row k="Engine" v={eng?.name ?? "—"} />
               <Row k="Gearbox" v={gb?.name ?? "—"} />
@@ -530,12 +556,12 @@ export default function SetupScreen({ cfg, onStart, onBack }: Props) {
           </Card>
           <Card title="Budget">
             <div className="space-y-2 text-sm">
-              <Row inline k="Starting budget" v={money(startCash)} />
-              <Row inline k="Equipment (one-time)" v={`-${money(equipmentCost)}`} />
-              <Row inline k="Driver wages" v={d1 && d2 ? `${money(d1.salary + d2.salary)}/yr · paid per weekend` : "—"} />
-              <Row inline k="Staff wages" v={`${money(staffCost)}/yr · ${money(staffWeekly)}/weekend`} />
-              <Row inline k="Sponsors" v={sponsorIds.length > 0 ? `${money(sponsorRaceIncome)}/race income, no sign fee` : "none"} />
-              <Row inline k="Cash at season start" v={money(remaining)} bold />
+              <Row k="Starting budget" v={money(startCash)} />
+              <Row k="Equipment (one-time)" v={`-${money(equipmentCost)}`} />
+              <Row k="Driver wages" v={d1 && d2 ? `${money(d1.salary + d2.salary)}/yr · paid per weekend` : "—"} />
+              <Row k="Staff wages" v={`${money(staffCost)}/yr · ${money(staffWeekly)}/weekend`} />
+              <Row k="Sponsors" v={sponsorIds.length > 0 ? `${money(sponsorRaceIncome)}/race income, no sign fee` : "none"} />
+              <Row k="Cash at season start" v={money(remaining)} bold />
             </div>
             <div className="mt-4 text-xs text-ink-faint">
               Difficulty {diff.label} · {cfg.season === 2013 ? "2013, 19 races" : "2025, 24 races + sprints"} · detail level{" "}
@@ -600,15 +626,16 @@ function TechPick({ active, onClick, title, meta, cost }: { active: boolean; onC
   );
 }
 
-function Row({ k, v, bold, inline }: { k: string; v: string; bold?: boolean; inline?: boolean }) {
+function Row({ k, v, bold, thumb }: { k: string; v: string; bold?: boolean; thumb?: ReactNode }) {
   return (
     <div
-      className={`border-b border-hairline/50 py-1 ${
-        inline ? "flex items-center justify-between gap-4" : "flex flex-col gap-0.5 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
-      }`}
+      className="flex items-center justify-between gap-4 border-b border-hairline/50 py-1"
     >
-      <span className={inline ? "text-ink-faint" : "text-ink-faint"}>{k}</span>
-      <span className={`${bold ? "font-display text-base font-bold" : ""}`}>{v}</span>
+      <span className="flex min-w-0 items-center gap-2 text-ink-faint">
+        {thumb}
+        {k}
+      </span>
+      <span className={`text-right ${bold ? "font-display text-base font-bold" : ""}`}>{v}</span>
     </div>
   );
 }
@@ -645,7 +672,7 @@ function SeatButton({ active, disabled, label, onClick }: { active: boolean; dis
       type="button"
       disabled={disabled || active}
       onClick={onClick}
-      className={`rounded-sm border px-2 py-1 text-[11px] font-semibold uppercase tracking-wider ${
+      className={`flex-1 rounded-sm border px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wider transition md:flex-none md:px-6 md:py-2.5 md:text-xs ${
         active ? "border-signal bg-signal/15 text-signal" : disabled ? "border-hairline text-ink-faint opacity-40" : "border-hairline text-ink-soft hover:border-signal hover:text-signal"
       }`}
     >

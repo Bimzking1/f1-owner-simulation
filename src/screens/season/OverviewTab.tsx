@@ -36,23 +36,41 @@ export function OverviewTab({ state, onNewsAction, onRunRound }: Props) {
         {next && <NextRaceCard track={next} />}
 
         <Card title="Team">
-          <div className="mb-3 flex flex-col items-start gap-3 lg:flex-row lg:items-center">
+          <div className="mb-3">
             {(() => {
               const c = constructorById(t.constructorId);
-              return c ? (
+              const pos = state.standingsConstructors.findIndex((s) => s.teamId === t.constructorId) + 1;
+              if (!c) return null;
+              return (
                 <>
-                  <div className="flex flex-wrap items-center gap-3">
-                    <Img src={c.image} alt={c.name} className="h-14 w-14 shrink-0 rounded-sm object-cover" />
-                    <Img src={c.carImage} alt={`${c.name} car`} className="h-14 w-auto shrink-0 rounded-sm" />
+                  {/* mobile: logo inline with name/pts/pos, car below */}
+                  <div className="flex flex-col gap-3 lg:hidden">
+                    <div className="flex items-center gap-3">
+                      <Img src={c.image} alt={c.name} className="h-14 w-14 shrink-0 rounded-sm object-cover" />
+                      <div className="min-w-0">
+                        <div className="font-display text-lg font-bold leading-tight">{c.fullName}</div>
+                        <div className="text-[11px] text-ink-faint">
+                          {t.points} pts · P{pos} in constructors
+                        </div>
+                      </div>
+                    </div>
+                    <Img src={c.carImage} alt={`${c.name} car`} className="h-14 w-auto rounded-sm" />
                   </div>
-                  <div className="min-w-0">
-                    <div className="font-display text-lg font-bold leading-tight lg:truncate">{c.fullName}</div>
-                    <div className="text-[11px] text-ink-faint lg:whitespace-nowrap">
-                      {t.points} pts · P{state.standingsConstructors.findIndex((s) => s.teamId === t.constructorId) + 1} in constructors
+                  {/* desktop: logo + car row, details beside */}
+                  <div className="hidden lg:flex lg:flex-row lg:items-center lg:gap-3">
+                    <div className="flex flex-wrap items-center gap-3">
+                      <Img src={c.image} alt={c.name} className="h-14 w-14 shrink-0 rounded-sm object-cover" />
+                      <Img src={c.carImage} alt={`${c.name} car`} className="h-14 w-auto shrink-0 rounded-sm" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="font-display text-lg font-bold leading-tight lg:truncate">{c.fullName}</div>
+                      <div className="text-[11px] text-ink-faint lg:whitespace-nowrap">
+                        {t.points} pts · P{pos} in constructors
+                      </div>
                     </div>
                   </div>
                 </>
-              ) : null;
+              );
             })()}
           </div>
           <div className="grid gap-3 sm:grid-cols-2">

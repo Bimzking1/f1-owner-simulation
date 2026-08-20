@@ -100,7 +100,7 @@ export function replaceComponent(draft: SimulationState, component: "engine" | "
     label: `${component === "engine" ? "Engine" : "Gearbox"} replacement`,
     amount: -cost,
     category: "other",
-    detail: `${component === "engine" ? "Engine" : "Gearbox"} unit paid in full up front (one-time part purchase, not a recurring fee).`,
+    detail: `${component === "engine" ? "Engine" : "Gearbox"} unit purchased.\nPaid in full up front — one-time part purchase, not a recurring fee.`,
   });
 }
 
@@ -125,7 +125,6 @@ export function applyRaceFinance(state: SimulationState, weekend: RaceWeekendRes
 
   // sponsor race payments
   let sponsorIncome = 0;
-  let sponsorParts = 0;
   for (const s of t.sponsors) {
     if (!s.active) continue;
     const spec = sponsorById(s.sponsorId);
@@ -133,7 +132,6 @@ export function applyRaceFinance(state: SimulationState, weekend: RaceWeekendRes
     const pay = Math.round(spec.racePayment * 100) / 100;
     sponsorIncome += pay;
     s.totalPaid = Math.round((s.totalPaid + pay) * 100) / 100;
-    sponsorParts++;
   }
 
   // promoter share from race points
@@ -157,16 +155,25 @@ export function applyRaceFinance(state: SimulationState, weekend: RaceWeekendRes
   const expense = Math.round((salaries + operations + supplier + staff) * 100) / 100;
   t.cash = Math.round((t.cash + income - expense) * 100) / 100;
 
-  const sponsorNames = t.sponsors
+  const sponsorBreakdown = t.sponsors
     .filter((s) => s.active)
-    .map((s) => sponsorById(s.sponsorId)?.name)
-    .filter(Boolean)
-    .join(", ");
+    .map((s) => {
+      const spec = sponsorById(s.sponsorId);
+      return spec ? `${spec.name} — $${spec.racePayment}M/weekend` : null;
+    })
+    .filter((x): x is string => Boolean(x))
+    .join("\n");
   const engName = engineById(t.engineId)?.supplier ?? "engine";
-  const staffNames = [
-    ...t.engineerIds.map((id) => engineerById(id)?.name ?? id),
-    ...t.mechanicIds.map((id) => mechanicById(id)?.name ?? id),
-  ];
+  const staffLines = [
+    ...t.engineerIds.map((id) => {
+      const e = engineerById(id);
+      return e ? `${e.name} — $${e.cost}M/season` : null;
+    }),
+    ...t.mechanicIds.map((id) => {
+      const m = mechanicById(id);
+      return m ? `${m.name} — $${m.cost}M/season` : null;
+    }),
+  ].filter((x): x is string => Boolean(x));
 
   t.history.push(
     {
@@ -174,8 +181,8 @@ export function applyRaceFinance(state: SimulationState, weekend: RaceWeekendRes
       label: "Sponsor payments",
       amount: sponsorIncome,
       category: "sponsor",
-      detail: sponsorNames
-        ? `Active sponsors pay ${sponsorParts} weekend rate(s): ${sponsorNames}. No upfront sign fees — every contract pays per race.`
+      detail: sponsorBreakdown
+        ? `Active sponsors pay per race weekend — no upfront sign fees.\n${sponsorBreakdown}`
         : "No active sponsor contracts this weekend.",
     },
     {
@@ -190,28 +197,28 @@ export function applyRaceFinance(state: SimulationState, weekend: RaceWeekendRes
       label: "Driver salaries",
       amount: -salaries,
       category: "salary",
-      detail: `Driver contracts are paid per weekend, not up front: (${d1?.name ?? t.driver1Id} $${d1?.salary ?? 4}M/season + ${d2?.name ?? t.driver2Id} $${d2?.salary ?? 4}M/season) ÷ ${totalRounds} race weekends = $${salaries.toFixed(2)}M this weekend.`,
+      detail: `Driver contracts are paid per weekend, not up front.\n${d1?.name ?? t.driver1Id} — $${d1?.salary ?? 4}M/season\n${d2?.name ?? t.driver2Id} — $${d2?.salary ?? 4}M/season\nTotal $${(d1?.salary ?? 4) + (d2?.salary ?? 4)}M ÷ ${totalRounds} race weekends = $${salaries.toFixed(2)}M this weekend.`,
     },
     {
       round,
       label: "Staff salaries",
       amount: -staff,
       category: "staff",
-      detail: `Staff are paid per weekend, not at hiring: ${staffNames.join(", ")} ($${staffTotal}M/season combined) ÷ ${totalRounds} race weekends = $${staff.toFixed(2)}M this weekend.`,
+      detail: `Staff are paid per weekend, not at hiring.\n${staffLines.join("\n")}\nTotal $${staffTotal}M/season ÷ ${totalRounds} race weekends = $${staff.toFixed(2)}M this weekend.`,
     },
     {
       round,
       label: "Team operations",
       amount: -operations,
       category: "operations",
-      detail: `${t.startCash}M starting fund — operations run at 8% of that (min $3.6M) = $${opsSeason}M/season ÷ ${totalRounds} weekends = $${operations.toFixed(2)}M. Logistics, rent, travel.`,
+      detail: `Operations run at 8% of the starting fund (min $3.6M).\n$${t.startCash}M × 8% = $${opsSeason}M/season\n÷ ${totalRounds} weekends = $${operations.toFixed(2)}M this weekend.\nCovers logistics, rent, travel.`,
     },
     {
       round,
       label: "Power unit lease",
       amount: -supplier,
       category: "supplier",
-      detail: `${engName} power unit — ${leaseSeason}M annual lease ÷ ${totalRounds} weekends = $${supplier.toFixed(2)}M. Equipment lease fees are spread per race.`,
+      detail: `${engName} power unit — $${leaseSeason}M annual lease.\n÷ ${totalRounds} weekends = $${supplier.toFixed(2)}M this weekend.\nEquipment lease fees are spread per race.`,
     },
   );
   return { sponsorIncome, promoterShare, salaries, operations, supplier, staff };
@@ -363,7 +370,7 @@ export function evaluateSponsors(state: SimulationState) {
           label: `${spec.name} bonus`,
           amount: spec.bonus,
           category: "sponsor",
-          detail: `Objective met for ${spec.name}. Contract bonus $${spec.bonus}M paid by the sponsor.`,
+          detail: `Objective met for ${spec.name}.\nContract bonus $${spec.bonus}M paid by the sponsor.`,
         });
         state.news.unshift({
           id: `bonus-${round}-${s.sponsorId}`,
@@ -483,7 +490,7 @@ export function startProject(draft: SimulationState, option: DevOption): boolean
     label: option.name,
     amount: -option.cost,
     category: "development",
-    detail: `${option.name} — development project cost $${option.cost}M paid up front; upgrades land in ${option.duration} race(s).`,
+    detail: `${option.name} — development project.\nCost $${option.cost}M paid up front.\nUpgrades land in ${option.duration} race(s).`,
   });
   return true;
 }
@@ -598,7 +605,7 @@ export function bankruptcyCheck(state: SimulationState): SimulationState {
       label: "Emergency bank guarantee",
       amount: 25,
       category: "other",
-      detail: "One-time rescue injection of $25M from your bankers. Reputation -20.",
+      detail: "One-time rescue injection of $25M from your bankers.\nReputation −20.",
     });
     state.news.unshift({
       id: `grace-${round}`,

@@ -53,18 +53,19 @@ export function FinanceTab({ state }: { state: SimulationState }) {
         <Card title="Ledger">
           <div className="max-h-96 divide-y divide-hairline/60 overflow-auto">
             {[...t.history].reverse().map((h, i) => (
-              <div key={i} className="flex items-center justify-between gap-2 py-1 text-xs">
+              <div
+                key={i}
+                onClick={() => h.detail && setSelected(h)}
+                className={`group flex items-center justify-between gap-2 py-1 text-xs ${
+                  h.detail ? "cursor-pointer hover:bg-raised/40" : ""
+                }`}
+              >
                 <span className="tabular text-ink-faint">R{h.round}</span>
                 <span className="min-w-0 flex-1 truncate text-ink-soft">{h.label}</span>
                 {h.detail ? (
-                  <button
-                    type="button"
-                    title="Why?"
-                    onClick={() => setSelected(h)}
-                    className="shrink-0 rounded-sm border border-hairline px-1 text-[10px] leading-4 text-ink-faint hover:border-ink-faint hover:text-ink"
-                  >
+                  <span className="shrink-0 rounded-sm border border-transparent px-1 text-[10px] leading-4 text-ink-faint group-hover:border-hairline group-hover:text-ink">
                     ⓘ
-                  </button>
+                  </span>
                 ) : (
                   <span className="w-4 shrink-0" />
                 )}
@@ -85,7 +86,9 @@ export function FinanceTab({ state }: { state: SimulationState }) {
               <span className="text-ink-faint">Amount</span>
               <Money value={selected.amount} className="font-display text-base font-bold" />
             </div>
-            <p className="border-l-2 border-hairline pl-3 leading-relaxed text-ink-soft">{selected.detail}</p>
+            <p className="whitespace-pre-line rounded-md border border-hairline bg-raised/40 p-3 text-xs leading-relaxed text-ink-soft">
+              {selected.detail}
+            </p>
           </div>
         )}
       </Modal>

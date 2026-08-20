@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { SimulationState } from "@/simulation/types";
 import { constructorById } from "@/data";
 import { difficultyOf } from "@/state";
-import { Button, Money, Stat } from "@/ui/kit";
+import { Button, Modal, Money, Stat } from "@/ui/kit";
 import type { Act } from "./parts";
 import { OverviewTab } from "./OverviewTab";
 import { RaceTab } from "./RaceTab";
@@ -29,6 +29,7 @@ export default function SeasonScreen({ state, onRunRound, onNewsAction, act, onR
   const ctor = constructorById(t.constructorId, state.season);
   const wccPos = state.standingsConstructors.findIndex((c) => c.teamId === t.constructorId) + 1;
   const [tab, setTab] = useState<Tab>("Overview");
+  const [confirmMenu, setConfirmMenu] = useState(false);
 
   if (state.phase === "bankrupt" || state.phase === "finished") {
     return <EndScreens state={state} onReset={onReset} />;
@@ -54,7 +55,7 @@ export default function SeasonScreen({ state, onRunRound, onNewsAction, act, onR
           <Stat label="WCC Pts" value={t.points} />
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="ghost" small onClick={onReset}>Menu</Button>
+          <Button variant="ghost" small onClick={() => setConfirmMenu(true)}>Menu</Button>
         </div>
       </header>
 
@@ -81,6 +82,16 @@ export default function SeasonScreen({ state, onRunRound, onNewsAction, act, onR
       {tab === "Sponsors" && <SponsorsTab state={state} act={act} />}
       {tab === "Garage" && <GarageTab state={state} act={act} />}
       {tab === "Finance" && <FinanceTab state={state} />}
+
+      <Modal open={confirmMenu} onClose={() => setConfirmMenu(false)} title="Quit to menu?">
+        <p className="text-sm leading-relaxed text-ink-soft">
+          This season will be lost — the save is cleared when you return to the main menu.
+        </p>
+        <div className="mt-4 flex justify-end gap-2">
+          <Button small variant="ghost" onClick={() => setConfirmMenu(false)}>Keep playing</Button>
+          <Button small onClick={onReset}>Quit to menu</Button>
+        </div>
+      </Modal>
     </div>
   );
 }

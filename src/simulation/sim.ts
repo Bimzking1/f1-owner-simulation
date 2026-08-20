@@ -372,7 +372,7 @@ export function resolveNewsAction(state: SimulationState, newsId: string, action
         label: "Supplier engine upgrade",
         amount: -cost,
         category: "supplier",
-        detail: `Supplier engine upgrade: $${cost}M one-time, +3 power +2 reliability. ${engineById(t.engineId)?.supplier ?? "Engine supplier"} unit.`,
+        detail: `Supplier engine upgrade.\n$${cost}M one-time cost.\n+3 power, +2 reliability (${engineById(t.engineId)?.supplier ?? "Engine supplier"} unit).`,
       });
       item.title = "Engine upgrade purchased";
       item.body = `+3 power, +2 reliability. -$${cost}M.`;

@@ -37,7 +37,7 @@ export function hireEngineer(state: SimulationState, engineerId: string): Action
     label: `Hire ${eng.name}`,
     amount: 0,
     category: "staff",
-    detail: `${eng.name} hired. No up-front fee — the $${eng.cost}M seasonal salary is paid per race weekend from now on ($${Math.round((eng.cost / (state.calendar.length || 19)) * 100) / 100}M/weekend).`,
+    detail: `${eng.name} signed.\nNo up-front fee — the $${eng.cost}M seasonal salary is paid per race weekend.\nThat's $${Math.round((eng.cost / (state.calendar.length || 19)) * 100) / 100}M/weekend.`,
   });
   return msg(result, true, `${eng.name} signed. Salary paid per weekend.`);
 }
@@ -55,7 +55,7 @@ export function fireEngineer(state: SimulationState, engineerId: string): Action
     label: `${eng.name} exit`,
     amount: -cost,
     category: "staff",
-    detail: `${eng.name} released. One-time severance = 50% of the $${eng.cost}M seasonal salary = $${cost}M.`,
+    detail: `${eng.name} released.\nOne-time severance = 50% of the $${eng.cost}M seasonal salary = $${cost}M.`,
   });
   return msg(result, true, `${eng.name} released (severance $${cost}M).`);
 }
@@ -73,7 +73,7 @@ export function hireMechanic(state: SimulationState, mechanicId: string): Action
     label: `Hire ${mech.name}`,
     amount: 0,
     category: "staff",
-    detail: `${mech.name} hired. No up-front fee — the $${mech.cost}M seasonal salary is paid per race weekend from now on ($${Math.round((mech.cost / (state.calendar.length || 19)) * 100) / 100}M/weekend).`,
+    detail: `${mech.name} signed.\nNo up-front fee — the $${mech.cost}M seasonal salary is paid per race weekend.\nThat's $${Math.round((mech.cost / (state.calendar.length || 19)) * 100) / 100}M/weekend.`,
   });
   return msg(result, true, `${mech.name} joined the crew. Salary paid per weekend.`);
 }
@@ -91,7 +91,7 @@ export function fireMechanic(state: SimulationState, mechanicId: string): Action
     label: `${mech.name} exit`,
     amount: -cost,
     category: "staff",
-    detail: `${mech.name} released. One-time severance = 50% of the $${mech.cost}M seasonal salary = $${cost}M.`,
+    detail: `${mech.name} released.\nOne-time severance = 50% of the $${mech.cost}M seasonal salary = $${cost}M.`,
   });
   return msg(result, true, `${mech.name} released (severance $${cost}M).`);
 }
@@ -153,7 +153,7 @@ export function swapDriver(state: SimulationState, slot: 1 | 2, driverId: string
     label: `${old?.shortName ?? currentId} out, ${target.shortName} in`,
     amount: -total,
     category: "other",
-    detail: `Seat change: $${quote.fee}M break fee + $${quote.prorated}M prorated salary delta (remaining rounds) = $${total}M.`,
+    detail: `Seat change.\nBreak fee: $${quote.fee}M\nProrated salary delta (${state.calendar.length - state.completedRounds} remaining rounds): $${quote.prorated}M\nTotal: $${total}M`,
   });
   state.news.unshift({
     id: `swap-${state.completedRounds + 1}-${driverId}`,
@@ -225,7 +225,7 @@ export function signSponsor(state: SimulationState, sponsorId: string): ActionRe
     label: `${spec.name} signing`,
     amount: 0,
     category: "sponsor",
-    detail: `${spec.name} signed — no up-front fee. Pays $${spec.racePayment}M per race weekend; $${Math.round(spec.bonus * 100) / 100}M bonus if the objective is met.`,
+    detail: `${spec.name} signed.\nNo up-front fee — pays $${spec.racePayment}M per race weekend.\nBonus: +$${Math.round(spec.bonus * 100) / 100}M if the objective is met.`,
   });
   return msg(result, true, `${spec.name} signed. No up-front fee — pays per race.`);
 }
@@ -260,7 +260,7 @@ export function terminateSponsor(state: SimulationState, sponsorId: string): Act
     label: `${spec.name} terminated`,
     amount: -fee,
     category: "sponsor",
-    detail: `${spec.name} terminated. Exit fee = 40% of the $${Math.round(spec.bonus * 100) / 100}M objective bonus = $${fee.toFixed(2)}M. Reputation -5.`,
+    detail: `${spec.name} terminated.\nExit fee = 40% of the $${Math.round(spec.bonus * 100) / 100}M objective bonus = $${fee.toFixed(2)}M.\nReputation −5.`,
   });
   return msg(result, true, `${spec.name} terminated ($${fee}M exit fee).`);
 }

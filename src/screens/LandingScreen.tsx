@@ -10,6 +10,65 @@ interface Props {
   hasSave: boolean;
 }
 
+interface Option<T> {
+  id: T;
+  label: string;
+  hint: string;
+}
+
+function SelectField<T extends string | number>({
+  value,
+  options,
+  onChange,
+}: {
+  value: T;
+  options: Option<T>[];
+  onChange: (id: T) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const selected = options.find((o) => o.id === value) ?? options[0];
+  return (
+    <div className="relative">
+      <div
+        role="listbox"
+        tabIndex={0}
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+        className="flex cursor-pointer select-none items-center justify-between rounded-md border border-hairline bg-surface px-3 py-2.5 transition hover:border-ink-faint"
+      >
+        <span className="font-display text-lg font-bold">{selected.label}</span>
+        <span className={`text-ink-faint transition-transform ${open ? "rotate-180" : ""}`}>▾</span>
+      </div>
+      {open && (
+        <div
+          onMouseDown={(e) => e.preventDefault()}
+          className="absolute left-0 right-0 top-full z-20 mt-1 overflow-hidden rounded-md border border-hairline bg-raised shadow-2xl"
+        >
+          {options
+            .filter((o) => o.id !== value)
+            .map((o) => (
+              <button
+                key={String(o.id)}
+                type="button"
+                onClick={() => {
+                  onChange(o.id);
+                  setOpen(false);
+                }}
+                className="block w-full px-3 py-2 text-left transition hover:bg-surface"
+              >
+                <div className="font-display font-bold">{o.label}</div>
+                <div className="text-[11px] text-ink-faint">{o.hint}</div>
+              </button>
+            ))}
+        </div>
+      )}
+      <div className="mt-2 min-h-[2.5rem] rounded-sm border-l-2 border-hairline bg-raised/40 px-3 py-2 text-[11px] leading-relaxed text-ink-soft">
+        {selected.hint}
+      </div>
+    </div>
+  );
+}
+
 export default function LandingScreen({ onNewGame, onContinue, hasSave }: Props) {
   const [season, setSeason] = useState<SeasonId>(2025);
   const [difficulty, setDifficulty] = useState<DifficultyId>("professional");
@@ -29,76 +88,47 @@ export default function LandingScreen({ onNewGame, onContinue, hasSave }: Props)
         of accounts.
       </p>
 
-      <div className="mt-8 grid max-w-2xl gap-8">
-        {/* Season */}
+      <div className="mt-8 grid max-w-3xl gap-5 sm:grid-cols-3">
         <section>
           <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-widest text-ink-faint">Season</h3>
-          <div className="grid grid-cols-2 gap-2">
-            {SEASONS.map((s) => (
-              <button
-                key={s.id}
-                type="button"
-                onClick={() => setSeason(s.id)}
-                className={`rounded-md border p-3 text-left transition ${season === s.id ? "border-signal bg-signal/10" : "border-hairline bg-surface hover:border-ink-faint"}`}
-              >
-                <div className="font-display text-lg font-bold">{s.label}</div>
-                <div className="text-[11px] text-ink-faint">{s.tagline}</div>
-              </button>
-            ))}
-          </div>
+          <SelectField
+            value={season}
+            options={SEASONS.map((s) => ({ id: s.id, label: s.label, hint: s.tagline }))}
+            onChange={(id) => setSeason(id as SeasonId)}
+          />
         </section>
-
-        {/* Difficulty */}
         <section>
           <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-widest text-ink-faint">Difficulty</h3>
-          <div className="grid grid-cols-2 gap-2">
-            {DIFFICULTIES.map((d) => (
-              <button
-                key={d.id}
-                type="button"
-                onClick={() => setDifficulty(d.id)}
-                className={`rounded-md border p-3 text-left transition ${difficulty === d.id ? "border-signal bg-signal/10" : "border-hairline bg-surface hover:border-ink-faint"}`}
-              >
-                <div className="font-display text-base font-bold">{d.label}</div>
-                <div className="text-[11px] leading-snug text-ink-faint">{d.description.slice(0, 80)}…</div>
-              </button>
-            ))}
-          </div>
+          <SelectField
+            value={difficulty}
+            options={DIFFICULTIES.map((d) => ({ id: d.id, label: d.label, hint: d.description }))}
+            onChange={(id) => setDifficulty(id as DifficultyId)}
+          />
         </section>
-
-        {/* Game length */}
         <section>
           <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-widest text-ink-faint">Season detail level</h3>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            {GAME_LENGTHS.map((g) => (
-              <button
-                key={g.id}
-                type="button"
-                onClick={() => setGameLength(g.id)}
-                className={`rounded-md border p-3 text-left transition ${gameLength === g.id ? "border-signal bg-signal/10" : "border-hairline bg-surface hover:border-ink-faint"}`}
-              >
-                <div className="font-display text-base font-bold">{g.label}</div>
-                <div className="text-[11px] text-ink-faint">{g.description.slice(0, 70)}…</div>
-              </button>
-            ))}
-          </div>
-        </section>
-
-        {/* Seed */}
-        <section>
-          <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-widest text-ink-faint">Season seed</h3>
-          <div className="flex flex-wrap items-center gap-2">
-            <input
-              value={seed}
-              onChange={(e) => setSeed(e.target.value)}
-              className="w-56 rounded-sm border border-hairline bg-surface px-3 py-2 font-mono text-sm text-ink outline-none focus:border-telemetry"
-              placeholder="F1-2025-000000"
-            />
-            <Button variant="ghost" small onClick={() => setSeed(makeSeed(season))}>Random</Button>
-            <Tag tone="telemetry">Same seed + same choices = same season</Tag>
-          </div>
+          <SelectField
+            value={gameLength}
+            options={GAME_LENGTHS.map((g) => ({ id: g.id, label: g.label, hint: g.description }))}
+            onChange={(id) => setGameLength(id as GameLengthId)}
+          />
         </section>
       </div>
+
+      {/* Seed */}
+      <section className="mt-6 max-w-3xl">
+        <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-widest text-ink-faint">Season seed</h3>
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            value={seed}
+            onChange={(e) => setSeed(e.target.value)}
+            className="w-56 rounded-sm border border-hairline bg-surface px-3 py-2 font-mono text-sm text-ink outline-none focus:border-telemetry"
+            placeholder="F1-2025-000000"
+          />
+          <Button variant="ghost" small onClick={() => setSeed(makeSeed(season))}>Random</Button>
+          <Tag tone="telemetry">Same seed + same choices = same season</Tag>
+        </div>
+      </section>
 
       <div className="mt-8 flex flex-wrap items-center gap-3">
         <Button onClick={() => onNewGame({ ...cfg, seed })}>Start Setup</Button>
