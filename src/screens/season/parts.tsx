@@ -45,7 +45,7 @@ export function NextRaceCard({ track }: { track: Track }) {
   const distanceKm = track.laps * track.lengthKm;
   return (
     <Card title={`Next up — ${track.grandPrix}`}>
-      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div className="min-w-0 flex-1">
           <div className="font-display text-2xl font-bold">{track.name}</div>
           <div className="text-xs text-ink-faint">
@@ -63,15 +63,23 @@ export function NextRaceCard({ track }: { track: Track }) {
             </span>
           </div>
           <div className="mt-2 text-xs text-ink-soft">{weatherNote}</div>
-          <div className="mt-1 flex flex-wrap gap-2 text-[11px] text-ink-faint">
-            <span>Downforce {track.characteristics.downforce}</span>
-            <span>High speed {track.characteristics.highSpeed}</span>
-            <span>Low speed {track.characteristics.lowSpeed}</span>
-            <span>Tire stress {track.characteristics.tireStress}</span>
-            <span>Overtaking {track.characteristics.overtaking}</span>
+          <div className="mt-3 grid max-w-sm grid-cols-2 gap-x-4 gap-y-1 text-[11px] text-ink-faint">
+            {[
+              ["Downforce", track.characteristics.downforce],
+              ["High speed", track.characteristics.highSpeed],
+              ["Low speed", track.characteristics.lowSpeed],
+              ["Tire stress", track.characteristics.tireStress],
+              ["Overtaking", track.characteristics.overtaking],
+              ["Technical", track.characteristics.technical],
+            ].map(([label, value]) => (
+              <span key={label} className="flex items-center justify-between gap-2 border-b border-hairline/40 pb-0.5">
+                <span>{label}</span>
+                <span className="tabular">{value}</span>
+              </span>
+            ))}
           </div>
         </div>
-        <div className="flex aspect-[4/3] w-40 shrink-0 items-center justify-center self-center overflow-hidden rounded-sm bg-white p-2 md:w-72 md:p-3">
+        <div className="flex aspect-[4/3] h-36 shrink-0 items-center justify-center overflow-hidden rounded-sm bg-white p-2 md:h-44">
           <Img
             src={track.image}
             alt={`${track.name} circuit layout`}

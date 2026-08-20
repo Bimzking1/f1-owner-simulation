@@ -19,7 +19,6 @@ export function RaceTab({ state, onRunRound }: Props) {
   return (
     <div className="grid gap-4 lg:grid-cols-3">
       <div className="space-y-4 lg:col-span-2">
-        {next && <NextRaceCard track={next} />}
         <Card title="Race Weekend">
           {done ? (
             <Empty>Season complete — see the final report.</Empty>
@@ -38,8 +37,9 @@ export function RaceTab({ state, onRunRound }: Props) {
             </div>
           )}
         </Card>
-        {last && <WeekendClassification state={state} weekend={last} />}
+        {next && <NextRaceCard track={next} />}
         {last && <ResultCard weekend={last} season={state.season} />}
+        {last && <WeekendClassification state={state} weekend={last} />}
       </div>
       <div className="space-y-4">
         <Card title="Components">
