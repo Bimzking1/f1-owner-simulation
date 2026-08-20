@@ -511,7 +511,7 @@ export default function SetupScreen({ cfg, onStart, onBack }: Props) {
                       </div>
                     </div>
                   </div>
-                  <Img src={ctor.carImage} alt={`${ctor.name} car`} className="h-14 w-auto rounded-sm" />
+                  <Img src={ctor.carImage} alt={`${ctor.name} car`} className="w-auto max-w-full rounded-sm" />
                 </div>
                 {/* desktop: logo + car row, details below */}
                 <div className="hidden lg:flex lg:flex-col lg:items-start lg:gap-3">
@@ -628,14 +628,12 @@ function TechPick({ active, onClick, title, meta, cost }: { active: boolean; onC
 
 function Row({ k, v, bold, thumb }: { k: string; v: string; bold?: boolean; thumb?: ReactNode }) {
   return (
-    <div
-      className="flex items-center justify-between gap-4 border-b border-hairline/50 py-1"
-    >
+    <div className="flex flex-col gap-0.5 border-b border-hairline/50 py-1.5 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
       <span className="flex min-w-0 items-center gap-2 text-ink-faint">
         {thumb}
         {k}
       </span>
-      <span className={`text-right ${bold ? "font-display text-base font-bold" : ""}`}>{v}</span>
+      <span className={`text-left sm:text-right ${bold ? "font-display text-base font-bold" : ""}`}>{v}</span>
     </div>
   );
 }

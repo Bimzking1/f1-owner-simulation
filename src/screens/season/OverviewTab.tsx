@@ -54,7 +54,7 @@ export function OverviewTab({ state, onNewsAction, onRunRound }: Props) {
                         </div>
                       </div>
                     </div>
-                    <Img src={c.carImage} alt={`${c.name} car`} className="h-14 w-auto rounded-sm" />
+                    <Img src={c.carImage} alt={`${c.name} car`} className="w-auto max-w-full rounded-sm" />
                   </div>
                   {/* desktop: logo + car row, details beside */}
                   <div className="hidden lg:flex lg:flex-row lg:items-center lg:gap-3">
