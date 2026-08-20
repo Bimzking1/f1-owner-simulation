@@ -13,21 +13,21 @@ export const CONSTRUCTORS: Constructor[] = [
     id: "redbull", name: "Red Bull", fullName: "Red Bull Racing", season: 2013,
     nationality: "Austria", dna: { chassis: 94, aero: 97, factory: 95, engineering: 92, reliability: 91, developmentCapacity: 94, budgetEfficiency: 80, reputation: 96, sponsorAppeal: 95 },
     allowedEngines: ["renault13-works"], startCash: 140, operatingCost: 6.5,
-    image: assetPaths.constructors.redbull, carImage: assetPaths.cars.redbull,
+    image: assetPaths.constructors.redbull, carImage: assetPaths.cars.redbull13,
     colors: { primary: "#1e1e28", secondary: "#1465D6" },
   },
   {
     id: "ferrari", name: "Ferrari", fullName: "Scuderia Ferrari", season: 2013,
     nationality: "Italy", dna: { chassis: 91, aero: 90, factory: 94, engineering: 88, reliability: 90, developmentCapacity: 88, budgetEfficiency: 70, reputation: 95, sponsorAppeal: 96 },
     allowedEngines: ["ferrari13-works"], startCash: 135, operatingCost: 6.4,
-    image: assetPaths.constructors.ferrari, carImage: assetPaths.cars.ferrari,
+    image: assetPaths.constructors.ferrari, carImage: assetPaths.cars.ferrari13,
     colors: { primary: "#D40000", secondary: "#1e1e28" },
   },
   {
     id: "mercedes", name: "Mercedes", fullName: "Mercedes AMG Petronas", season: 2013,
     nationality: "Germany", dna: { chassis: 90, aero: 91, factory: 92, engineering: 90, reliability: 92, developmentCapacity: 90, budgetEfficiency: 78, reputation: 92, sponsorAppeal: 94 },
     allowedEngines: ["mercedes13-works"], startCash: 130, operatingCost: 6.2,
-    image: assetPaths.constructors.mercedes, carImage: assetPaths.cars.mercedes,
+    image: assetPaths.constructors.mercedes, carImage: assetPaths.cars.mercedes13,
     colors: { primary: "#00A19B", secondary: "#1e1e28" },
   },
   {
@@ -41,7 +41,7 @@ export const CONSTRUCTORS: Constructor[] = [
     id: "mclaren", name: "McLaren", fullName: "McLaren Mercedes", season: 2013,
     nationality: "United Kingdom", dna: { chassis: 89, aero: 88, factory: 93, engineering: 87, reliability: 85, developmentCapacity: 86, budgetEfficiency: 75, reputation: 88, sponsorAppeal: 92 },
     allowedEngines: ["mercedes13-customer"], startCash: 120, operatingCost: 5.6,
-    image: assetPaths.constructors.mclaren, carImage: assetPaths.cars.mclaren,
+    image: assetPaths.constructors.mclaren, carImage: assetPaths.cars.mclaren13,
     colors: { primary: "#FF8000", secondary: "#1e1e28" },
   },
   {
@@ -55,7 +55,7 @@ export const CONSTRUCTORS: Constructor[] = [
     id: "sauber", name: "Sauber", fullName: "Sauber F1 Team", season: 2013,
     nationality: "Switzerland", dna: { chassis: 80, aero: 78, factory: 72, engineering: 75, reliability: 78, developmentCapacity: 80, budgetEfficiency: 88, reputation: 58, sponsorAppeal: 55 },
     allowedEngines: ["ferrari13-customer"], startCash: 82, operatingCost: 3.7,
-    image: assetPaths.constructors.sauber, carImage: assetPaths.cars.sauber,
+    image: assetPaths.constructors.sauber, carImage: assetPaths.cars.sauber13,
     colors: { primary: "#1e1e28", secondary: "#96C643" },
   },
   {
@@ -69,7 +69,7 @@ export const CONSTRUCTORS: Constructor[] = [
     id: "williams", name: "Williams", fullName: "Williams F1 Team", season: 2013,
     nationality: "United Kingdom", dna: { chassis: 82, aero: 80, factory: 78, engineering: 78, reliability: 76, developmentCapacity: 83, budgetEfficiency: 84, reputation: 72, sponsorAppeal: 65 },
     allowedEngines: ["renault13-customer"], startCash: 90, operatingCost: 4.4,
-    image: assetPaths.constructors.williams, carImage: assetPaths.cars.williams,
+    image: assetPaths.constructors.williams, carImage: assetPaths.cars.williams13,
     colors: { primary: "#00A0DE", secondary: "#1e1e28" },
   },
   {

@@ -1,8 +1,9 @@
-import type { SimulationState } from "@/simulation/types";
+import { useState } from "react";
+import type { SimulationState, SponsorSpec } from "@/simulation/types";
 import { sponsorById } from "@/data";
 import { availableSponsors } from "@/data";
 import { signSponsor, terminateSponsor } from "@/actions";
-import { Button, Card, Empty, Money, Tag } from "@/ui/kit";
+import { Button, Card, Empty, Modal, Money, Tag } from "@/ui/kit";
 import type { Act } from "./parts";
 
 interface Props {
@@ -12,8 +13,9 @@ interface Props {
 
 export function SponsorsTab({ state, act }: Props) {
   const t = state.team!;
+  const [confirm, setConfirm] = useState<SponsorSpec | null>(null);
   const active = t.sponsors.filter((s) => s.active);
-  const pool = availableSponsors(state.season, t.reputation, t.cash + 40);
+  const pool = availableSponsors(state.season, t.reputation);
   const signed = new Set(t.sponsors.map((s) => s.sponsorId));
 
   return (
@@ -60,7 +62,15 @@ export function SponsorsTab({ state, act }: Props) {
             {pool.map((spec) => {
               const taken = signed.has(spec.id);
               return (
-                <div key={spec.id} className={`rounded-md border p-3 ${taken ? "border-positive/50 bg-positive/10" : "border-hairline"}`}>
+                <button
+                  key={spec.id}
+                  type="button"
+                  disabled={taken}
+                  onClick={() => setConfirm(spec)}
+                  className={`rounded-md border p-3 text-left transition disabled:cursor-default ${
+                    taken ? "border-positive/50 bg-positive/10" : "border-hairline hover:border-ink-faint"
+                  }`}
+                >
                   <div className="flex items-center justify-between gap-2">
                     <span className="font-display font-bold">{spec.name}</span>
                     <Tag tone={spec.tier === "title" ? "elite" : spec.tier === "major" ? "telemetry" : "ink"}>{spec.tier}</Tag>
@@ -68,14 +78,13 @@ export function SponsorsTab({ state, act }: Props) {
                   <div className="mt-1 text-[11px] text-ink-soft">{spec.objectiveTextEnjoyer}</div>
                   <div className="mt-2 flex items-center justify-between gap-2 text-xs">
                     <span className="text-ink-faint">
-                      <Money value={spec.signingBonus} /> sign · <Money value={spec.racePayment} />/race ·{" "}
-                      +<Money value={spec.bonus} /> bonus
+                      Pays <Money value={spec.racePayment} />/race · +<Money value={spec.bonus} /> bonus
                     </span>
-                    <Button small variant="ghost" disabled={taken} onClick={() => act((x) => signSponsor(x, spec.id).message)}>
-                      Sign
-                    </Button>
+                    <span className="font-display text-[11px] font-bold uppercase tracking-widest text-signal">
+                      {taken ? "Signed" : "Review →"}
+                    </span>
                   </div>
-                </div>
+                </button>
               );
             })}
           </div>
@@ -85,7 +94,7 @@ export function SponsorsTab({ state, act }: Props) {
       <div className="space-y-4">
         <Card title="How sponsors work">
           <ul className="list-inside list-disc space-y-1 text-xs text-ink-soft">
-            <li>Signing bonuses are paid immediately from cash.</li>
+            <li>Signing is free — no up-front fee, ever.</li>
             <li>Race payments arrive automatically every weekend.</li>
             <li>Objectives are evaluated at a deadline round.</li>
             <li>Miss an objective and patience drops. At 0, the sponsor walks.</li>
@@ -105,6 +114,55 @@ export function SponsorsTab({ state, act }: Props) {
           </div>
         </Card>
       </div>
+
+      {confirm && (
+        <Modal open onClose={() => setConfirm(null)} title={`Sign ${confirm.name}?`}>
+          <div className="space-y-3">
+            <p className="text-xs leading-relaxed text-ink-soft">
+              Are you sure you want to add <span className="font-semibold text-ink">{confirm.name}</span> as a new
+              sponsor mid-season? The deal locks in a slot and an obligation.
+            </p>
+            <div className="grid gap-2 rounded-md border border-hairline bg-raised/40 p-3 text-xs">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-ink-faint">Benefit — per race</span>
+                <span className="tabular text-positive">
+                  <Money value={confirm.racePayment} /> + <Money value={confirm.bonus} /> bonus
+                </span>
+              </div>
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-ink-faint">Payment</span>
+                <span className="tabular">
+                  <Money value={confirm.racePayment} /> paid every race · free to sign
+                </span>
+              </div>
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-ink-faint">Tier</span>
+                <Tag tone={confirm.tier === "title" ? "elite" : confirm.tier === "major" ? "telemetry" : "ink"}>{confirm.tier}</Tag>
+              </div>
+            </div>
+            <div className="rounded-md border-l-2 border-hairline bg-raised/40 p-3 text-xs">
+              <div className="mb-1 text-[10px] font-semibold uppercase tracking-widest text-ink-faint">
+                Requirement to get the money
+              </div>
+              <p className="leading-relaxed text-ink-soft">{confirm.objectiveTextEnjoyer}</p>
+            </div>
+            <div className="flex justify-end gap-2 pt-1">
+              <Button small variant="ghost" onClick={() => setConfirm(null)}>
+                Not now
+              </Button>
+              <Button
+                small
+                onClick={() => {
+                  act((x) => signSponsor(x, confirm.id).message);
+                  setConfirm(null);
+                }}
+              >
+                Yes, sign {confirm.name}
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }

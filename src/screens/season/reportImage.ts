@@ -110,6 +110,14 @@ function standingsTable(
   });
 }
 
+function aroundPlayer(rows: StandRow[], above: number, below: number): StandRow[] {
+  const hits = rows.map((r, i) => (r.highlight ? i : -1)).filter((i) => i >= 0);
+  if (hits.length === 0) return rows.slice(0, above + 1 + below);
+  const lo = Math.max(0, Math.min(...hits) - above);
+  const hi = Math.min(rows.length - 1, Math.max(...hits) + below);
+  return rows.slice(lo, hi + 1);
+}
+
 export function exportReportImage(state: SimulationState, ratio: Ratio) {
   const t = state.team;
   if (!t) return;
@@ -159,7 +167,7 @@ function drawReport(
     highlight: s.teamId === t.constructorId,
   }));
   const wdcRows: StandRow[] = state.standingsDrivers.map((s) => ({
-    name: driverById(s.driverId)?.name ?? s.driverId,
+    name: driverById(s.driverId, state.season)?.name ?? s.driverId,
     pts: s.points,
     highlight: s.driverId === t.driver1Id || s.driverId === t.driver2Id,
   }));
@@ -209,13 +217,13 @@ function drawPortrait(
   fillText(ctx, `SEASON ${state.season}`, W - pad, 72, 26, C.faint, { weight: 600, font: BODY, align: "right" });
   ctx.textAlign = "left";
 
-  fillText(ctx, `WCC P${pos}`, pad, 192, 128, C.ink, { weight: 700 });
+  fillText(ctx, `WCC P${pos}`, pad, 196, 128, C.ink, { weight: 700 });
   {
     const pw = ctx.measureText(`WCC P${pos}`).width;
-    fillText(ctx, ".", pad + pw - 8, 220, 128, accent, { weight: 700 });
+    fillText(ctx, ".", pad + pw - 8, 224, 128, accent, { weight: 700 });
   }
-  fillText(ctx, teamName.toUpperCase(), pad, 268, 46, C.ink, { weight: 700 });
-  fillText(ctx, `SEASON ${state.season} · ${diffLabel.toUpperCase()} · SEED ${state.seed}`, pad, 308, 22, C.faint, { font: MONO, weight: 500 });
+  fillText(ctx, teamName.toUpperCase(), pad, 276, 46, C.ink, { weight: 700 });
+  fillText(ctx, `SEASON ${state.season} · ${diffLabel.toUpperCase()} · SEED ${state.seed}`, pad, 316, 22, C.faint, { font: MONO, weight: 500 });
 
   const stats: [string, string, string][] = [
     ["Points", `${t.points}`, C.ink],
@@ -226,47 +234,49 @@ function drawPortrait(
     ["Cash", money(t.cash), C.green],
   ];
   const cardW = (W - pad * 2 - 24) / 3;
-  const cardH = 96;
+  const cardH = 104;
   stats.forEach(([label, value, color], i) => {
     const col = i % 3;
     const row = Math.floor(i / 3);
-    statCard(ctx, pad + col * (cardW + 12), 344 + row * (cardH + 12), cardW, cardH, label, value, color);
+    statCard(ctx, pad + col * (cardW + 12), 352 + row * (cardH + 16), cardW, cardH, label, value, color);
   });
 
-  const rewardY = 344 + 2 * (cardH + 12) + 16;
-  roundRect(ctx, pad, rewardY, cardW, 90, 10);
+  const rewardY = 352 + 2 * (cardH + 16) + 22;
+  roundRect(ctx, pad, rewardY, cardW, 92, 10);
   ctx.fillStyle = C.panel;
   ctx.fill();
-  fillText(ctx, `PRIZE MONEY · WCC P${pos}`, pad + 18, rewardY + 28, 17, C.faint, { font: BODY, weight: 600 });
-  fillText(ctx, money(prize), pad + 18, rewardY + 74, 30, C.yellow, { weight: 700 });
-  roundRect(ctx, pad + cardW + 12, rewardY, cardW * 2 + 12, 90, 10);
+  fillText(ctx, `PRIZE MONEY · WCC P${pos}`, pad + 18, rewardY + 30, 17, C.faint, { font: BODY, weight: 600 });
+  fillText(ctx, money(prize), pad + 18, rewardY + 76, 30, C.yellow, { weight: 700 });
+  roundRect(ctx, pad + cardW + 12, rewardY, cardW * 2 + 12, 92, 10);
   ctx.fillStyle = C.panel;
   ctx.fill();
-  fillText(ctx, "TEAM", pad + cardW + 30, rewardY + 28, 17, C.faint, { font: BODY, weight: 600 });
+  fillText(ctx, "TEAM", pad + cardW + 30, rewardY + 30, 17, C.faint, { font: BODY, weight: 600 });
   const l2w = ctx.measureText(teamName).width;
-  fillText(ctx, teamName, pad + cardW + 30, rewardY + 74, 26, C.ink, { weight: 700 });
-  fillText(ctx, `NET ${money(net)}`, pad + cardW + 30 + l2w + 28, rewardY + 74, 26, net >= 0 ? C.green : C.red, { weight: 700 });
+  fillText(ctx, teamName, pad + cardW + 30, rewardY + 76, 26, C.ink, { weight: 700 });
+  fillText(ctx, `NET ${money(net)}`, pad + cardW + 30 + l2w + 28, rewardY + 76, 26, net >= 0 ? C.green : C.red, { weight: 700 });
 
-  const tableTop = rewardY + 96 + 34;
+  const tableTop = rewardY + 108 + 50;
   fillText(ctx, "CONSTRUCTORS CHAMPIONSHIP", pad, tableTop, 24, C.muted, { weight: 700 });
-  standingsTable(ctx, pad, tableTop + 40, W - pad * 2, wccRows.slice(0, 10), 46, accent);
+  const wccShown = aroundPlayer(wccRows, 2, 2);
+  standingsTable(ctx, pad, tableTop + 46, W - pad * 2, wccShown, 58, accent);
 
-  const wdcTop = tableTop + 40 + 10 * 46 + 44;
+  const wdcTop = tableTop + 46 + wccShown.length * 58 + 58;
   fillText(ctx, "DRIVERS CHAMPIONSHIP", pad, wdcTop, 24, C.muted, { weight: 700 });
-  standingsTable(ctx, pad, wdcTop + 40, W - pad * 2, wdcRows.slice(0, 10), 42, accent);
+  const wdcShown = aroundPlayer(wdcRows, 2, 2);
+  standingsTable(ctx, pad, wdcTop + 46, W - pad * 2, wdcShown, 56, accent);
 
-  const driverTop = wdcTop + 40 + 10 * 42 + 34;
+  const driverTop = wdcTop + 46 + wdcShown.length * 56 + 56;
   fillText(ctx, "YOUR DRIVERS", pad, driverTop, 24, C.muted, { weight: 700 });
   myStandings.forEach(({ s, i }, idx) => {
-    const d = driverById(s.driverId);
+    const d = driverById(s.driverId, state.season);
     const dx = pad + idx * ((W - pad * 2 - 16) / 2 + 8);
     const dw = (W - pad * 2 - 16) / 2;
-    roundRect(ctx, dx, driverTop + 40, dw, 78, 10);
+    roundRect(ctx, dx, driverTop + 44, dw, 84, 10);
     ctx.fillStyle = C.panel;
     ctx.fill();
-    fillText(ctx, `P${i + 1}`, dx + 18, driverTop + 96, 26, i === 0 ? C.green : C.muted, { font: MONO, weight: 700 });
-    fillText(ctx, d?.name ?? s.driverId, dx + 70, driverTop + 89, 22, C.ink, { weight: 700 });
-    fillText(ctx, `${s.points} pts · ${s.dnfs} DNF`, dx + 70, driverTop + 110, 16, C.faint, { font: BODY, weight: 500 });
+    fillText(ctx, `P${i + 1}`, dx + 18, driverTop + 102, 26, i === 0 ? C.green : C.muted, { font: MONO, weight: 700 });
+    fillText(ctx, d?.name ?? s.driverId, dx + 70, driverTop + 95, 22, C.ink, { weight: 700 });
+    fillText(ctx, `${s.points} pts · ${s.dnfs} DNF`, dx + 70, driverTop + 116, 16, C.faint, { font: BODY, weight: 500 });
   });
 
   fillText(ctx, "F1 OWNER — SEASON REPORT", W / 2, H - 36, 20, C.faint, { weight: 600, font: BODY, align: "center" });

@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { SimulationState } from "@/simulation/types";
 import { constructorById } from "@/data";
 import { difficultyOf } from "@/state";
-import { Button, Money, Stat } from "@/ui/kit";
+import { Button, Modal, Money, Stat } from "@/ui/kit";
 import type { Act } from "./parts";
 import { OverviewTab } from "./OverviewTab";
 import { RaceTab } from "./RaceTab";
@@ -28,8 +28,8 @@ export default function SeasonScreen({ state, onRunRound, onNewsAction, act, onR
   const t = state.team!;
   const ctor = constructorById(t.constructorId, state.season);
   const wccPos = state.standingsConstructors.findIndex((c) => c.teamId === t.constructorId) + 1;
-  const done = state.completedRounds >= state.calendar.length;
   const [tab, setTab] = useState<Tab>("Overview");
+  const [confirmMenu, setConfirmMenu] = useState(false);
 
   if (state.phase === "bankrupt" || state.phase === "finished") {
     return <EndScreens state={state} onReset={onReset} />;
@@ -55,8 +55,7 @@ export default function SeasonScreen({ state, onRunRound, onNewsAction, act, onR
           <Stat label="WCC Pts" value={t.points} />
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="ghost" small onClick={onReset}>Menu</Button>
-          <Button small onClick={onRunRound} disabled={done}>Race Weekend →</Button>
+          <Button variant="ghost" small onClick={() => setConfirmMenu(true)}>Menu</Button>
         </div>
       </header>
 
@@ -66,8 +65,10 @@ export default function SeasonScreen({ state, onRunRound, onNewsAction, act, onR
             key={tb}
             type="button"
             onClick={() => setTab(tb)}
-            className={`rounded-sm px-3 py-1.5 text-xs font-bold uppercase tracking-widest transition ${
-              tab === tb ? "bg-signal text-white" : "bg-raised text-ink-soft hover:text-ink"
+            className={`rounded-sm border px-3 py-1.5 text-xs font-bold uppercase tracking-widest transition ${
+              tab === tb
+                ? "border-signal/40 bg-signal/15 text-signal"
+                : "border-transparent bg-raised/40 text-ink-soft hover:bg-raised hover:text-ink"
             }`}
           >
             {tb}
@@ -75,12 +76,22 @@ export default function SeasonScreen({ state, onRunRound, onNewsAction, act, onR
         ))}
       </nav>
 
-      {tab === "Overview" && <OverviewTab state={state} onNewsAction={onNewsAction} />}
+      {tab === "Overview" && <OverviewTab state={state} onNewsAction={onNewsAction} onRunRound={onRunRound} />}
       {tab === "Race" && <RaceTab state={state} onRunRound={onRunRound} />}
       {tab === "Market" && <MarketTab state={state} act={act} />}
       {tab === "Sponsors" && <SponsorsTab state={state} act={act} />}
       {tab === "Garage" && <GarageTab state={state} act={act} />}
       {tab === "Finance" && <FinanceTab state={state} />}
+
+      <Modal open={confirmMenu} onClose={() => setConfirmMenu(false)} title="Quit to menu?">
+        <p className="text-sm leading-relaxed text-ink-soft">
+          This season will be lost — the save is cleared when you return to the main menu.
+        </p>
+        <div className="mt-4 flex justify-end gap-2">
+          <Button small variant="ghost" onClick={() => setConfirmMenu(false)}>Keep playing</Button>
+          <Button small onClick={onReset}>Quit to menu</Button>
+        </div>
+      </Modal>
     </div>
   );
 }

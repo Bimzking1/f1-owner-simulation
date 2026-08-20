@@ -118,6 +118,10 @@ export const assetManifest: AssetEntry[] = [
   { filename: "dummy127.png", category: "drivers", description: "Yuki Tsunoda photo", seasons: "2025", usedBy: ["tsunoda"] },
   { filename: "dummy128.png", category: "drivers", description: "Isack Hadjar photo", seasons: "2025", usedBy: ["hadjar"] },
   { filename: "dummy129.png", category: "drivers", description: "Gabriel Bortoleto photo", seasons: "2025", usedBy: ["bortoleto"] },
+  { filename: "dummy130.png", category: "drivers", description: "Lewis Hamilton photo (2025)", seasons: "2025", usedBy: ["hamilton"] },
+  { filename: "dummy131.png", category: "drivers", description: "Fernando Alonso photo (2025)", seasons: "2025", usedBy: ["alonso"] },
+  { filename: "dummy132.png", category: "drivers", description: "Nico Hulkenberg photo (2025)", seasons: "2025", usedBy: ["hulkenberg"] },
+  { filename: "dummy133.png", category: "drivers", description: "Franco Colapinto photo (Alpine reserve)", seasons: "2025", usedBy: ["colapinto"] },
 
   // 141–165 Car images
   { filename: "dummy141.png", category: "cars", description: "Ferrari car image", seasons: "2025", usedBy: ["ferrari"] },
@@ -135,6 +139,12 @@ export const assetManifest: AssetEntry[] = [
   { filename: "dummy153.png", category: "cars", description: "Toro Rosso car image", seasons: "2013", usedBy: ["tororosso"] },
   { filename: "dummy154.png", category: "cars", description: "Caterham car image", seasons: "2013", usedBy: ["caterham"] },
   { filename: "dummy155.png", category: "cars", description: "Marussia car image", seasons: "2013", usedBy: ["marussia"] },
+  { filename: "dummy156.png", category: "cars", description: "Ferrari car image (2013)", seasons: "2013", usedBy: ["ferrari"] },
+  { filename: "dummy157.png", category: "cars", description: "Red Bull Racing car image (2013)", seasons: "2013", usedBy: ["redbull"] },
+  { filename: "dummy158.png", category: "cars", description: "Mercedes car image (2013)", seasons: "2013", usedBy: ["mercedes"] },
+  { filename: "dummy159.png", category: "cars", description: "McLaren car image (2013)", seasons: "2013", usedBy: ["mclaren"] },
+  { filename: "dummy160.png", category: "cars", description: "Williams car image (2013)", seasons: "2013", usedBy: ["williams"] },
+  { filename: "dummy161.png", category: "cars", description: "Sauber car image (2013)", seasons: "2013", usedBy: ["sauber"] },
 
   // 166–185 Engines / gearbox / technical
   { filename: "dummy166.png", category: "engines", description: "Renault RS27 V8 (2013)", seasons: "2013", usedBy: ["renault13"] },
@@ -213,6 +223,12 @@ export const assetPaths = {
     tororosso: A("cars", "dummy153.png"),
     caterham: A("cars", "dummy154.png"),
     marussia: A("cars", "dummy155.png"),
+    ferrari13: A("cars", "dummy156.png"),
+    redbull13: A("cars", "dummy157.png"),
+    mercedes13: A("cars", "dummy158.png"),
+    mclaren13: A("cars", "dummy159.png"),
+    williams13: A("cars", "dummy160.png"),
+    sauber13: A("cars", "dummy161.png"),
   },
   drivers: {
     vettel: A("drivers", "dummy091.png"),
@@ -254,6 +270,10 @@ export const assetPaths = {
     tsunoda: A("drivers", "dummy127.png"),
     hadjar: A("drivers", "dummy128.png"),
     bortoleto: A("drivers", "dummy129.png"),
+    hamilton2025: A("drivers", "dummy130.png"),
+    alonso2025: A("drivers", "dummy131.png"),
+    hulkenberg2025: A("drivers", "dummy132.png"),
+    colapinto: A("drivers", "dummy133.png"),
   },
   tracks: {
     melbourne: A("tracks", "dummy051.png"),
@@ -309,8 +329,11 @@ export const assetPaths = {
   },
 } as const;
 
-/** Resolve driver image by driver id (used by data + UI). */
-export function driverImage(id: string): string {
-  return (assetPaths.drivers as Record<string, unknown>)[id] as string | undefined ??
-    assetPaths.branding.fallbackLogo;
+/** Resolve driver image by driver id (used by data + UI). Season-aware so
+ *  drivers who appear in both eras (Hamilton, Alonso, Hulkenberg) get their
+ *  2025 photo when a season-specific asset exists. */
+export function driverImage(id: string, season?: number): string {
+  const map = assetPaths.drivers as Record<string, unknown>;
+  const seasonal = season === 2025 ? (map[`${id}2025`] as string | undefined) : undefined;
+  return (seasonal ?? map[id]) as string | undefined ?? assetPaths.branding.fallbackLogo;
 }

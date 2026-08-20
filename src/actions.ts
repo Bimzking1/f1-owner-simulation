@@ -31,12 +31,15 @@ export function hireEngineer(state: SimulationState, engineerId: string): Action
   if (t.engineerIds.length >= 5) return msg(result, false, "Engineering staff is full (5 max).");
   const eng = engineerById(engineerId);
   if (!eng) return msg(result, false, "Unknown engineer.");
-  const cost = Math.round(eng.cost * 100) / 100;
-  if (t.cash < cost) return msg(result, false, `Need $${cost}M.`);
-  t.cash = Math.round((t.cash - cost) * 100) / 100;
   t.engineerIds.push(engineerId);
-  t.history.push({ round: state.completedRounds + 1, label: `Hire ${eng.name}`, amount: -cost, category: "staff" });
-  return msg(result, true, `${eng.name} signed.`);
+  t.history.push({
+    round: state.completedRounds + 1,
+    label: `Hire ${eng.name}`,
+    amount: 0,
+    category: "staff",
+    detail: `${eng.name} signed.\nNo up-front fee — the $${eng.cost}M seasonal salary is paid per race weekend.\nThat's $${Math.round((eng.cost / (state.calendar.length || 19)) * 100) / 100}M/weekend.`,
+  });
+  return msg(result, true, `${eng.name} signed. Salary paid per weekend.`);
 }
 
 export function fireEngineer(state: SimulationState, engineerId: string): ActionResult {
@@ -47,7 +50,13 @@ export function fireEngineer(state: SimulationState, engineerId: string): Action
   t.engineerIds = t.engineerIds.filter((id) => id !== engineerId);
   const cost = Math.round((eng.cost * 0.5) * 100) / 100; // severance
   t.cash = Math.round((t.cash - cost) * 100) / 100;
-  t.history.push({ round: state.completedRounds + 1, label: `${eng.name} exit`, amount: -cost, category: "staff" });
+  t.history.push({
+    round: state.completedRounds + 1,
+    label: `${eng.name} exit`,
+    amount: -cost,
+    category: "staff",
+    detail: `${eng.name} released.\nOne-time severance = 50% of the $${eng.cost}M seasonal salary = $${cost}M.`,
+  });
   return msg(result, true, `${eng.name} released (severance $${cost}M).`);
 }
 
@@ -58,12 +67,15 @@ export function hireMechanic(state: SimulationState, mechanicId: string): Action
   if (t.mechanicIds.length >= 5) return msg(result, false, "Pit crew is full (5 max).");
   const mech = mechanicById(mechanicId);
   if (!mech) return msg(result, false, "Unknown mechanic.");
-  const cost = Math.round(mech.cost * 100) / 100;
-  if (t.cash < cost) return msg(result, false, `Need $${cost}M.`);
-  t.cash = Math.round((t.cash - cost) * 100) / 100;
   t.mechanicIds.push(mechanicId);
-  t.history.push({ round: state.completedRounds + 1, label: `Hire ${mech.name}`, amount: -cost, category: "staff" });
-  return msg(result, true, `${mech.name} joined the crew.`);
+  t.history.push({
+    round: state.completedRounds + 1,
+    label: `Hire ${mech.name}`,
+    amount: 0,
+    category: "staff",
+    detail: `${mech.name} signed.\nNo up-front fee — the $${mech.cost}M seasonal salary is paid per race weekend.\nThat's $${Math.round((mech.cost / (state.calendar.length || 19)) * 100) / 100}M/weekend.`,
+  });
+  return msg(result, true, `${mech.name} joined the crew. Salary paid per weekend.`);
 }
 
 export function fireMechanic(state: SimulationState, mechanicId: string): ActionResult {
@@ -74,7 +86,13 @@ export function fireMechanic(state: SimulationState, mechanicId: string): Action
   t.mechanicIds = t.mechanicIds.filter((id) => id !== mechanicId);
   const cost = Math.round((mech.cost * 0.5) * 100) / 100;
   t.cash = Math.round((t.cash - cost) * 100) / 100;
-  t.history.push({ round: state.completedRounds + 1, label: `${mech.name} exit`, amount: -cost, category: "staff" });
+  t.history.push({
+    round: state.completedRounds + 1,
+    label: `${mech.name} exit`,
+    amount: -cost,
+    category: "staff",
+    detail: `${mech.name} released.\nOne-time severance = 50% of the $${mech.cost}M seasonal salary = $${cost}M.`,
+  });
   return msg(result, true, `${mech.name} released (severance $${cost}M).`);
 }
 
@@ -91,9 +109,9 @@ export interface SwapQuote {
 export function swapQuote(state: SimulationState, slot: 1 | 2, driverId: string): SwapQuote | null {
   const t = state.team!;
   const currentId = slot === 1 ? t.driver1Id : t.driver2Id;
-  const target = driverById(driverId);
+  const target = driverById(driverId, state.season);
   if (!target) return null;
-  const old = driverById(currentId);
+  const old = driverById(currentId, state.season);
   const roundsLeft = Math.max(1, state.calendar.length - state.round);
   const prorated = Math.max(0, ((target.salary - (old?.salary ?? 4)) / state.calendar.length) * roundsLeft);
   const fee = 2; // $M break fee
@@ -108,16 +126,17 @@ export function swapDriver(state: SimulationState, slot: 1 | 2, driverId: string
   const currentId = slot === 1 ? t.driver1Id : t.driver2Id;
   const otherId = slot === 1 ? t.driver2Id : t.driver1Id;
   if (currentId === driverId) return msg(result, false, "Already driving.");
-  if (driverId === otherId) return msg(result, false, `${driverById(driverId)?.shortName ?? driverId} already drives for the team.`);
-  const target = driverById(driverId);
+  if (driverId === otherId) return msg(result, false, `${driverById(driverId, state.season)?.shortName ?? driverId} already drives for the team.`);
+  const target = driverById(driverId, state.season);
   if (!target) return msg(result, false, "Unknown driver.");
-  const old = driverById(currentId);
+  const old = driverById(currentId, state.season);
   const quote = swapQuote(state, slot, driverId)!;
   const total = quote.total;
   if (t.cash < total) return msg(result, false, `Need $${total}M for the transfer.`);
   t.cash = Math.round((t.cash - total) * 100) / 100;
   const previousState = t.drivers.find((d) => d.driverId === currentId) ?? null;
   if (slot === 1) t.driver1Id = driverId; else t.driver2Id = driverId;
+  if (state.lineups) state.lineups[t.constructorId] = [t.driver1Id, t.driver2Id];
   t.drivers = t.drivers.filter((d) => d.driverId !== currentId);
   const newState: DriverState = {
     driverId,
@@ -134,6 +153,7 @@ export function swapDriver(state: SimulationState, slot: 1 | 2, driverId: string
     label: `${old?.shortName ?? currentId} out, ${target.shortName} in`,
     amount: -total,
     category: "other",
+    detail: `Seat change.\nBreak fee: $${quote.fee}M\nProrated salary delta (${state.calendar.length - state.completedRounds} remaining rounds): $${quote.prorated}M\nTotal: $${total}M`,
   });
   state.news.unshift({
     id: `swap-${state.completedRounds + 1}-${driverId}`,
@@ -163,8 +183,9 @@ export function undoDriverSwap(state: SimulationState): ActionResult {
   if (!log) return msg(result, false, "Nothing to undo.");
   const currentId = log.slot === 1 ? t.driver1Id : t.driver2Id;
   if (currentId !== log.newDriverId) return msg(result, false, "Line-up changed since the swap.");
-  const target = driverById(log.newDriverId);
+  const target = driverById(log.newDriverId, state.season);
   if (log.slot === 1) t.driver1Id = log.previousDriverId; else t.driver2Id = log.previousDriverId;
+  if (state.lineups) state.lineups[t.constructorId] = [t.driver1Id, t.driver2Id];
   const newsIdx = state.news.findIndex((n) => n.id.startsWith(`swap-${log.round}-`));
   if (newsIdx >= 0) state.news.splice(newsIdx, 1);
   const histIdx = [...t.history].reverse().findIndex((h) => (h.amount + log.fee) < 0.001 && h.label.includes("out, "));
@@ -187,8 +208,6 @@ export function signSponsor(state: SimulationState, sponsorId: string): ActionRe
   const spec = sponsorById(sponsorId);
   if (!spec) return msg(result, false, "Unknown sponsor.");
   if (t.reputation < (spec.tier === "title" ? 30 : 0)) return msg(result, false, "Reputation too low for a title sponsor.");
-  if (t.cash < spec.signingBonus) return msg(result, false, `Need $${spec.signingBonus}M signing money.`);
-  t.cash = Math.round((t.cash - spec.signingBonus) * 100) / 100;
   t.sponsors.push({
     sponsorId: spec.id,
     progress: 0,
@@ -201,8 +220,14 @@ export function signSponsor(state: SimulationState, sponsorId: string): ActionRe
   const round = state.completedRounds + 1;
   scheduleObjective(state, spec.id, round);
   if (!state.lastWeekend) scheduleObjective(state, spec.id, 1);
-  t.history.push({ round, label: `${spec.name} signing`, amount: -spec.signingBonus, category: "sponsor" });
-  return msg(result, true, `${spec.name} signed.`);
+  t.history.push({
+    round,
+    label: `${spec.name} signing`,
+    amount: 0,
+    category: "sponsor",
+    detail: `${spec.name} signed.\nNo up-front fee — pays $${spec.racePayment}M per race weekend.\nBonus: +$${Math.round(spec.bonus * 100) / 100}M if the objective is met.`,
+  });
+  return msg(result, true, `${spec.name} signed. No up-front fee — pays per race.`);
 }
 
 function scheduleObjective(state: SimulationState, sponsorId: string, round: number) {
@@ -230,7 +255,13 @@ export function terminateSponsor(state: SimulationState, sponsorId: string): Act
   const fee = Math.round(spec.bonus * 0.4 * 100) / 100;
   t.cash = Math.round((t.cash - fee) * 100) / 100;
   t.reputation = Math.max(0, t.reputation - 5);
-  t.history.push({ round: state.completedRounds + 1, label: `${spec.name} terminated`, amount: -fee, category: "sponsor" });
+  t.history.push({
+    round: state.completedRounds + 1,
+    label: `${spec.name} terminated`,
+    amount: -fee,
+    category: "sponsor",
+    detail: `${spec.name} terminated.\nExit fee = 40% of the $${Math.round(spec.bonus * 100) / 100}M objective bonus = $${fee.toFixed(2)}M.\nReputation −5.`,
+  });
   return msg(result, true, `${spec.name} terminated ($${fee}M exit fee).`);
 }
 
@@ -251,6 +282,12 @@ export function runTest(state: SimulationState, type: TestType): TestReport {
   t.history.push({ round: state.completedRounds + 1, label: `${labelOf(type)} test`, amount: -cost, category: "testing" });
   const rng = createRng(`${state.seed}:test:${state.completedRounds}:${type}`);
   const test = buildTestReport(state, type, rng);
+  if (type === "driver") {
+    for (const ds of t.drivers) {
+      ds.confidence = clamp(ds.confidence + 4, 0, 100);
+      ds.morale = clamp(ds.morale + 3, 0, 100);
+    }
+  }
   state.testing.unshift(test);
   return test;
 }
@@ -263,7 +300,7 @@ function buildTestReport(state: SimulationState, type: TestType, rng: () => numb
   const t = state.team!;
   let value: number;
   if (type === "driver") {
-    const d = t.drivers[0] ? driverById(t.drivers[0].driverId) : undefined;
+    const d = t.drivers[0] ? driverById(t.drivers[0].driverId, state.season) : undefined;
     value = Math.round((d ? d.overall + t.drivers[0].form * 2 : 70) * (0.94 + rng() * 0.12));
   } else {
     const base = {

@@ -22,7 +22,11 @@ export const ALL_MECHANICS = MECHANICS;
 export const ALL_SPONSORS = SPONSORS;
 export const ALL_TRACKS = [...TRACKS_2013, ...TRACKS_2025];
 
-export function driverById(id: string) {
+export function driverById(id: string, season?: number) {
+  if (season !== undefined) {
+    const hit = ALL_DRIVERS.find((d) => d.id === id && d.season === season);
+    if (hit) return hit;
+  }
   return ALL_DRIVERS.find((d) => d.id === id);
 }
 export function constructorById(id: string, season?: number) {
@@ -72,11 +76,8 @@ export function takeoverOptions(season: SeasonId) {
   return constructorsBySeason(season);
 }
 
-/** Sponsor pool scaled to a team's reputation (spec §47). */
-export function availableSponsors(season: SeasonId, reputation: number, cash: number) {
+/** Sponsor pool scaled to a team's reputation (spec §47). No up-front cash gate: contracts pay per race. */
+export function availableSponsors(season: SeasonId, reputation: number) {
   const all = sponsorsForSeason(season);
-  return all.filter((s) => {
-    const tierGate = s.tier === "title" ? reputation >= 30 : true;
-    return tierGate && s.signingBonus <= cash + 2;
-  });
+  return all.filter((s) => (s.tier === "title" ? reputation >= 30 : true));
 }
