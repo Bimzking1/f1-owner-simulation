@@ -4,7 +4,10 @@ import {
   driverById,
   driversByTeam,
   engineerById,
+  engineerRole,
+  engineerSeniority,
   mechanicById,
+  mechanicTier,
 } from "@/data";
 import {
   fireEngineer,
@@ -144,8 +147,9 @@ export function MarketTab({ state, act }: Props) {
                       </Button>
                     )}
                   </div>
-                  <div className="mt-0.5 flex flex-wrap gap-x-2 text-[10px] text-ink-soft">
-                    <span className="text-ink-faint">{e.department}</span>
+                  <div className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[10px]">
+                    <Tag tone={engineerSeniority(e).tone}>{engineerSeniority(e).label}</Tag>
+                    <Tag tone="telemetry">{engineerRole(e)}</Tag>
                     <Rating label="Exp" value={e.expertise} />
                     <Rating label="Dev" value={e.developmentSpeed} />
                   </div>
@@ -175,7 +179,9 @@ export function MarketTab({ state, act }: Props) {
                       </Button>
                     )}
                   </div>
-                  <div className="mt-0.5 flex flex-wrap gap-x-2 text-[10px] text-ink-soft">
+                  <div className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[10px]">
+                    <Tag tone={mechanicTier(m).tone}>{mechanicTier(m).label}</Tag>
+                    <Tag tone="telemetry">Pit crew</Tag>
                     <Rating label="Pit" value={`${m.pitStop.toFixed(2)}s`} rank={100 - Math.round((m.pitStop - 2) * 40)} />
                     <Rating label="Err" value={`${m.errorChance}%`} rank={100 - Math.round(m.errorChance * 10)} />
                     <Rating label="Repair" value={m.repairEfficiency} />

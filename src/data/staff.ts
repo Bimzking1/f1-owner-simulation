@@ -55,3 +55,25 @@ export const DEPARTMENT_LABELS: Record<string, string> = {
   reliability: "Reliability",
   cto: "Chief Technical Officer",
 };
+
+export interface StaffMeta {
+  label: string;
+  tone: "ink" | "telemetry" | "elite" | "caution";
+}
+
+export function engineerSeniority(e: EngineerSpec): StaffMeta {
+  if (e.name.startsWith("Junior")) return { label: "Junior", tone: "ink" };
+  if (e.name.startsWith("Head of") || e.name === "Chassis Director") return { label: "Head", tone: "elite" };
+  if (e.name.startsWith("Chief")) return { label: "CTO", tone: "elite" };
+  return { label: "Senior", tone: "telemetry" };
+}
+
+export function engineerRole(e: EngineerSpec): string {
+  return e.department === "cto" ? "Technical leadership" : DEPARTMENT_LABELS[e.department];
+}
+
+export function mechanicTier(m: MechanicSpec): StaffMeta {
+  if (m.name.startsWith("Budget")) return { label: "Budget", tone: "caution" };
+  if (m.name.startsWith("Standard")) return { label: "Standard", tone: "telemetry" };
+  return { label: "Elite", tone: "elite" };
+}

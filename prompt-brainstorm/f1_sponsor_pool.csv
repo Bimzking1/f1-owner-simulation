@@ -1,0 +1,21 @@
+Sponsor,Category,Tier,Signing Bonus ($M),Race Payment ($M),Base Performance Bonus ($M),Primary Requirement,Bonus Conditions,Failure / Risk
+Oracle,Technology / Cloud,Mega,20,3.5,20,Finish Top 5 Constructors AND score points in 70% of races,+20M if Constructors P3 or better; +10M if driver wins >=3 races,Sponsor confidence -15; renewal chance -25%
+HP,Technology,Mega,18,3.5,25,3 podiums before Round 12,+25M if target achieved; +10M if Constructors P3 or better,Sponsor confidence -20
+Aramco,Energy,Premium,15,2.5,18,Finish Top 6 Constructors AND score points in 75% of races,+8M if mechanical DNFs <=3,Performance bonus lost if targets missed
+Petronas,Energy / Technical,Premium,14,2.3,15,Finish Top 5 Constructors,+10M if reliability >=90; +8M if >=5 podiums,Performance bonus lost if target missed
+Santander,Banking / Finance,Major,8,1.2,12,Score points in 10 races,+8M if Top 5 Constructors,Low volatility; bonus lost if target missed
+Lenovo,Technology,Major,9,1.5,14,Finish Top 8 Constructors,+5M if development rating >=85; +5M if driver scores 100+ points,Performance bonus lost if target missed
+TAG Heuer,Luxury / Timekeeping,Major,10,1.4,12,3 podiums OR finish Top 5 Constructors,+3M if driver reputation >=85,Performance bonus lost if target missed
+Mastercard,Finance / Payments,Major,7,1.3,15,5 Top-10 finishes in first 8 races,Full performance bonus if target achieved,No initial penalty; bonus lost
+DHL,Logistics,Major,7,1.1,10,Complete >=90% of races AND finish >=12 races,+5M if reliability >=85,Performance bonus lost if target missed
+Pirelli,Tires / Technical,Premium,10,1.5,15,Average tire degradation <=20%,+10M for 5+ podiums,Performance bonus lost if target missed
+Microsoft,Technology,Major,8,1.3,15,Development Efficiency >=80,+7M if 3 upgrades completed before Round 12,Performance bonus lost if target missed
+SAP,Enterprise Software,Professional / Major,5,0.9,10,Financial Efficiency >=75,+6M if season ends with positive cash,Performance bonus lost if target missed
+CrowdStrike,Cybersecurity / Technology,Major,6,1.0,12,<=4 major technical failures,+8M if reliability >=90,Performance bonus lost if target missed
+IWC Schaffhausen,Luxury / Watch,Professional,4,0.7,8,3 Top-10 finishes,No additional bonus beyond performance target,Low risk; bonus lost if target missed
+PepsiCo,Food / Beverage,Premium,12,1.8,15,5 Top-10 finishes,"+2M per podium, maximum +10M",Performance bonus lost if target missed
+Shell,Energy / Fuel / Lubricants,Premium,13,2.0,16,Finish Top 6 Constructors AND reliability >=85,+8M if fuel/energy efficiency >=85,Sponsor confidence -10 if reliability target missed
+IBM,Technology / Data,Major,7,1.1,13,Development Efficiency >=80 AND complete 2 major upgrades,+6M if simulation/development efficiency >=90,Bonus reduced by 50% if one target missed
+Salesforce,Technology / CRM,Major,6,1.0,11,Driver reputation >=80 AND 4 Top-10 finishes,+5M if fan popularity increases by >=15,Bonus lost if either main target missed
+Crypto.com,Finance / Crypto,Premium,11,2.2,20,Finish Top 8 Constructors OR 2 podiums,+10M for Top 5 Constructors; +5M for 5 podiums,Higher volatility; renewal chance affected heavily by poor performance
+AWS,Technology / Cloud / Data,Premium,10,1.7,18,Development Efficiency >=85 AND score points in 80% of races,+8M if reliability >=90; +5M if 3+ upgrades succeed,Sponsor confidence -15 if technical failures exceed threshold

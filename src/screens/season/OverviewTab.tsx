@@ -49,7 +49,7 @@ export function OverviewTab({ state, onNewsAction, onRunRound }: Props) {
         <Card title="Team">
           <div className="mb-3">
             {(() => {
-              const c = constructorById(t.constructorId);
+              const c = constructorById(t.constructorId, state.season);
               const pos = state.standingsConstructors.findIndex((s) => s.teamId === t.constructorId) + 1;
               if (!c) return null;
               return (
