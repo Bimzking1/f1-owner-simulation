@@ -17,7 +17,7 @@ import {
   testingBudget,
   undoDriverSwap,
 } from "@/actions";
-import { Button, Card, Img, Modal, Money, Tag } from "@/ui/kit";
+import { Button, Card, Img, Modal, Money, Ovr, Rating, Tag } from "@/ui/kit";
 import { driverImage } from "@/data/assets";
 import type { Act } from "./parts";
 
@@ -51,6 +51,7 @@ const MECHANIC_IDS: Record<number, string[]> = {
 export function MarketTab({ state, act }: Props) {
   const t = state.team!;
   const [pending, setPending] = useState<{ slot: 1 | 2; driverId: string } | null>(null);
+  const [staffPick, setStaffPick] = useState<{ kind: "engineer" | "mechanic"; id: string; action: "hire" | "fire" } | null>(null);
   const seasonDrivers = Object.values(driversByTeam(state.season))
     .flat()
     .map(driverById)
@@ -86,7 +87,7 @@ export function MarketTab({ state, act }: Props) {
                   <div className="mb-2 flex items-center gap-2">
                     <span className="font-display font-bold">Seat {slot}</span>
                     {cur && <Tag tone="elite">{cur.shortName}</Tag>}
-                    <span className="ml-auto text-[11px] text-ink-faint">OVR {cur?.overall}</span>
+                    {cur && <Ovr value={cur.overall} className="ml-auto text-[11px]" />}
                   </div>
                   <div className="max-h-64 space-y-1 overflow-auto pr-1">
                     {freeAgents.map((d) => (
@@ -98,7 +99,7 @@ export function MarketTab({ state, act }: Props) {
                       >
                         <Img src={driverImage(d.id, state.season)} alt={d.shortName} className="h-6 w-6 rounded-sm object-cover" />
                         <span className="min-w-0 flex-1 truncate">{d.shortName}</span>
-                        <span className="text-[11px] text-ink-faint">OVR {d.overall}</span>
+                        <Ovr value={d.overall} className="text-[11px]" />
                         <span className="text-[11px] text-ink-faint">${d.salary}M</span>
                         <Tag tone="telemetry">Swap</Tag>
                       </button>
@@ -128,20 +129,26 @@ export function MarketTab({ state, act }: Props) {
             {engineers.map((e) => {
               const hired = t.engineerIds.includes(e.id);
               return (
-                <div key={e.id} className="flex items-center gap-2 rounded-sm border border-hairline px-2 py-1.5 text-sm">
-                  <span className="min-w-0 flex-1 truncate">{e.name}</span>
-                  <span className="text-[11px] text-ink-faint">{e.department} · ${e.cost}M/yr</span>
-                  {hired ? (
-                    <Button small variant="danger" onClick={() => act((s) => fireEngineer(s, e.id).message)}>Fire</Button>
-                  ) : (
-                    <Button
-                      small variant="ghost"
-                      disabled={t.engineerIds.length >= 5}
-                      onClick={() => act((s) => hireEngineer(s, e.id).message)}
-                    >
-                      Hire
-                    </Button>
-                  )}
+                <div key={e.id} className="rounded-sm border border-hairline px-2 py-1.5 text-sm">
+                  <div className="flex items-center gap-2">
+                    <span className="min-w-0 flex-1 truncate">{e.name}</span>
+                    {hired ? (
+                      <Button small variant="danger" onClick={() => setStaffPick({ kind: "engineer", id: e.id, action: "fire" })}>Fire</Button>
+                    ) : (
+                      <Button
+                        small variant="ghost"
+                        disabled={t.engineerIds.length >= 5}
+                        onClick={() => setStaffPick({ kind: "engineer", id: e.id, action: "hire" })}
+                      >
+                        Hire
+                      </Button>
+                    )}
+                  </div>
+                  <div className="mt-0.5 flex flex-wrap gap-x-2 text-[10px] text-ink-soft">
+                    <span className="text-ink-faint">{e.department}</span>
+                    <Rating label="Exp" value={e.expertise} />
+                    <Rating label="Dev" value={e.developmentSpeed} />
+                  </div>
                 </div>
               );
             })}
@@ -153,20 +160,26 @@ export function MarketTab({ state, act }: Props) {
             {mechanics.map((m) => {
               const hired = t.mechanicIds.includes(m.id);
               return (
-                <div key={m.id} className="flex items-center gap-2 rounded-sm border border-hairline px-2 py-1.5 text-sm">
-                  <span className="min-w-0 flex-1 truncate">{m.name}</span>
-                  <span className="text-[11px] text-ink-faint">{m.pitStop.toFixed(2)}s · ${m.cost}M/yr</span>
-                  {hired ? (
-                    <Button small variant="danger" onClick={() => act((s) => fireMechanic(s, m.id).message)}>Fire</Button>
-                  ) : (
-                    <Button
-                      small variant="ghost"
-                      disabled={t.mechanicIds.length >= 5}
-                      onClick={() => act((s) => hireMechanic(s, m.id).message)}
-                    >
-                      Hire
-                    </Button>
-                  )}
+                <div key={m.id} className="rounded-sm border border-hairline px-2 py-1.5 text-sm">
+                  <div className="flex items-center gap-2">
+                    <span className="min-w-0 flex-1 truncate">{m.name}</span>
+                    {hired ? (
+                      <Button small variant="danger" onClick={() => setStaffPick({ kind: "mechanic", id: m.id, action: "fire" })}>Fire</Button>
+                    ) : (
+                      <Button
+                        small variant="ghost"
+                        disabled={t.mechanicIds.length >= 5}
+                        onClick={() => setStaffPick({ kind: "mechanic", id: m.id, action: "hire" })}
+                      >
+                        Hire
+                      </Button>
+                    )}
+                  </div>
+                  <div className="mt-0.5 flex flex-wrap gap-x-2 text-[10px] text-ink-soft">
+                    <Rating label="Pit" value={`${m.pitStop.toFixed(2)}s`} rank={100 - Math.round((m.pitStop - 2) * 40)} />
+                    <Rating label="Err" value={`${m.errorChance}%`} rank={100 - Math.round(m.errorChance * 10)} />
+                    <Rating label="Repair" value={m.repairEfficiency} />
+                  </div>
                 </div>
               );
             })}
@@ -230,11 +243,113 @@ export function MarketTab({ state, act }: Props) {
           <p className="mt-2 text-[11px] text-ink-faint">Affects driver confidence swings between teammates.</p>
         </Card>
       </div>
+
+      {staffPick && <StaffConfirmModal staffPick={staffPick} state={state} act={act} onClose={() => setStaffPick(null)} />}
     </div>
   );
 }
 
 // ---------------------------------------------------------------------------
+
+function StaffConfirmModal({
+  staffPick,
+  state,
+  act,
+  onClose,
+}: {
+  staffPick: { kind: "engineer" | "mechanic"; id: string; action: "hire" | "fire" };
+  state: SimulationState;
+  act: Act;
+  onClose: () => void;
+}) {
+  const eng = staffPick.kind === "engineer" ? engineerById(staffPick.id) : null;
+  const mech = staffPick.kind === "mechanic" ? mechanicById(staffPick.id) : null;
+  const staff = eng ?? mech;
+  if (!staff) return null;
+
+  const name = staff.name;
+  const hiring = staffPick.action === "hire";
+  const rounds = state.calendar.length || 19;
+  const weekly = Math.round((staff.cost / rounds) * 100) / 100;
+  const severance = Math.round(staff.cost * 0.5 * 100) / 100;
+
+  const stats =
+    staffPick.kind === "engineer" && eng ? (
+      <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-ink-soft">
+        <Rating label="Expertise" value={eng.expertise} />
+        <Rating label="Innovation" value={eng.innovation} />
+        <Rating label="Dev speed" value={eng.developmentSpeed} />
+        <Rating label="Reliability" value={eng.reliabilityFocus} />
+      </div>
+    ) : mech ? (
+      <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-ink-soft">
+        <Rating label="Pit stop" value={`${mech.pitStop.toFixed(2)}s`} rank={100 - Math.round((mech.pitStop - 2) * 40)} />
+        <Rating label="Error" value={`${mech.errorChance}%`} rank={100 - Math.round(mech.errorChance * 10)} />
+        <Rating label="Repair" value={mech.repairEfficiency} />
+      </div>
+    ) : null;
+
+  const impact = hiring
+    ? staffPick.kind === "engineer"
+      ? "Hiring boosts development output and innovation across the {department} department. No up-front fee — the seasonal salary is paid per weekend out of race earnings."
+      : "Hiring cuts pit stop times and reduces error odds for the rest of the season. No up-front fee — the seasonal salary is paid per weekend out of race earnings."
+    : staffPick.kind === "engineer"
+      ? "Firing frees a workshop slot and removes this engineer's development contribution until you replace them."
+      : "Firing frees a crew slot and your pit stops will be slower until the crew slot is refilled.";
+
+  return (
+    <Modal open onClose={onClose} title={`${hiring ? "Hire" : "Fire"} ${name}?`}>
+      <div className="space-y-3 text-sm">
+        <p className="text-xs leading-relaxed text-ink-soft">
+          {hiring
+            ? `Sign ${name} for the rest of the season.`
+            : `Release ${name} from the ${staffPick.kind === "engineer" ? "workshop" : "pit crew"} — a one-time severance is due now.`}
+        </p>
+
+        <div className="rounded-md border border-hairline bg-raised/40 p-3">{stats}</div>
+
+        <div className="grid gap-1 rounded-md border border-hairline bg-raised/40 p-3 text-xs">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-ink-faint">{hiring ? "Salary" : "Severance (50% of salary)"}</span>
+            {hiring ? (
+              <span className="tabular">
+                <Money value={staff.cost} />/yr ≈ <Money value={weekly} />/weekend
+              </span>
+            ) : (
+              <span className="tabular text-signal">−<Money value={severance} /></span>
+            )}
+          </div>
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-ink-faint">Payable now</span>
+            <span className="tabular">{hiring ? "—" : `−${severance.toFixed(1)}M`}</span>
+          </div>
+        </div>
+
+        <p className="rounded-md border-l-2 border-hairline bg-raised/40 p-3 text-xs leading-relaxed text-ink-soft">
+          {impact.replace("{department}", eng?.department ?? "")}
+        </p>
+
+        <div className="flex justify-end gap-2 pt-1">
+          <Button small variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button
+            small
+            variant={hiring ? "positive" : "danger"}
+            onClick={() => {
+              if (staffPick.kind === "engineer") {
+                act((s) => (hiring ? hireEngineer(s, staffPick.id) : fireEngineer(s, staffPick.id)).message);
+              } else {
+                act((s) => (hiring ? hireMechanic(s, staffPick.id) : fireMechanic(s, staffPick.id)).message);
+              }
+              onClose();
+            }}
+          >
+            {hiring ? `Yes, hire ${name}` : `Yes, fire ${name}`}
+          </Button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
 
 const COMPARE_KEYS: { key: string; label: string }[] = [
   { key: "overall", label: "Overall" },
@@ -345,7 +460,8 @@ function DriverMini({ d, label, season }: { d: ReturnType<typeof driverById>; la
       {label && <span className="text-[10px] font-semibold uppercase tracking-widest text-ink-faint">{label}</span>}
       <Img src={driverImage(d.id, season)} alt={d.shortName} className="h-10 w-10 rounded-sm object-cover" />
       <span className="font-display text-sm font-bold">{d.shortName}</span>
-      <span className="text-[11px] text-ink-faint">OVR {d.overall} · ${d.salary}M/yr</span>
+      <Ovr value={d.overall} className="text-[11px]" />
+      <span className="text-[11px] text-ink-faint">${d.salary}M/yr</span>
     </div>
   );
 }

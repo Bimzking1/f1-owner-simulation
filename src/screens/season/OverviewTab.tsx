@@ -1,8 +1,8 @@
 import type { SimulationState } from "@/simulation/types";
 import { driverById, constructorById } from "@/data";
-import { Bar, Button, Card, Img, Tag } from "@/ui/kit";
+import { Bar, Button, Card, Img, Ovr, Tag } from "@/ui/kit";
 import { driverImage } from "@/data/assets";
-import { MiniBar, NextRaceCard, StandingsCard } from "./parts";
+import { MiniBar, StandingsCard } from "./parts";
 
 interface Props {
   state: SimulationState;
@@ -33,7 +33,18 @@ export function OverviewTab({ state, onNewsAction, onRunRound }: Props) {
             </div>
           </Card>
         )}
-        {next && <NextRaceCard track={next} />}
+        {next && (
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md border border-hairline bg-surface/70 px-4 py-2 text-sm">
+            <span className="font-display text-base font-bold">{next.name}</span>
+            <span className="text-xs text-ink-faint">
+              {next.country} · {next.laps} laps · {next.lengthKm.toFixed(3)} km
+            </span>
+            {next.sprint && <Tag tone="elite">Sprint</Tag>}
+            <span className="ml-auto text-[11px] uppercase tracking-widest text-ink-faint">
+              Details & map on the Race tab
+            </span>
+          </div>
+        )}
 
         <Card title="Team">
           <div className="mb-3">
@@ -86,12 +97,12 @@ export function OverviewTab({ state, onNewsAction, onRunRound }: Props) {
                       <Tag tone={ds.confidence > 55 ? "positive" : "caution"}>{ds.confidence} conf</Tag>
                     </div>
                     <div className="text-[11px] text-ink-faint">
-                      OVR {d.overall} · Pts {ds.points}
+                      <Ovr value={d.overall} /> · Pts {ds.points}
                       {ds.dnfs > 0 ? ` · ${ds.dnfs} DNF` : ""}
                     </div>
                     <div className="mt-1 space-y-0.5">
-                      <MiniBar label="Conf" value={ds.confidence} tone="telemetry" />
-                      <MiniBar label="Morale" value={ds.morale} tone={ds.morale < 40 ? "caution" : "positive"} />
+                      <MiniBar label="Conf" value={ds.confidence} />
+                      <MiniBar label="Morale" value={ds.morale} />
                     </div>
                   </div>
                 </div>
@@ -101,8 +112,8 @@ export function OverviewTab({ state, onNewsAction, onRunRound }: Props) {
           <div className="mt-3 grid gap-2 sm:grid-cols-2">
             <Bar label="Aero" value={t.car.aero} />
             <Bar label="Chassis" value={t.car.chassis} />
-            <Bar label="Reliability" value={t.car.reliability} tone="positive" />
-            <Bar label="Power" value={t.car.power} tone="signal" />
+            <Bar label="Reliability" value={t.car.reliability} />
+            <Bar label="Power" value={t.car.power} />
             <Bar label="Tires" value={t.car.tireBehavior} />
             <Bar label="Gearbox" value={t.car.gearboxPerf} />
           </div>

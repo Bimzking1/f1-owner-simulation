@@ -18,6 +18,7 @@
   --color-elite: rgb(var(--accent-elite));
   --color-caution: rgb(var(--accent-caution));
   --color-positive: rgb(var(--accent-positive));
+  --color-azure: rgb(var(--accent-azure));
 }
 
 @utility sector-stripe {
@@ -45,6 +46,7 @@
   --accent-elite: 177 78 255;
   --accent-caution: 255 201 60;
   --accent-positive: 61 220 132;
+  --accent-azure: 77 153 255;
 }
 
 html.light {
@@ -61,6 +63,7 @@ html.light {
   --accent-elite: 133 40 214;
   --accent-caution: 178 122 5;
   --accent-positive: 21 140 82;
+  --accent-azure: 0 102 222;
 }
 
 html,

@@ -1,9 +1,26 @@
 import type { ReactNode } from "react";
 import { useState } from "react";
+import { ovrClass, ratingTextClass, ratingTone, type KitTone } from "./ratings";
 
 // ---------------------------------------------------------------------------
 // Tiny UI kit for F1 Owner — all styling via tailwind theme tokens in index.css
 // ---------------------------------------------------------------------------
+
+/** OVR badge — light purple for top drivers, green mid, grey low. */
+export function Ovr({ value, className = "" }: { value: number; className?: string }) {
+  return <span className={`tabular font-semibold ${ovrClass(value)} ${className}`}>OVR {value}</span>;
+}
+
+/** Rated attribute — colored by its 0-100 rank (use `rank` when higher is worse). */
+export function Rating({ label, value, rank }: { label: string; value: ReactNode; rank?: number }) {
+  const r = rank ?? (typeof value === "number" ? value : 0);
+  return (
+    <span className="tabular">
+      <span className="text-ink-faint">{label} </span>
+      <span className={`font-semibold ${ratingTextClass(r)}`}>{value}</span>
+    </span>
+  );
+}
 
 export function Money({ value, className = "" }: { value: number; className?: string }) {
   const neg = value < 0;
@@ -31,7 +48,7 @@ export function Tag({ children, tone = "ink" }: { children: ReactNode; tone?: "i
   );
 }
 
-export function Meter({ value, max = 100, tone = "telemetry", className = "" }: { value: number; max?: number; tone?: "signal" | "telemetry" | "positive" | "caution" | "elite"; className?: string }) {
+export function Meter({ value, max = 100, tone = "telemetry", className = "" }: { value: number; max?: number; tone?: KitTone; className?: string }) {
   const pct = Math.max(0, Math.min(100, (value / max) * 100));
   const tones: Record<string, string> = {
     signal: "bg-signal",
@@ -39,6 +56,7 @@ export function Meter({ value, max = 100, tone = "telemetry", className = "" }: 
     positive: "bg-positive",
     caution: "bg-caution",
     elite: "bg-elite",
+    azure: "bg-azure",
   };
   return (
     <div className={`h-1.5 w-full min-w-12 overflow-hidden rounded-full bg-raised ${className}`}>
@@ -47,12 +65,12 @@ export function Meter({ value, max = 100, tone = "telemetry", className = "" }: 
   );
 }
 
-export function Bar({ label, value, tone, right, max = 100 }: { label: string; value: number; tone?: "signal" | "telemetry" | "positive" | "caution" | "elite"; right?: ReactNode; max?: number }) {
+export function Bar({ label, value, tone, right, max = 100 }: { label: string; value: number; tone?: KitTone; right?: ReactNode; max?: number }) {
   return (
     <div className="flex items-center gap-2">
       <span className="w-24 shrink-0 text-xs text-ink-soft">{label}</span>
-      <Meter value={value} max={max} tone={tone} />
-      <span className="w-8 shrink-0 text-right text-xs tabular text-ink-soft">{right ?? Math.round(value)}</span>
+      <Meter value={value} max={max} tone={tone ?? ratingTone(value)} />
+      <span className={`w-8 shrink-0 text-right text-xs tabular ${tone ? "text-ink-soft" : ratingTextClass(value)}`}>{right ?? Math.round(value)}</span>
     </div>
   );
 }

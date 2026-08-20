@@ -1,18 +1,38 @@
 import type { SimulationState, Track } from "@/simulation/types";
 import { constructorById, driverById, trackById } from "@/data";
 import { Card, Img, Meter, Tag } from "@/ui/kit";
+import { ratingTone, type KitTone } from "@/ui/ratings";
 import { driverImage } from "@/data/assets";
 
 export type Act = (fn: (s: SimulationState) => string) => void;
 
-export function MiniBar({ label, value, tone }: { label: string; value: number; tone?: "signal" | "telemetry" | "positive" | "caution" | "elite" }) {
+export function MiniBar({ label, value, tone }: { label: string; value: number; tone?: KitTone }) {
   return (
     <div className="flex items-center gap-2 text-[10px]">
       <span className="w-9 text-ink-faint">{label}</span>
-      <Meter value={value} tone={tone} />
-      <span className="w-6 text-right tabular text-ink-faint">{Math.round(value)}</span>
+      <Meter value={value} tone={tone ?? ratingTone(value)} />
+      <span className={`w-6 text-right tabular ${tone ? "text-ink-faint" : ratingText(value)}`}>{Math.round(value)}</span>
     </div>
   );
+}
+
+function ratingText(v: number): string {
+  if (v >= 80) return "text-azure";
+  if (v >= 60) return "text-positive";
+  if (v >= 40) return "text-caution";
+  return "text-signal";
+}
+
+function attendanceFor(track: Track): number {
+  const c = track.characteristics;
+  const raw =
+    35000 +
+    c.overtaking * 180 +
+    c.driverImportance * 220 +
+    c.technical * 100 +
+    c.highSpeed * 90 +
+    c.tireStress * 60;
+  return Math.round(raw / 1000) * 1000;
 }
 
 export function NextRaceCard({ track }: { track: Track }) {
@@ -22,21 +42,42 @@ export function NextRaceCard({ track }: { track: Track }) {
       : track.characteristics.weatherRisk > 40
         ? "Some weather risk."
         : "Low weather risk.";
+  const distanceKm = track.laps * track.lengthKm;
   return (
     <Card title={`Next up — ${track.grandPrix}`}>
-      <div>
-        <div className="font-display text-2xl font-bold">{track.name}</div>
-        <div className="text-xs text-ink-faint">
-          {track.country} · {track.laps} laps · {track.lengthKm.toFixed(3)} km{" "}
-          {track.sprint && <Tag tone="elite">Sprint</Tag>}
+      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+        <div className="min-w-0 flex-1">
+          <div className="font-display text-2xl font-bold">{track.name}</div>
+          <div className="text-xs text-ink-faint">
+            {track.country} · {track.laps} laps · {track.lengthKm.toFixed(3)} km{" "}
+            {track.sprint && <Tag tone="elite">Sprint</Tag>}
+          </div>
+          <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-ink-faint">
+            <span>Race distance {distanceKm.toFixed(0)} km</span>
+            <span>~{attendanceFor(track).toLocaleString()} attendance</span>
+            <span>
+              Weather:{" "}
+              <span className={ratingText(track.characteristics.weatherRisk)}>
+                {track.characteristics.weatherRisk}% risk
+              </span>
+            </span>
+          </div>
+          <div className="mt-2 text-xs text-ink-soft">{weatherNote}</div>
+          <div className="mt-1 flex flex-wrap gap-2 text-[11px] text-ink-faint">
+            <span>Downforce {track.characteristics.downforce}</span>
+            <span>High speed {track.characteristics.highSpeed}</span>
+            <span>Low speed {track.characteristics.lowSpeed}</span>
+            <span>Tire stress {track.characteristics.tireStress}</span>
+            <span>Overtaking {track.characteristics.overtaking}</span>
+          </div>
         </div>
-        <div className="mt-2 text-xs text-ink-soft">{weatherNote}</div>
-        <div className="mt-1 flex flex-wrap gap-2 text-[11px] text-ink-faint">
-          <span>Downforce {track.characteristics.downforce}</span>
-          <span>High speed {track.characteristics.highSpeed}</span>
-          <span>Low speed {track.characteristics.lowSpeed}</span>
-          <span>Tire stress {track.characteristics.tireStress}</span>
-          <span>Overtaking {track.characteristics.overtaking}</span>
+        <div className="flex aspect-[4/3] w-40 shrink-0 items-center justify-center self-center overflow-hidden rounded-sm bg-white p-2 md:w-72 md:p-3">
+          <Img
+            src={track.image}
+            alt={`${track.name} circuit layout`}
+            fallback={<span className="text-[10px] text-ink-faint">Layout</span>}
+            className="max-h-full max-w-full object-contain"
+          />
         </div>
       </div>
     </Card>
@@ -58,13 +99,16 @@ export function StandingsCard({ state, rows = 10 }: { state: SimulationState; ro
           ))}
         </div>
         <div className="divide-y divide-hairline/60">
-          {state.standingsDrivers.slice(0, rows).map((s, i) => (
-            <div key={s.driverId} className="flex items-center gap-2 py-1 text-sm text-ink-soft">
-              <span className="w-5 tabular text-ink-faint">{i + 1}</span>
-              <span className="min-w-0 flex-1 truncate">{driverById(s.driverId, state.season)?.shortName ?? s.driverId}</span>
-              <span className="tabular">{s.points}</span>
-            </div>
-          ))}
+          {state.standingsDrivers.slice(0, rows).map((s, i) => {
+            const mine = s.driverId === t.driver1Id || s.driverId === t.driver2Id;
+            return (
+              <div key={s.driverId} className={`flex items-center gap-2 py-1 text-sm ${mine ? "font-semibold text-ink" : "text-ink-soft"}`}>
+                <span className="w-5 tabular text-ink-faint">{i + 1}</span>
+                <span className="min-w-0 flex-1 truncate">{driverById(s.driverId, state.season)?.shortName ?? s.driverId}</span>
+                <span className="tabular">{s.points}</span>
+              </div>
+            );
+          })}
         </div>
       </div>
     </Card>

@@ -6,6 +6,7 @@ import {
 } from "@/simulation/systems";
 import { replaceEngine, replaceGearbox, startDev } from "@/actions";
 import { Button, Card, Empty, Meter, Money } from "@/ui/kit";
+import { ratingTone } from "@/ui/ratings";
 import type { Act } from "./parts";
 
 interface Props {
@@ -129,7 +130,7 @@ function SwapRow({
         <span className="font-display font-bold">{label}</span>
         <span className={`tabular text-sm ${condition < 50 ? "text-caution" : "text-ink-soft"}`}>{condition.toFixed(1)}%</span>
       </div>
-      <Meter value={condition} tone={condition < 50 ? "signal" : "positive"} className="my-2" />
+      <Meter value={condition} tone={ratingTone(condition)} className="my-2" />
       <div className="flex items-center justify-between text-xs text-ink-faint">
         <span>age {age} race(s) · {replacements} replaced</span>
         <Button small variant="ghost" disabled={cash < cost} onClick={onSwap}>

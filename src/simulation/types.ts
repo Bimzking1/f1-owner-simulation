@@ -277,6 +277,7 @@ export interface RaceEntry {
   dnf: boolean;
   dnfReason?: string;
   fastestLap?: boolean;
+  bestLapSeconds?: number; // fastest lap time of the race (set on the holder)
   time: number; // seconds behind winner (or DNF time)
 }
 

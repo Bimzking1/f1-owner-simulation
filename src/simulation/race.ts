@@ -464,13 +464,11 @@ export function simulateRace(
   classified.sort((a, b) => a.time - b.time);
 
   let fastestLapDriver: string | undefined;
-  {
-    let fl = Infinity;
-    for (const r of running) {
-      if (!r.out && r.fastestLap < fl) {
-        fl = r.fastestLap;
-        fastestLapDriver = r.comp.driverId;
-      }
+  let fl = Infinity;
+  for (const r of running) {
+    if (!r.out && r.fastestLap < fl) {
+      fl = r.fastestLap;
+      fastestLapDriver = r.comp.driverId;
     }
   }
 
@@ -492,6 +490,11 @@ export function simulateRace(
 
   if (fastestLapDriver) {
     const flComp = competitors.find((x) => x.driverId === fastestLapDriver);
+    const flEntry = classified.find((e) => e.driverId === fastestLapDriver);
+    if (flEntry) {
+      flEntry.fastestLap = true;
+      flEntry.bestLapSeconds = Math.round(fl * 1000) / 1000;
+    }
     push({
       lap: laps,
       type: "info",

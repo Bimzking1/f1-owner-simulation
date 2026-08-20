@@ -21,7 +21,7 @@ import {
   sponsorById,
 } from "@/data";
 import { DIFFICULTIES, PHILOSOPHIES } from "@/data/config";
-import { Bar, Button, Card, Img, Money, Tag } from "@/ui/kit";
+import { Bar, Button, Card, Img, Money, Ovr, Rating, Tag } from "@/ui/kit";
 import { driverImage } from "@/data/assets";
 
 export interface SetupConfig {
@@ -214,7 +214,7 @@ export default function SetupScreen({ cfg, onStart, onBack }: Props) {
               <div className="mt-1 text-[11px] text-ink-faint">{c.nationality}</div>
               <div className="mt-3 space-y-1 text-xs text-ink-soft">
                 {(["aero", "chassis", "reliability", "engineering"] as const).map((k) => (
-                  <Bar key={k} label={k} value={c.dna[k]} tone={k === "reliability" ? "positive" : "telemetry"} />
+                  <Bar key={k} label={k} value={c.dna[k]} />
                 ))}
               </div>
               <div className="mt-3 flex items-center justify-between text-xs">
@@ -237,7 +237,11 @@ export default function SetupScreen({ cfg, onStart, onBack }: Props) {
                 type="button"
                 onClick={swapSeats}
                 disabled={!d1 || !d2}
-                className="order-2 w-full rounded-sm border border-hairline px-2 py-1 text-xs font-semibold uppercase tracking-wider text-ink-soft hover:border-signal hover:text-signal disabled:opacity-40 md:order-3 md:w-auto md:shrink-0"
+                className={`order-2 w-full rounded-sm border px-2 py-1 text-xs font-semibold uppercase tracking-wider transition md:order-3 md:w-auto md:shrink-0 ${
+                  d1 && d2
+                    ? "border-signal/60 bg-signal/15 text-signal hover:bg-signal/25"
+                    : "cursor-not-allowed border-hairline text-ink-faint opacity-50"
+                }`}
               >
                 ⇄ Swap seats
               </button>
@@ -285,7 +289,7 @@ export default function SetupScreen({ cfg, onStart, onBack }: Props) {
                                   {d.rookie && <Tag tone="positive">Rookie</Tag>}
                                 </div>
                                 <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-ink-faint">
-                                  <span>OVR {d.overall}</span>
+                                  <Ovr value={d.overall} />
                                   <span>${d.salary}M/yr</span>
                                   <span>#{d.number}</span>
                                 </div>
@@ -314,7 +318,7 @@ export default function SetupScreen({ cfg, onStart, onBack }: Props) {
             <div className="grid gap-2">
               {engines.map((e) => (
                 <TechPick key={e.id} active={engineId === e.id} onClick={() => setEngineId(e.id)} title={e.name}
-                  meta={[`Power ${e.power}`, `Rel ${e.reliability}`, e.status, e.supplier]} cost={costOf(e.cost)} />
+                  stats={[{ label: "Power", value: e.power }, { label: "Rel", value: e.reliability }]} extra={[e.status, e.supplier]} cost={costOf(e.cost)} />
               ))}
             </div>
           </Card>
@@ -322,7 +326,7 @@ export default function SetupScreen({ cfg, onStart, onBack }: Props) {
             <div className="grid gap-2">
               {gearboxes.map((g) => (
                 <TechPick key={g.id} active={gearboxId === g.id} onClick={() => setGearboxId(g.id)} title={g.name}
-                  meta={[`Perf ${g.performance}`, `Rel ${g.reliability}`]} cost={costOf(g.cost)} />
+                  stats={[{ label: "Perf", value: g.performance }, { label: "Rel", value: g.reliability }]} cost={costOf(g.cost)} />
               ))}
             </div>
           </Card>
@@ -330,7 +334,7 @@ export default function SetupScreen({ cfg, onStart, onBack }: Props) {
             <div className="grid gap-2">
               {techs.map((t) => (
                 <TechPick key={t.id} active={techId === t.id} onClick={() => setTechId(t.id)} title={t.name}
-                  meta={[`Aero ${t.aero}`, `Chassis ${t.chassis}`, `Rel ${t.reliability}`]} cost={costOf(t.cost)} />
+                  stats={[{ label: "Aero", value: t.aero }, { label: "Chassis", value: t.chassis }, { label: "Rel", value: t.reliability }]} cost={costOf(t.cost)} />
               ))}
             </div>
           </Card>
@@ -359,11 +363,11 @@ export default function SetupScreen({ cfg, onStart, onBack }: Props) {
                         <span className="font-display font-bold">{e.name}</span>
                         <Tag>{e.department}</Tag>
                       </div>
-                      <div className="mt-1 flex flex-wrap gap-2 text-[11px] text-ink-soft">
-                        <span>Expertise {e.expertise}</span>
-                        <span>Innov {e.innovation}</span>
-                        <span>Dev speed {e.developmentSpeed}</span>
-                        <span>Rel {e.reliabilityFocus}</span>
+                      <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-ink-soft">
+                        <Rating label="Expertise" value={e.expertise} />
+                        <Rating label="Innov" value={e.innovation} />
+                        <Rating label="Dev speed" value={e.developmentSpeed} />
+                        <Rating label="Rel" value={e.reliabilityFocus} />
                       </div>
                     </div>
                     <Money value={e.cost} className="text-sm font-bold" />
@@ -388,10 +392,10 @@ export default function SetupScreen({ cfg, onStart, onBack }: Props) {
                   >
                     <div className="min-w-0 flex-1">
                       <div className="font-display font-bold">{m.name}</div>
-                      <div className="mt-1 flex flex-wrap gap-2 text-[11px] text-ink-soft">
-                        <span>Pit {m.pitStop.toFixed(2)}s</span>
-                        <span>Error {m.errorChance}%</span>
-                        <span>Repair {m.repairEfficiency}</span>
+                      <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-ink-soft">
+                        <Rating label="Pit" value={`${m.pitStop.toFixed(2)}s`} rank={100 - Math.round((m.pitStop - 2) * 40)} />
+                        <Rating label="Error" value={`${m.errorChance}%`} rank={100 - Math.round(m.errorChance * 10)} />
+                        <Rating label="Repair" value={m.repairEfficiency} />
                       </div>
                     </div>
                     <Money value={m.cost} className="text-sm font-bold" />
@@ -610,7 +614,7 @@ const MECHANIC_IDS: Record<SeasonId, string[]> = {
   2025: ["mech-budget25", "mech-standard25", "mech-elite25"],
 };
 
-function TechPick({ active, onClick, title, meta, cost }: { active: boolean; onClick: () => void; title: string; meta: string[]; cost: number }) {
+function TechPick({ active, onClick, title, stats, extra, cost }: { active: boolean; onClick: () => void; title: string; stats: { label: string; value: number }[]; extra?: string[]; cost: number }) {
   return (
     <button
       type="button"
@@ -619,7 +623,10 @@ function TechPick({ active, onClick, title, meta, cost }: { active: boolean; onC
     >
       <div className="min-w-0">
         <div className="font-display text-sm font-bold">{title}</div>
-        <div className="text-[11px] text-ink-faint">{meta.join(" · ")}</div>
+        <div className="mt-0.5 flex flex-wrap gap-x-2 gap-y-0.5 text-[11px] text-ink-soft">
+          {stats.map((s) => <Rating key={s.label} label={s.label} value={s.value} />)}
+          {extra?.map((x) => <span key={x} className="text-ink-faint">{x}</span>)}
+        </div>
       </div>
       <Money value={cost} className="shrink-0 text-sm font-bold" />
     </button>
@@ -653,7 +660,7 @@ function SeatChip({ label, d, season, onClear }: { label: string; d?: ReturnType
         ) : (
           <div className="text-sm text-ink-faint">Empty</div>
         )}
-        {d && <div className="text-[11px] text-ink-faint">OVR {d.overall} · ${d.salary}M/yr</div>}
+        {d && <div className="text-[11px] text-ink-faint"><Ovr value={d.overall} /> · ${d.salary}M/yr</div>}
       </div>
       {d && onClear && (
         <button type="button" onClick={onClear} className="ml-auto shrink-0 rounded-sm border border-hairline px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-ink-faint hover:text-signal">
