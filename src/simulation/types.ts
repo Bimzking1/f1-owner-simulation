@@ -206,6 +206,7 @@ export type SponsorObjectiveKind =
 export interface SponsorSpec {
   id: string;
   name: string;
+  category: string; // e.g. "Technology", "Energy", "Banking"
   season: SeasonId;
   tier: "title" | "major" | "minor";
   signingBonus: number; // $M

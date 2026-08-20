@@ -3,7 +3,7 @@ import type { SimulationState, SponsorSpec } from "@/simulation/types";
 import { sponsorById } from "@/data";
 import { availableSponsors } from "@/data";
 import { signSponsor, terminateSponsor } from "@/actions";
-import { Button, Card, Empty, Modal, Money, Tag } from "@/ui/kit";
+import { Button, Card, Empty, Img, Modal, Money, Tag } from "@/ui/kit";
 import type { Act } from "./parts";
 
 interface Props {
@@ -30,7 +30,13 @@ export function SponsorsTab({ state, act }: Props) {
               return (
                 <div key={s.sponsorId} className="rounded-md border border-hairline p-3">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="font-display font-bold">{spec.name}</span>
+                    <div className="flex min-w-0 items-center gap-2">
+                      <Img src={spec.image} alt={spec.name} className="h-6 w-10 shrink-0 rounded-sm object-contain" />
+                      <div className="min-w-0">
+                        <div className="truncate font-display font-bold">{spec.name}</div>
+                        <div className="truncate text-[10px] text-ink-faint">{spec.category}</div>
+                      </div>
+                    </div>
                     <Tag tone={spec.tier === "title" ? "elite" : spec.tier === "major" ? "telemetry" : "ink"}>{spec.tier}</Tag>
                   </div>
                   <div className="mt-1 text-[11px] text-ink-soft">{spec.objectiveTextEnjoyer}</div>
@@ -72,7 +78,13 @@ export function SponsorsTab({ state, act }: Props) {
                   }`}
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <span className="font-display font-bold">{spec.name}</span>
+                    <div className="flex min-w-0 items-center gap-2">
+                      <Img src={spec.image} alt={spec.name} className="h-6 w-10 shrink-0 rounded-sm object-contain" />
+                      <div className="min-w-0">
+                        <div className="truncate font-display font-bold">{spec.name}</div>
+                        <div className="truncate text-[10px] text-ink-faint">{spec.category}</div>
+                      </div>
+                    </div>
                     <Tag tone={spec.tier === "title" ? "elite" : spec.tier === "major" ? "telemetry" : "ink"}>{spec.tier}</Tag>
                   </div>
                   <div className="mt-1 text-[11px] text-ink-soft">{spec.objectiveTextEnjoyer}</div>
@@ -122,6 +134,13 @@ export function SponsorsTab({ state, act }: Props) {
               Are you sure you want to add <span className="font-semibold text-ink">{confirm.name}</span> as a new
               sponsor mid-season? The deal locks in a slot and an obligation.
             </p>
+            <div className="flex items-center gap-3 rounded-md border border-hairline bg-raised/40 p-3">
+              <Img src={confirm.image} alt={confirm.name} className="h-8 w-14 shrink-0 rounded-sm object-contain" />
+              <div className="min-w-0">
+                <div className="font-display font-bold">{confirm.name}</div>
+                <div className="text-[11px] text-ink-faint">{confirm.category}</div>
+              </div>
+            </div>
             <div className="grid gap-2 rounded-md border border-hairline bg-raised/40 p-3 text-xs">
               <div className="flex items-center justify-between gap-2">
                 <span className="text-ink-faint">Benefit — per race</span>

@@ -5,11 +5,12 @@
 import type { SeasonId } from "@/simulation/types";
 import { CONSTRUCTORS, ENGINES, GEARBOXES, TECH_PACKAGES, constructorsBySeason, enginesForSeason, gearboxesForSeason, techPackagesForSeason } from "./constructors";
 import { DRIVERS_2013, DRIVERS_2025, driversForSeason } from "./drivers";
-import { ENGINEERS, MECHANICS, engineersForSeason, mechanicsForSeason } from "./staff";
+import { ENGINEERS, MECHANICS, engineersForSeason, mechanicsForSeason, DEPARTMENT_LABELS, engineerSeniority, engineerRole, mechanicTier } from "./staff";
 import { SPONSORS, sponsorsForSeason } from "./sponsors";
 import { TRACKS_2013, TRACKS_2025, calendarForSeason } from "./tracks";
 
 export { constructorsBySeason, enginesForSeason, gearboxesForSeason, techPackagesForSeason, engineersForSeason, mechanicsForSeason, sponsorsForSeason, calendarForSeason, driversForSeason };
+export { DEPARTMENT_LABELS, engineerSeniority, engineerRole, mechanicTier };
 export { DRIVERS_2013, DRIVERS_2025, TRACKS_2013, TRACKS_2025 };
 
 export const ALL_DRIVERS = [...DRIVERS_2013, ...DRIVERS_2025];

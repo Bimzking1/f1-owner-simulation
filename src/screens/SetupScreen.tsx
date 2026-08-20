@@ -11,9 +11,12 @@ import {
   constructorsBySeason,
   driversByTeam,
   engineerById,
+  engineerRole,
+  engineerSeniority,
   enginesForSeason,
   gearboxesForSeason,
   mechanicById,
+  mechanicTier,
   seasonCalendar,
   techPackagesForSeason,
   availableSponsors,
@@ -116,6 +119,7 @@ export default function SetupScreen({ cfg, onStart, onBack }: Props) {
       return;
     }
     setStep(STEPS[stepIndex + 1]);
+    window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   function buildTeam(): TeamState {
@@ -361,9 +365,10 @@ export default function SetupScreen({ cfg, onStart, onBack }: Props) {
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                         <span className="font-display font-bold">{e.name}</span>
-                        <Tag>{e.department}</Tag>
+                        <Tag tone={engineerSeniority(e).tone}>{engineerSeniority(e).label}</Tag>
                       </div>
-                      <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-ink-soft">
+                      <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-ink-soft">
+                        <Tag tone="telemetry">{engineerRole(e)}</Tag>
                         <Rating label="Expertise" value={e.expertise} />
                         <Rating label="Innov" value={e.innovation} />
                         <Rating label="Dev speed" value={e.developmentSpeed} />
@@ -391,8 +396,12 @@ export default function SetupScreen({ cfg, onStart, onBack }: Props) {
                     }`}
                   >
                     <div className="min-w-0 flex-1">
-                      <div className="font-display font-bold">{m.name}</div>
-                      <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-ink-soft">
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                        <span className="font-display font-bold">{m.name}</span>
+                        <Tag tone={mechanicTier(m).tone}>{mechanicTier(m).label}</Tag>
+                      </div>
+                      <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-ink-soft">
+                        <Tag tone="telemetry">Pit crew</Tag>
                         <Rating label="Pit" value={`${m.pitStop.toFixed(2)}s`} rank={100 - Math.round((m.pitStop - 2) * 40)} />
                         <Rating label="Error" value={`${m.errorChance}%`} rank={100 - Math.round(m.errorChance * 10)} />
                         <Rating label="Repair" value={m.repairEfficiency} />
@@ -470,7 +479,13 @@ export default function SetupScreen({ cfg, onStart, onBack }: Props) {
                   }`}
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <div className="font-display font-bold">{s.name}</div>
+                    <div className="flex min-w-0 items-center gap-2">
+                      <Img src={s.image} alt={s.name} className="h-6 w-10 shrink-0 rounded-sm object-contain" />
+                      <div className="min-w-0">
+                        <div className="truncate font-display font-bold">{s.name}</div>
+                        <div className="truncate text-[10px] text-ink-faint">{s.category}</div>
+                      </div>
+                    </div>
                     <Tag tone={s.tier === "title" ? "elite" : s.tier === "major" ? "telemetry" : "ink"}>{s.tier}</Tag>
                   </div>
                   <div className="mt-1 text-[11px] text-ink-soft">{s.objectiveTextEnjoyer}</div>
@@ -575,7 +590,7 @@ export default function SetupScreen({ cfg, onStart, onBack }: Props) {
         </div>
       )}
 
-      <div className="fixed inset-x-3 bottom-3 z-40 flex items-center justify-between gap-3 rounded-md border border-hairline bg-surface/95 p-3 shadow-xl backdrop-blur lg:static lg:inset-auto lg:mt-6 lg:border-0 lg:bg-transparent lg:p-0 lg:shadow-none">
+      <div className="fixed inset-x-3 bottom-3 z-40 flex items-center justify-between gap-3 rounded-md border border-hairline bg-surface/95 p-3 shadow-xl backdrop-blur">
         <Button variant="ghost" onClick={() => (stepIndex > 0 ? setStep(STEPS[stepIndex - 1]) : onBack())}>
           Back
         </Button>

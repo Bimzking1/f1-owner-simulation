@@ -117,9 +117,26 @@ Real art already dropped in for: `dummy021.png`, `dummy022.png`, `dummy023.png`,
 | `dummy178.png` | engines | Technical package — Elite spec | both | techElite |
 | `dummy179.png` | engines | Engineering department generic | both | engineers |
 | `dummy180.png` | engines | Pit crew generic | both | mechanics |
-| `dummy186.png` | sponsors | Sponsor logo — title tier | both | sponsors |
-| `dummy187.png` | sponsors | Sponsor logo — major tier | both | sponsors |
-| `dummy188.png` | sponsors | Sponsor logo — minor tier | both | sponsors |
+| `dummy186.png` | sponsors | Petronas logo | both | sponsor-petronas13 |
+| `dummy187.png` | sponsors | Shell logo | both | sponsor-shell13 |
+| `dummy188.png` | sponsors | Pirelli logo | both | sponsor-pirelli13 |
+| `dummy189.png` | sponsors | Santander logo | both | sponsor-santander13 |
+| `dummy190.png` | sponsors | DHL logo | both | sponsor-dhl13 |
+| `dummy191.png` | sponsors | Microsoft logo | both | sponsor-microsoft13 |
+| `dummy192.png` | sponsors | Lenovo logo | both | sponsor-lenovo13 |
+| `dummy193.png` | sponsors | Mastercard logo | both | sponsor-mastercard13 |
+| `dummy194.png` | sponsors | SAP logo | both | sponsor-sap13 |
+| `dummy195.png` | sponsors | IWC Schaffhausen logo | both | sponsor-iwc13 |
+| `dummy196.png` | sponsors | Oracle logo | both | sponsor-oracle25 |
+| `dummy197.png` | sponsors | HP logo | both | sponsor-hp25 |
+| `dummy198.png` | sponsors | Aramco logo | both | sponsor-aramco25 |
+| `dummy199.png` | sponsors | PepsiCo logo | both | sponsor-pepsico25 |
+| `dummy200.png` | sponsors | TAG Heuer logo | both | sponsor-tagheuer25 |
+| `dummy201.png` | sponsors | Crypto.com logo | both | sponsor-cryptocom25 |
+| `dummy202.png` | sponsors | AWS logo | both | sponsor-aws25 |
+| `dummy203.png` | sponsors | CrowdStrike logo | both | sponsor-crowdstrike25 |
+| `dummy204.png` | sponsors | IBM logo | both | sponsor-ibm25 |
+| `dummy205.png` | sponsors | Salesforce logo | both | sponsor-salesforce25 |
 | `dummy051.png` | tracks | Albert Park circuit layout (Australia) | both | melbourne |
 | `dummy052.png` | tracks | Sepang International Circuit layout | 2013 | sepang |
 | `dummy053.png` | tracks | Shanghai International Circuit layout | both | shanghai |
