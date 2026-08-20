@@ -14,6 +14,7 @@ import {
   enginesForSeason,
   gearboxesForSeason,
   mechanicById,
+  seasonCalendar,
   techPackagesForSeason,
   availableSponsors,
   driverById,
@@ -68,12 +69,14 @@ export default function SetupScreen({ cfg, onStart, onBack }: Props) {
   const gb = gearboxes.find((g) => g.id === gearboxId);
   const tech = techs.find((t) => t.id === techId);
 
-  const sponsorCost = sponsorIds.reduce((a, id) => a + costOf(sponsorById(id)?.signingBonus ?? 0), 0);
   const equipmentCost = costOf(eng?.cost ?? 0) + costOf(gb?.cost ?? 0) + costOf(tech?.cost ?? 0);
+  const totalRounds = seasonCalendar(cfg.season).length;
   const staffCost =
-    engineerIds.reduce((a, id) => a + costOf(engineerById(id)?.cost ?? 0), 0) +
-    mechanicIds.reduce((a, id) => a + costOf(mechanicById(id)?.cost ?? 0), 0);
-  const remaining = Math.round((startCash - equipmentCost - sponsorCost - staffCost) * 100) / 100;
+    engineerIds.reduce((a, id) => a + (engineerById(id)?.cost ?? 0), 0) +
+    mechanicIds.reduce((a, id) => a + (mechanicById(id)?.cost ?? 0), 0);
+  const staffWeekly = totalRounds > 0 ? Math.round((staffCost / totalRounds) * 100) / 100 : 0;
+  const sponsorRaceIncome = sponsorIds.reduce((a, id) => a + (sponsorById(id)?.racePayment ?? 0), 0);
+  const remaining = Math.round((startCash - equipmentCost) * 100) / 100;
 
   const d1 = driverById(driver1Id, cfg.season);
   const d2 = driverById(driver2Id, cfg.season);
@@ -150,7 +153,7 @@ export default function SetupScreen({ cfg, onStart, onBack }: Props) {
     };
   }
 
-  const sponsors = availableSponsors(cfg.season, ctor?.dna.reputation ?? 0, remaining + sponsorCost);
+  const sponsors = availableSponsors(cfg.season, ctor?.dna.reputation ?? 0);
 
   return (
     <div className="mx-auto max-w-5xl px-6 pb-32 lg:pb-8">
@@ -396,8 +399,9 @@ export default function SetupScreen({ cfg, onStart, onBack }: Props) {
             </div>
           </Card>
           <div className="lg:col-span-2 text-xs text-ink-faint">
-            Staff are hired at season start and paid out of the setup budget. Engineers boost development speed and innovation;
-            mechanics set pit stop times and error rates. Releasing or adding staff mid-season costs money too.
+            No up-front fee: staff salaries are paid per race weekend out of season cash (≈{staffWeekly}M/weekend for your
+            current picks). Engineers boost development speed and innovation; mechanics set pit stop times and error rates.
+            Releasing mid-season costs a one-time severance.
           </div>
         </div>
       )}
@@ -443,25 +447,20 @@ export default function SetupScreen({ cfg, onStart, onBack }: Props) {
       {step === "Sponsors" && (
         <Card title={`Sponsors (${sponsorIds.length}/5 slots)`}>
           {sponsors.length === 0 && (
-            <div className="text-xs text-ink-faint">No sponsors can afford to sign with this team right now.</div>
+            <div className="text-xs text-ink-faint">No sponsors are interested in this team right now.</div>
           )}
           <div className="grid gap-2 sm:grid-cols-2">
             {sponsors.map((s) => {
               const signed = sponsorIds.includes(s.id);
-              const canPay = remaining + sponsorCost >= costOf(s.signingBonus);
-              const locked = !signed && !canPay;
               return (
                 <button
                   key={s.id}
                   type="button"
-                  disabled={locked}
                   onClick={() => setSponsorIds(signed ? sponsorIds.filter((x) => x !== s.id) : [...sponsorIds, s.id])}
                   className={`rounded-md border p-3 text-left transition ${
                     signed
                       ? "border-positive/50 bg-positive/10"
-                      : locked
-                        ? "cursor-not-allowed border-hairline bg-surface opacity-50"
-                        : "border-hairline bg-surface hover:border-ink-faint"
+                      : "border-hairline bg-surface hover:border-ink-faint"
                   }`}
                 >
                   <div className="flex items-center justify-between gap-2">
@@ -471,24 +470,25 @@ export default function SetupScreen({ cfg, onStart, onBack }: Props) {
                   <div className="mt-1 text-[11px] text-ink-soft">{s.objectiveTextEnjoyer}</div>
                   <div className="mt-2 flex items-center justify-between gap-2 text-xs">
                     <span className="text-ink-faint">
-                      +<Money value={costOf(s.signingBonus)} /> · <Money value={s.racePayment} />/race · +<Money value={s.bonus} /> bonus
+                      Pays <Money value={s.racePayment} />/race · bonus +<Money value={s.bonus} />
                     </span>
                     <span
                       className={`inline-flex shrink-0 items-center rounded-sm border px-2 py-1 font-display text-[11px] font-bold uppercase tracking-widest ${
                         signed
                           ? "border-positive/40 bg-positive/15 text-positive"
-                          : locked
-                            ? "border-hairline text-ink-faint"
-                            : "border-hairline bg-raised text-ink-soft"
+                          : "border-hairline bg-raised text-ink-soft"
                       }`}
                     >
-                      {signed ? "Signed" : locked ? "Can't afford" : s.tier === "title" ? "Sign Title" : "Sign"}
+                      {signed ? "Signed" : s.tier === "title" ? "Sign Title" : "Sign"}
                     </span>
                   </div>
                 </button>
               );
             })}
           </div>
+          <p className="mt-3 text-[11px] text-ink-faint">
+            No up-front fee: sponsors pay their race rate every weekend you keep the contract.
+          </p>
         </Card>
       )}
 
@@ -497,10 +497,10 @@ export default function SetupScreen({ cfg, onStart, onBack }: Props) {
         <div className="grid gap-4 lg:grid-cols-2">
           <Card title="Team">
             {ctor && (
-              <div className="mb-3 flex flex-col items-start gap-3 sm:flex-row sm:items-center">
-                <div className="flex items-center gap-3">
+              <div className="mb-3 flex flex-col items-start gap-3">
+                <div className="flex flex-wrap items-center gap-3">
                   <Img src={ctor.image} alt={ctor.name} className="h-14 w-14 shrink-0 rounded-sm object-cover" />
-                  <Img src={ctor.carImage} alt={`${ctor.name} car`} className="h-14 w-20 shrink-0 rounded-sm object-cover" />
+                  <Img src={ctor.carImage} alt={`${ctor.name} car`} className="h-14 w-auto shrink-0 rounded-sm" />
                 </div>
                 <div className="min-w-0 text-sm">
                   <div className="font-display font-bold">{ctor.fullName}</div>
@@ -531,14 +531,15 @@ export default function SetupScreen({ cfg, onStart, onBack }: Props) {
           <Card title="Budget">
             <div className="space-y-2 text-sm">
               <Row inline k="Starting budget" v={money(startCash)} />
-              <Row inline k="Equipment" v={`-${money(equipmentCost)}`} />
-              <Row inline k="Staff signings" v={`-${money(staffCost)}`} />
-              <Row inline k="Sponsor signings" v={`-${money(sponsorCost)}`} />
+              <Row inline k="Equipment (one-time)" v={`-${money(equipmentCost)}`} />
+              <Row inline k="Driver wages" v={d1 && d2 ? `${money(d1.salary + d2.salary)}/yr · paid per weekend` : "—"} />
+              <Row inline k="Staff wages" v={`${money(staffCost)}/yr · ${money(staffWeekly)}/weekend`} />
+              <Row inline k="Sponsors" v={sponsorIds.length > 0 ? `${money(sponsorRaceIncome)}/race income, no sign fee` : "none"} />
               <Row inline k="Cash at season start" v={money(remaining)} bold />
             </div>
             <div className="mt-4 text-xs text-ink-faint">
               Difficulty {diff.label} · {cfg.season === 2013 ? "2013, 19 races" : "2025, 24 races + sprints"} · detail level{" "}
-              {cfg.gameLength} · staff paid once at signing
+              {cfg.gameLength} · driver & staff wages paid per weekend; parts (engine, gearbox, tech) bought up front
             </div>
           </Card>
         </div>

@@ -9,7 +9,7 @@ import type {
   SimulationState,
   TeamState,
 } from "./types";
-import { driverById, engineerById, sponsorById } from "@/data";
+import { driverById, engineById, engineerById, mechanicById, sponsorById } from "@/data";
 import { DIFFICULTIES } from "@/data/config";
 import { clamp, type Rng } from "./rng";
 
@@ -100,6 +100,7 @@ export function replaceComponent(draft: SimulationState, component: "engine" | "
     label: `${component === "engine" ? "Engine" : "Gearbox"} replacement`,
     amount: -cost,
     category: "other",
+    detail: `${component === "engine" ? "Engine" : "Gearbox"} unit paid in full up front (one-time part purchase, not a recurring fee).`,
   });
 }
 
@@ -112,16 +113,19 @@ export interface RaceFinanceBreakdown {
   salaries: number;
   operations: number;
   supplier: number;
+  staff: number;
 }
 
 export function applyRaceFinance(state: SimulationState, weekend: RaceWeekendResult): RaceFinanceBreakdown {
   const t = state.team;
-  if (!t) return { sponsorIncome: 0, promoterShare: 0, salaries: 0, operations: 0, supplier: 0 };
+  if (!t)
+    return { sponsorIncome: 0, promoterShare: 0, salaries: 0, operations: 0, supplier: 0, staff: 0 };
   const totalRounds = state.calendar.length || 19;
   const round = state.completedRounds + 1;
 
   // sponsor race payments
   let sponsorIncome = 0;
+  let sponsorParts = 0;
   for (const s of t.sponsors) {
     if (!s.active) continue;
     const spec = sponsorById(s.sponsorId);
@@ -129,6 +133,7 @@ export function applyRaceFinance(state: SimulationState, weekend: RaceWeekendRes
     const pay = Math.round(spec.racePayment * 100) / 100;
     sponsorIncome += pay;
     s.totalPaid = Math.round((s.totalPaid + pay) * 100) / 100;
+    sponsorParts++;
   }
 
   // promoter share from race points
@@ -139,26 +144,84 @@ export function applyRaceFinance(state: SimulationState, weekend: RaceWeekendRes
   const d1 = driverById(t.driver1Id, state.season);
   const d2 = driverById(t.driver2Id, state.season);
   const salaries = perRace((d1?.salary ?? 4) + (d2?.salary ?? 4));
-  const operations = perRace(teamOperatingCost(t));
-  const supplier = perRace(state.season === 2013 ? 9 : 12);
+  const opsSeason = teamOperatingCost(t);
+  const operations = perRace(opsSeason);
+  const leaseSeason = state.season === 2013 ? 11 : 14;
+  const supplier = perRace(leaseSeason);
+  const staffTotal =
+    t.engineerIds.reduce((a, id) => a + (engineerById(id)?.cost ?? 0), 0) +
+    t.mechanicIds.reduce((a, id) => a + (mechanicById(id)?.cost ?? 0), 0);
+  const staff = perRace(staffTotal);
 
   const income = Math.round((sponsorIncome + promoterShare) * 100) / 100;
-  const expense = Math.round((salaries + operations + supplier) * 100) / 100;
+  const expense = Math.round((salaries + operations + supplier + staff) * 100) / 100;
   t.cash = Math.round((t.cash + income - expense) * 100) / 100;
 
+  const sponsorNames = t.sponsors
+    .filter((s) => s.active)
+    .map((s) => sponsorById(s.sponsorId)?.name)
+    .filter(Boolean)
+    .join(", ");
+  const engName = engineById(t.engineId)?.supplier ?? "engine";
+  const staffNames = [
+    ...t.engineerIds.map((id) => engineerById(id)?.name ?? id),
+    ...t.mechanicIds.map((id) => mechanicById(id)?.name ?? id),
+  ];
+
   t.history.push(
-    { round, label: "Sponsor payments", amount: sponsorIncome, category: "sponsor" },
-    { round, label: "Promoter share", amount: promoterShare, category: "prize" },
-    { round, label: "Driver salaries", amount: -salaries, category: "salary" },
-    { round, label: "Team operations", amount: -operations, category: "staff" },
-    { round, label: "Power unit lease", amount: -supplier, category: "supplier" },
+    {
+      round,
+      label: "Sponsor payments",
+      amount: sponsorIncome,
+      category: "sponsor",
+      detail: sponsorNames
+        ? `Active sponsors pay ${sponsorParts} weekend rate(s): ${sponsorNames}. No upfront sign fees — every contract pays per race.`
+        : "No active sponsor contracts this weekend.",
+    },
+    {
+      round,
+      label: "Promoter share",
+      amount: promoterShare,
+      category: "prize",
+      detail: `${teamPoints} point(s) × $0.45M = $${promoterShare.toFixed(2)}M. Promoter pays the team per championship point scored.`,
+    },
+    {
+      round,
+      label: "Driver salaries",
+      amount: -salaries,
+      category: "salary",
+      detail: `Driver contracts are paid per weekend, not up front: (${d1?.name ?? t.driver1Id} $${d1?.salary ?? 4}M/season + ${d2?.name ?? t.driver2Id} $${d2?.salary ?? 4}M/season) ÷ ${totalRounds} race weekends = $${salaries.toFixed(2)}M this weekend.`,
+    },
+    {
+      round,
+      label: "Staff salaries",
+      amount: -staff,
+      category: "staff",
+      detail: `Staff are paid per weekend, not at hiring: ${staffNames.join(", ")} ($${staffTotal}M/season combined) ÷ ${totalRounds} race weekends = $${staff.toFixed(2)}M this weekend.`,
+    },
+    {
+      round,
+      label: "Team operations",
+      amount: -operations,
+      category: "operations",
+      detail: `${t.startCash}M starting fund — operations run at 8% of that (min $3.6M) = $${opsSeason}M/season ÷ ${totalRounds} weekends = $${operations.toFixed(2)}M. Logistics, rent, travel.`,
+    },
+    {
+      round,
+      label: "Power unit lease",
+      amount: -supplier,
+      category: "supplier",
+      detail: `${engName} power unit — ${leaseSeason}M annual lease ÷ ${totalRounds} weekends = $${supplier.toFixed(2)}M. Equipment lease fees are spread per race.`,
+    },
   );
-  return { sponsorIncome, promoterShare, salaries, operations, supplier };
+  return { sponsorIncome, promoterShare, salaries, operations, supplier, staff };
 }
 
 function teamOperatingCost(t: TeamState): number {
-  // derived from constructor size — stored implicitly via startCash tier
-  return Math.max(2.4, Math.round(t.startCash * 0.045 * 10) / 10);
+  // derived from constructor size — stored implicitly via startCash tier.
+  // 8% of the starting fund (min $3.6M) covers the weekly running bill now
+  // that staff wages are paid per weekend instead of up front.
+  return Math.max(3.6, Math.round(t.startCash * 0.08 * 10) / 10);
 }
 
 /** Season-end prize money by projected WCC position. */
@@ -295,7 +358,13 @@ export function evaluateSponsors(state: SimulationState) {
         s.patience = clamp(spec.patience + 1, 1, 6);
         t.cash = Math.round((t.cash + spec.bonus) * 100) / 100;
         t.reputation = clamp(t.reputation + Math.round(2 * specMult), 0, 100);
-        t.history.push({ round, label: `${spec.name} bonus`, amount: spec.bonus, category: "sponsor" });
+        t.history.push({
+          round,
+          label: `${spec.name} bonus`,
+          amount: spec.bonus,
+          category: "sponsor",
+          detail: `Objective met for ${spec.name}. Contract bonus $${spec.bonus}M paid by the sponsor.`,
+        });
         state.news.unshift({
           id: `bonus-${round}-${s.sponsorId}`,
           round,
@@ -414,6 +483,7 @@ export function startProject(draft: SimulationState, option: DevOption): boolean
     label: option.name,
     amount: -option.cost,
     category: "development",
+    detail: `${option.name} — development project cost $${option.cost}M paid up front; upgrades land in ${option.duration} race(s).`,
   });
   return true;
 }
@@ -523,7 +593,13 @@ export function bankruptcyCheck(state: SimulationState): SimulationState {
     state.bankrupt = true;
     t.cash = Math.round((t.cash + 25) * 100) / 100;
     t.reputation = Math.max(0, t.reputation - 20);
-    t.history.push({ round, label: "Emergency bank guarantee", amount: 25, category: "other" });
+    t.history.push({
+      round,
+      label: "Emergency bank guarantee",
+      amount: 25,
+      category: "other",
+      detail: "One-time rescue injection of $25M from your bankers. Reputation -20.",
+    });
     state.news.unshift({
       id: `grace-${round}`,
       round,

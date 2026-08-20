@@ -76,11 +76,8 @@ export function takeoverOptions(season: SeasonId) {
   return constructorsBySeason(season);
 }
 
-/** Sponsor pool scaled to a team's reputation (spec §47). */
-export function availableSponsors(season: SeasonId, reputation: number, cash: number) {
+/** Sponsor pool scaled to a team's reputation (spec §47). No up-front cash gate: contracts pay per race. */
+export function availableSponsors(season: SeasonId, reputation: number) {
   const all = sponsorsForSeason(season);
-  return all.filter((s) => {
-    const tierGate = s.tier === "title" ? reputation >= 30 : true;
-    return tierGate && s.signingBonus <= cash + 2;
-  });
+  return all.filter((s) => (s.tier === "title" ? reputation >= 30 : true));
 }

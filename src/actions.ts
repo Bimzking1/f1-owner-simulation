@@ -31,12 +31,15 @@ export function hireEngineer(state: SimulationState, engineerId: string): Action
   if (t.engineerIds.length >= 5) return msg(result, false, "Engineering staff is full (5 max).");
   const eng = engineerById(engineerId);
   if (!eng) return msg(result, false, "Unknown engineer.");
-  const cost = Math.round(eng.cost * 100) / 100;
-  if (t.cash < cost) return msg(result, false, `Need $${cost}M.`);
-  t.cash = Math.round((t.cash - cost) * 100) / 100;
   t.engineerIds.push(engineerId);
-  t.history.push({ round: state.completedRounds + 1, label: `Hire ${eng.name}`, amount: -cost, category: "staff" });
-  return msg(result, true, `${eng.name} signed.`);
+  t.history.push({
+    round: state.completedRounds + 1,
+    label: `Hire ${eng.name}`,
+    amount: 0,
+    category: "staff",
+    detail: `${eng.name} hired. No up-front fee — the $${eng.cost}M seasonal salary is paid per race weekend from now on ($${Math.round((eng.cost / (state.calendar.length || 19)) * 100) / 100}M/weekend).`,
+  });
+  return msg(result, true, `${eng.name} signed. Salary paid per weekend.`);
 }
 
 export function fireEngineer(state: SimulationState, engineerId: string): ActionResult {
@@ -47,7 +50,13 @@ export function fireEngineer(state: SimulationState, engineerId: string): Action
   t.engineerIds = t.engineerIds.filter((id) => id !== engineerId);
   const cost = Math.round((eng.cost * 0.5) * 100) / 100; // severance
   t.cash = Math.round((t.cash - cost) * 100) / 100;
-  t.history.push({ round: state.completedRounds + 1, label: `${eng.name} exit`, amount: -cost, category: "staff" });
+  t.history.push({
+    round: state.completedRounds + 1,
+    label: `${eng.name} exit`,
+    amount: -cost,
+    category: "staff",
+    detail: `${eng.name} released. One-time severance = 50% of the $${eng.cost}M seasonal salary = $${cost}M.`,
+  });
   return msg(result, true, `${eng.name} released (severance $${cost}M).`);
 }
 
@@ -58,12 +67,15 @@ export function hireMechanic(state: SimulationState, mechanicId: string): Action
   if (t.mechanicIds.length >= 5) return msg(result, false, "Pit crew is full (5 max).");
   const mech = mechanicById(mechanicId);
   if (!mech) return msg(result, false, "Unknown mechanic.");
-  const cost = Math.round(mech.cost * 100) / 100;
-  if (t.cash < cost) return msg(result, false, `Need $${cost}M.`);
-  t.cash = Math.round((t.cash - cost) * 100) / 100;
   t.mechanicIds.push(mechanicId);
-  t.history.push({ round: state.completedRounds + 1, label: `Hire ${mech.name}`, amount: -cost, category: "staff" });
-  return msg(result, true, `${mech.name} joined the crew.`);
+  t.history.push({
+    round: state.completedRounds + 1,
+    label: `Hire ${mech.name}`,
+    amount: 0,
+    category: "staff",
+    detail: `${mech.name} hired. No up-front fee — the $${mech.cost}M seasonal salary is paid per race weekend from now on ($${Math.round((mech.cost / (state.calendar.length || 19)) * 100) / 100}M/weekend).`,
+  });
+  return msg(result, true, `${mech.name} joined the crew. Salary paid per weekend.`);
 }
 
 export function fireMechanic(state: SimulationState, mechanicId: string): ActionResult {
@@ -74,7 +86,13 @@ export function fireMechanic(state: SimulationState, mechanicId: string): Action
   t.mechanicIds = t.mechanicIds.filter((id) => id !== mechanicId);
   const cost = Math.round((mech.cost * 0.5) * 100) / 100;
   t.cash = Math.round((t.cash - cost) * 100) / 100;
-  t.history.push({ round: state.completedRounds + 1, label: `${mech.name} exit`, amount: -cost, category: "staff" });
+  t.history.push({
+    round: state.completedRounds + 1,
+    label: `${mech.name} exit`,
+    amount: -cost,
+    category: "staff",
+    detail: `${mech.name} released. One-time severance = 50% of the $${mech.cost}M seasonal salary = $${cost}M.`,
+  });
   return msg(result, true, `${mech.name} released (severance $${cost}M).`);
 }
 
@@ -135,6 +153,7 @@ export function swapDriver(state: SimulationState, slot: 1 | 2, driverId: string
     label: `${old?.shortName ?? currentId} out, ${target.shortName} in`,
     amount: -total,
     category: "other",
+    detail: `Seat change: $${quote.fee}M break fee + $${quote.prorated}M prorated salary delta (remaining rounds) = $${total}M.`,
   });
   state.news.unshift({
     id: `swap-${state.completedRounds + 1}-${driverId}`,
@@ -189,8 +208,6 @@ export function signSponsor(state: SimulationState, sponsorId: string): ActionRe
   const spec = sponsorById(sponsorId);
   if (!spec) return msg(result, false, "Unknown sponsor.");
   if (t.reputation < (spec.tier === "title" ? 30 : 0)) return msg(result, false, "Reputation too low for a title sponsor.");
-  if (t.cash < spec.signingBonus) return msg(result, false, `Need $${spec.signingBonus}M signing money.`);
-  t.cash = Math.round((t.cash - spec.signingBonus) * 100) / 100;
   t.sponsors.push({
     sponsorId: spec.id,
     progress: 0,
@@ -203,8 +220,14 @@ export function signSponsor(state: SimulationState, sponsorId: string): ActionRe
   const round = state.completedRounds + 1;
   scheduleObjective(state, spec.id, round);
   if (!state.lastWeekend) scheduleObjective(state, spec.id, 1);
-  t.history.push({ round, label: `${spec.name} signing`, amount: -spec.signingBonus, category: "sponsor" });
-  return msg(result, true, `${spec.name} signed.`);
+  t.history.push({
+    round,
+    label: `${spec.name} signing`,
+    amount: 0,
+    category: "sponsor",
+    detail: `${spec.name} signed — no up-front fee. Pays $${spec.racePayment}M per race weekend; $${Math.round(spec.bonus * 100) / 100}M bonus if the objective is met.`,
+  });
+  return msg(result, true, `${spec.name} signed. No up-front fee — pays per race.`);
 }
 
 function scheduleObjective(state: SimulationState, sponsorId: string, round: number) {
@@ -232,7 +255,13 @@ export function terminateSponsor(state: SimulationState, sponsorId: string): Act
   const fee = Math.round(spec.bonus * 0.4 * 100) / 100;
   t.cash = Math.round((t.cash - fee) * 100) / 100;
   t.reputation = Math.max(0, t.reputation - 5);
-  t.history.push({ round: state.completedRounds + 1, label: `${spec.name} terminated`, amount: -fee, category: "sponsor" });
+  t.history.push({
+    round: state.completedRounds + 1,
+    label: `${spec.name} terminated`,
+    amount: -fee,
+    category: "sponsor",
+    detail: `${spec.name} terminated. Exit fee = 40% of the $${Math.round(spec.bonus * 100) / 100}M objective bonus = $${fee.toFixed(2)}M. Reputation -5.`,
+  });
   return msg(result, true, `${spec.name} terminated ($${fee}M exit fee).`);
 }
 

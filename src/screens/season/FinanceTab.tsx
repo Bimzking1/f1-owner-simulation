@@ -1,8 +1,10 @@
-import type { SimulationState } from "@/simulation/types";
-import { Card, Money } from "@/ui/kit";
+import { useState } from "react";
+import type { FinancialTransaction, SimulationState } from "@/simulation/types";
+import { Card, Modal, Money } from "@/ui/kit";
 
 export function FinanceTab({ state }: { state: SimulationState }) {
   const t = state.team!;
+  const [selected, setSelected] = useState<FinancialTransaction | null>(null);
   const byRound = new Map<number, { inc: number; exp: number }>();
   for (const h of t.history) {
     const d = byRound.get(h.round) ?? { inc: 0, exp: 0 };
@@ -54,12 +56,39 @@ export function FinanceTab({ state }: { state: SimulationState }) {
               <div key={i} className="flex items-center justify-between gap-2 py-1 text-xs">
                 <span className="tabular text-ink-faint">R{h.round}</span>
                 <span className="min-w-0 flex-1 truncate text-ink-soft">{h.label}</span>
+                {h.detail ? (
+                  <button
+                    type="button"
+                    title="Why?"
+                    onClick={() => setSelected(h)}
+                    className="shrink-0 rounded-sm border border-hairline px-1 text-[10px] leading-4 text-ink-faint hover:border-ink-faint hover:text-ink"
+                  >
+                    ⓘ
+                  </button>
+                ) : (
+                  <span className="w-4 shrink-0" />
+                )}
                 <Money value={h.amount} className="shrink-0" />
               </div>
             ))}
           </div>
         </Card>
       </div>
+      <Modal
+        open={!!selected}
+        onClose={() => setSelected(null)}
+        title={selected ? `${selected.label} · R${selected.round}` : ""}
+      >
+        {selected && (
+          <div className="space-y-3 text-sm">
+            <div className="flex items-center justify-between">
+              <span className="text-ink-faint">Amount</span>
+              <Money value={selected.amount} className="font-display text-base font-bold" />
+            </div>
+            <p className="border-l-2 border-hairline pl-3 leading-relaxed text-ink-soft">{selected.detail}</p>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }

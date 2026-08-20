@@ -79,8 +79,8 @@ export function createSeason(draft: SimulationState, seed: string): SimulationSt
       };
     });
 
-  // sponsors (spec §46-48): attach signed sponsors; signing bonuses were paid
-  // out of the setup budget, so cash is untouched here.
+  // sponsors (spec §46-48): attach signed sponsors. Signing is free — no
+  // up-front fee; sponsors pay their race rate every weekend.
   const rng0 = createRng(seed + ":sponsors");
   const signed = t.sponsorIds
     .map(sponsorById)
@@ -367,7 +367,13 @@ export function resolveNewsAction(state: SimulationState, newsId: string, action
       t.cash = Math.round((t.cash - cost) * 100) / 100;
       t.car.power = Math.min(100, t.car.power + 3);
       t.car.reliability = Math.min(100, t.car.reliability + 2);
-      t.history.push({ round, label: "Supplier engine upgrade", amount: -cost, category: "supplier" });
+      t.history.push({
+        round,
+        label: "Supplier engine upgrade",
+        amount: -cost,
+        category: "supplier",
+        detail: `Supplier engine upgrade: $${cost}M one-time, +3 power +2 reliability. ${engineById(t.engineId)?.supplier ?? "Engine supplier"} unit.`,
+      });
       item.title = "Engine upgrade purchased";
       item.body = `+3 power, +2 reliability. -$${cost}M.`;
       item.bodyEnjoyer = `Engine upgraded. That's $${cost}M gone.`;

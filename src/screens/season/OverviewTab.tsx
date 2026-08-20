@@ -36,16 +36,18 @@ export function OverviewTab({ state, onNewsAction, onRunRound }: Props) {
         {next && <NextRaceCard track={next} />}
 
         <Card title="Team">
-          <div className="mb-3 flex items-center gap-3">
+          <div className="mb-3 flex flex-col items-start gap-3 lg:flex-row lg:items-center">
             {(() => {
               const c = constructorById(t.constructorId);
               return c ? (
                 <>
-                  <Img src={c.image} alt={c.name} className="h-14 w-14 shrink-0 rounded-sm object-cover" />
-                  <Img src={c.carImage} alt={`${c.name} car`} className="h-14 w-20 shrink-0 rounded-sm object-cover" />
+                  <div className="flex flex-wrap items-center gap-3">
+                    <Img src={c.image} alt={c.name} className="h-14 w-14 shrink-0 rounded-sm object-cover" />
+                    <Img src={c.carImage} alt={`${c.name} car`} className="h-14 w-auto shrink-0 rounded-sm" />
+                  </div>
                   <div className="min-w-0">
-                    <div className="truncate font-display text-lg font-bold">{c.fullName}</div>
-                    <div className="text-[11px] text-ink-faint">
+                    <div className="font-display text-lg font-bold leading-tight lg:truncate">{c.fullName}</div>
+                    <div className="text-[11px] text-ink-faint lg:whitespace-nowrap">
                       {t.points} pts · P{state.standingsConstructors.findIndex((s) => s.teamId === t.constructorId) + 1} in constructors
                     </div>
                   </div>

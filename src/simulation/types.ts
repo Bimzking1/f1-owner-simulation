@@ -382,6 +382,7 @@ export interface FinancialTransaction {
   label: string;
   amount: number; // +income / -expense $M
   category: TransactionCategory;
+  detail?: string; // human-readable breakdown/formula, shown in FinanceTab ⓘ
 }
 
 export interface TeamState {

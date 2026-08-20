@@ -13,7 +13,7 @@ interface Props {
 export function SponsorsTab({ state, act }: Props) {
   const t = state.team!;
   const active = t.sponsors.filter((s) => s.active);
-  const pool = availableSponsors(state.season, t.reputation, t.cash + 40);
+  const pool = availableSponsors(state.season, t.reputation);
   const signed = new Set(t.sponsors.map((s) => s.sponsorId));
 
   return (
@@ -68,8 +68,7 @@ export function SponsorsTab({ state, act }: Props) {
                   <div className="mt-1 text-[11px] text-ink-soft">{spec.objectiveTextEnjoyer}</div>
                   <div className="mt-2 flex items-center justify-between gap-2 text-xs">
                     <span className="text-ink-faint">
-                      <Money value={spec.signingBonus} /> sign · <Money value={spec.racePayment} />/race ·{" "}
-                      +<Money value={spec.bonus} /> bonus
+                      Pays <Money value={spec.racePayment} />/race · +<Money value={spec.bonus} /> bonus
                     </span>
                     <Button small variant="ghost" disabled={taken} onClick={() => act((x) => signSponsor(x, spec.id).message)}>
                       Sign
@@ -85,7 +84,7 @@ export function SponsorsTab({ state, act }: Props) {
       <div className="space-y-4">
         <Card title="How sponsors work">
           <ul className="list-inside list-disc space-y-1 text-xs text-ink-soft">
-            <li>Signing bonuses are paid immediately from cash.</li>
+            <li>Signing is free — no up-front fee, ever.</li>
             <li>Race payments arrive automatically every weekend.</li>
             <li>Objectives are evaluated at a deadline round.</li>
             <li>Miss an objective and patience drops. At 0, the sponsor walks.</li>

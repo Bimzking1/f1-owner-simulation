@@ -130,7 +130,7 @@ export function MarketTab({ state, act }: Props) {
               return (
                 <div key={e.id} className="flex items-center gap-2 rounded-sm border border-hairline px-2 py-1.5 text-sm">
                   <span className="min-w-0 flex-1 truncate">{e.name}</span>
-                  <span className="text-[11px] text-ink-faint">{e.department} · ${e.cost}M</span>
+                  <span className="text-[11px] text-ink-faint">{e.department} · ${e.cost}M/yr</span>
                   {hired ? (
                     <Button small variant="danger" onClick={() => act((s) => fireEngineer(s, e.id).message)}>Fire</Button>
                   ) : (
@@ -155,7 +155,7 @@ export function MarketTab({ state, act }: Props) {
               return (
                 <div key={m.id} className="flex items-center gap-2 rounded-sm border border-hairline px-2 py-1.5 text-sm">
                   <span className="min-w-0 flex-1 truncate">{m.name}</span>
-                  <span className="text-[11px] text-ink-faint">{m.pitStop.toFixed(2)}s · ${m.cost}M</span>
+                  <span className="text-[11px] text-ink-faint">{m.pitStop.toFixed(2)}s · ${m.cost}M/yr</span>
                   {hired ? (
                     <Button small variant="danger" onClick={() => act((s) => fireMechanic(s, m.id).message)}>Fire</Button>
                   ) : (
