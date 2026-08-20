@@ -139,6 +139,12 @@ export const assetManifest: AssetEntry[] = [
   { filename: "dummy153.png", category: "cars", description: "Toro Rosso car image", seasons: "2013", usedBy: ["tororosso"] },
   { filename: "dummy154.png", category: "cars", description: "Caterham car image", seasons: "2013", usedBy: ["caterham"] },
   { filename: "dummy155.png", category: "cars", description: "Marussia car image", seasons: "2013", usedBy: ["marussia"] },
+  { filename: "dummy156.png", category: "cars", description: "Ferrari car image (2013)", seasons: "2013", usedBy: ["ferrari"] },
+  { filename: "dummy157.png", category: "cars", description: "Red Bull Racing car image (2013)", seasons: "2013", usedBy: ["redbull"] },
+  { filename: "dummy158.png", category: "cars", description: "Mercedes car image (2013)", seasons: "2013", usedBy: ["mercedes"] },
+  { filename: "dummy159.png", category: "cars", description: "McLaren car image (2013)", seasons: "2013", usedBy: ["mclaren"] },
+  { filename: "dummy160.png", category: "cars", description: "Williams car image (2013)", seasons: "2013", usedBy: ["williams"] },
+  { filename: "dummy161.png", category: "cars", description: "Sauber car image (2013)", seasons: "2013", usedBy: ["sauber"] },
 
   // 166–185 Engines / gearbox / technical
   { filename: "dummy166.png", category: "engines", description: "Renault RS27 V8 (2013)", seasons: "2013", usedBy: ["renault13"] },
@@ -217,6 +223,12 @@ export const assetPaths = {
     tororosso: A("cars", "dummy153.png"),
     caterham: A("cars", "dummy154.png"),
     marussia: A("cars", "dummy155.png"),
+    ferrari13: A("cars", "dummy156.png"),
+    redbull13: A("cars", "dummy157.png"),
+    mercedes13: A("cars", "dummy158.png"),
+    mclaren13: A("cars", "dummy159.png"),
+    williams13: A("cars", "dummy160.png"),
+    sauber13: A("cars", "dummy161.png"),
   },
   drivers: {
     vettel: A("drivers", "dummy091.png"),

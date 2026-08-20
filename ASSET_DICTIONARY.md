@@ -38,6 +38,12 @@ Real art already dropped in for: `dummy021.png`, `dummy022.png`, `dummy023.png`,
 | `dummy153.png` | cars | Toro Rosso car image | 2013 | tororosso |
 | `dummy154.png` | cars | Caterham car image | 2013 | caterham |
 | `dummy155.png` | cars | Marussia car image | 2013 | marussia |
+| `dummy156.png` | cars | Ferrari car image (2013) | 2013 | ferrari |
+| `dummy157.png` | cars | Red Bull Racing car image (2013) | 2013 | redbull |
+| `dummy158.png` | cars | Mercedes car image (2013) | 2013 | mercedes |
+| `dummy159.png` | cars | McLaren car image (2013) | 2013 | mclaren |
+| `dummy160.png` | cars | Williams car image (2013) | 2013 | williams |
+| `dummy161.png` | cars | Sauber car image (2013) | 2013 | sauber |
 | `dummy021.png` | constructors | Ferrari logo | both | ferrari |
 | `dummy022.png` | constructors | Red Bull Racing logo | both | redbull |
 | `dummy023.png` | constructors | Mercedes-AMG Petronas logo | both | mercedes |
