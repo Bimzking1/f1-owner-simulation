@@ -35,7 +35,7 @@ export function RaceTab({ state, onRunRound }: Props) {
             </div>
           )}
         </Card>
-        {last && <ResultCard weekend={last} />}
+        {last && <ResultCard weekend={last} season={state.season} />}
       </div>
       <div className="space-y-4">
         <Card title="Components">
@@ -77,7 +77,7 @@ export function RaceTab({ state, onRunRound }: Props) {
   );
 }
 
-function ResultCard({ weekend }: { weekend: RaceWeekendResult }) {
+function ResultCard({ weekend, season }: { weekend: RaceWeekendResult; season: number }) {
   const [open, setOpen] = useState(false);
   const track = trackById(weekend.trackId);
   const finishes = weekend.playerEntries.map((p) => (p.dnf ? 999 : p.position));
@@ -92,7 +92,7 @@ function ResultCard({ weekend }: { weekend: RaceWeekendResult }) {
           const d = driverById(p.driverId);
           return (
             <div key={p.driverId} className="flex items-center gap-2 rounded-md border border-hairline bg-raised/50 px-2 py-1.5">
-              <Img src={d ? driverImage(d.id) : ""} alt={d?.shortName ?? p.driverId} className="h-6 w-6 rounded-sm object-cover" />
+              <Img src={d ? driverImage(d.id, season) : ""} alt={d?.shortName ?? p.driverId} className="h-6 w-6 rounded-sm object-cover" />
               <span className="min-w-0 flex-1 truncate">{d?.shortName ?? p.driverId}</span>
               {p.dnf ? (
                 <Tag tone="signal">DNF</Tag>

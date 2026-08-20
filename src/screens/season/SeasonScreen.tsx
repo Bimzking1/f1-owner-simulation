@@ -28,7 +28,6 @@ export default function SeasonScreen({ state, onRunRound, onNewsAction, act, onR
   const t = state.team!;
   const ctor = constructorById(t.constructorId, state.season);
   const wccPos = state.standingsConstructors.findIndex((c) => c.teamId === t.constructorId) + 1;
-  const done = state.completedRounds >= state.calendar.length;
   const [tab, setTab] = useState<Tab>("Overview");
 
   if (state.phase === "bankrupt" || state.phase === "finished") {
@@ -56,7 +55,6 @@ export default function SeasonScreen({ state, onRunRound, onNewsAction, act, onR
         </div>
         <div className="flex items-center gap-2">
           <Button variant="ghost" small onClick={onReset}>Menu</Button>
-          <Button small onClick={onRunRound} disabled={done}>Race Weekend →</Button>
         </div>
       </header>
 
@@ -66,8 +64,10 @@ export default function SeasonScreen({ state, onRunRound, onNewsAction, act, onR
             key={tb}
             type="button"
             onClick={() => setTab(tb)}
-            className={`rounded-sm px-3 py-1.5 text-xs font-bold uppercase tracking-widest transition ${
-              tab === tb ? "bg-signal text-white" : "bg-raised text-ink-soft hover:text-ink"
+            className={`rounded-sm border px-3 py-1.5 text-xs font-bold uppercase tracking-widest transition ${
+              tab === tb
+                ? "border-signal/40 bg-signal/15 text-signal"
+                : "border-transparent bg-raised/40 text-ink-soft hover:bg-raised hover:text-ink"
             }`}
           >
             {tb}
@@ -75,7 +75,7 @@ export default function SeasonScreen({ state, onRunRound, onNewsAction, act, onR
         ))}
       </nav>
 
-      {tab === "Overview" && <OverviewTab state={state} onNewsAction={onNewsAction} />}
+      {tab === "Overview" && <OverviewTab state={state} onNewsAction={onNewsAction} onRunRound={onRunRound} />}
       {tab === "Race" && <RaceTab state={state} onRunRound={onRunRound} />}
       {tab === "Market" && <MarketTab state={state} act={act} />}
       {tab === "Sponsors" && <SponsorsTab state={state} act={act} />}

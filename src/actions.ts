@@ -251,6 +251,12 @@ export function runTest(state: SimulationState, type: TestType): TestReport {
   t.history.push({ round: state.completedRounds + 1, label: `${labelOf(type)} test`, amount: -cost, category: "testing" });
   const rng = createRng(`${state.seed}:test:${state.completedRounds}:${type}`);
   const test = buildTestReport(state, type, rng);
+  if (type === "driver") {
+    for (const ds of t.drivers) {
+      ds.confidence = clamp(ds.confidence + 4, 0, 100);
+      ds.morale = clamp(ds.morale + 3, 0, 100);
+    }
+  }
   state.testing.unshift(test);
   return test;
 }

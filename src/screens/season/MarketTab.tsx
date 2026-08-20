@@ -96,7 +96,7 @@ export function MarketTab({ state, act }: Props) {
                         onClick={() => setPending({ slot, driverId: d.id })}
                         className="flex w-full items-center gap-2 rounded-sm border border-hairline px-2 py-1 text-left text-sm hover:border-telemetry"
                       >
-                        <Img src={driverImage(d.id)} alt={d.shortName} className="h-6 w-6 rounded-sm object-cover" />
+                        <Img src={driverImage(d.id, state.season)} alt={d.shortName} className="h-6 w-6 rounded-sm object-cover" />
                         <span className="min-w-0 flex-1 truncate">{d.shortName}</span>
                         <span className="text-[11px] text-ink-faint">OVR {d.overall}</span>
                         <span className="text-[11px] text-ink-faint">${d.salary}M</span>
@@ -279,9 +279,9 @@ function SwapConfirm({
         <p className="text-xs leading-relaxed text-ink-soft">{swapText}</p>
 
         <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 text-center">
-          <DriverMini d={cur} />
+          <DriverMini d={cur} season={state.season} />
           <span className="font-display text-xl font-bold text-telemetry">→</span>
-          <DriverMini d={quote.target} label="New" />
+          <DriverMini d={quote.target} label="New" season={state.season} />
         </div>
 
         <div className="divide-y divide-hairline/60 rounded-md border border-hairline">
@@ -338,12 +338,12 @@ function SwapConfirm({
   );
 }
 
-function DriverMini({ d, label }: { d: ReturnType<typeof driverById>; label?: string }) {
+function DriverMini({ d, label, season }: { d: ReturnType<typeof driverById>; label?: string; season: number }) {
   if (!d) return <div className="text-xs text-ink-faint">—</div>;
   return (
     <div className="flex flex-col items-center gap-1 rounded-md border border-hairline bg-raised/50 p-2">
       {label && <span className="text-[10px] font-semibold uppercase tracking-widest text-ink-faint">{label}</span>}
-      <Img src={driverImage(d.id)} alt={d.shortName} className="h-10 w-10 rounded-sm object-cover" />
+      <Img src={driverImage(d.id, season)} alt={d.shortName} className="h-10 w-10 rounded-sm object-cover" />
       <span className="font-display text-sm font-bold">{d.shortName}</span>
       <span className="text-[11px] text-ink-faint">OVR {d.overall} · ${d.salary}M/yr</span>
     </div>

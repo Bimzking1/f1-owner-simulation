@@ -75,12 +75,12 @@ export function TrackName({ id }: { id: string }) {
   return <span>{trackById(id)?.grandPrix ?? id}</span>;
 }
 
-export function DriverChip({ driverId, size = 24 }: { driverId: string; size?: number }) {
+export function DriverChip({ driverId, size = 24, season }: { driverId: string; size?: number; season?: number }) {
   const d = driverById(driverId);
   if (!d) return null;
   return (
     <span className="inline-flex items-center gap-2">
-      <Img src={driverImage(d.id)} alt={d.shortName} className="rounded-sm object-cover" style={{ width: size, height: size }} />
+      <Img src={driverImage(d.id, season)} alt={d.shortName} className="rounded-sm object-cover" style={{ width: size, height: size }} />
       <span>{d.shortName}</span>
     </span>
   );

@@ -35,7 +35,7 @@ interface Props {
   onBack: () => void;
 }
 
-const STEPS = ["Constructor", "Drivers", "Staff", "Technical", "Philosophy", "Sponsors", "Review"] as const;
+const STEPS = ["Constructor", "Drivers", "Technical", "Staff", "Philosophy", "Sponsors", "Review"] as const;
 type Step = (typeof STEPS)[number];
 
 export default function SetupScreen({ cfg, onStart, onBack }: Props) {
@@ -139,15 +139,15 @@ export default function SetupScreen({ cfg, onStart, onBack }: Props) {
   const sponsors = availableSponsors(cfg.season, ctor?.dna.reputation ?? 0, remaining + sponsorCost);
 
   return (
-    <div className="mx-auto max-w-5xl px-6 py-8">
-      <div className="mb-6 flex items-center justify-between gap-4">
+    <div className="mx-auto max-w-5xl px-6 pb-32 lg:pb-8">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
         <div>
           <button type="button" onClick={onBack} className="text-[11px] uppercase tracking-widest text-ink-faint hover:text-ink">
             ← back
           </button>
           <h1 className="font-display text-3xl font-bold uppercase tracking-tight">Team Setup</h1>
         </div>
-        <div className="text-right">
+        <div className="text-left sm:text-right">
           <div className="text-[11px] uppercase tracking-widest text-ink-faint">Budget · {diff.label}</div>
           <Money value={remaining} className={`font-display text-2xl font-bold ${remaining < 0 ? "text-signal" : ""}`} />
           {overBudget && <div className="text-[11px] font-semibold uppercase tracking-wider text-signal">Over budget — adjust picks</div>}
@@ -191,7 +191,7 @@ export default function SetupScreen({ cfg, onStart, onBack }: Props) {
               className={`rounded-md border p-4 text-left transition ${constructorId === c.id ? "border-signal bg-signal/10" : "border-hairline bg-surface hover:border-ink-faint"}`}
             >
               <div className="flex items-center gap-2">
-                <span className="h-3 w-3 rounded-full" style={{ background: c.colors.primary }} />
+                <Img src={c.image} alt={c.name} className="h-10 w-10 shrink-0 rounded-sm object-cover" />
                 <span className="font-display text-lg font-bold">{c.name}</span>
               </div>
               <div className="mt-1 text-[11px] text-ink-faint">{c.nationality}</div>
@@ -236,14 +236,21 @@ export default function SetupScreen({ cfg, onStart, onBack }: Props) {
                             : "border-hairline bg-surface hover:border-ink-faint"
                       }`}
                     >
-                      <Img src={driverImage(d.id)} alt={d.shortName} className="h-10 w-10 rounded-sm object-cover" />
+                      <Img
+                        src={driverImage(d.id, cfg.season)}
+                        alt={d.shortName}
+                        className="h-20 w-20 shrink-0 rounded-sm object-cover md:h-24 md:w-24"
+                      />
                       <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                           <span className="font-display font-bold">{d.name}</span>
                           <Tag tone={d.rookie ? "positive" : "ink"}>{d.rookie ? "Rookie" : d.personality}</Tag>
                         </div>
-                        <div className="text-[11px] text-ink-faint">
-                          #{d.number} · OVR {d.overall} · ${d.salary}M/yr · {d.attributes.pressure} pressure
+                        <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-ink-faint">
+                          <span>#{d.number}</span>
+                          <span>OVR {d.overall}</span>
+                          <span>${d.salary}M/yr</span>
+                          <span>{d.attributes.pressure} pressure</span>
                         </div>
                       </div>
                     </button>
@@ -265,6 +272,36 @@ export default function SetupScreen({ cfg, onStart, onBack }: Props) {
         </div>
       )}
 
+      {/* TECHNICAL */}
+      {step === "Technical" && (
+        <div className="grid gap-4 lg:grid-cols-3">
+          <Card title="Engine">
+            <div className="grid gap-2">
+              {engines.map((e) => (
+                <TechPick key={e.id} active={engineId === e.id} onClick={() => setEngineId(e.id)} title={e.name}
+                  meta={[`Power ${e.power}`, `Rel ${e.reliability}`, e.status, e.supplier]} cost={costOf(e.cost)} />
+              ))}
+            </div>
+          </Card>
+          <Card title="Gearbox">
+            <div className="grid gap-2">
+              {gearboxes.map((g) => (
+                <TechPick key={g.id} active={gearboxId === g.id} onClick={() => setGearboxId(g.id)} title={g.name}
+                  meta={[`Perf ${g.performance}`, `Rel ${g.reliability}`]} cost={costOf(g.cost)} />
+              ))}
+            </div>
+          </Card>
+          <Card title="Technical package">
+            <div className="grid gap-2">
+              {techs.map((t) => (
+                <TechPick key={t.id} active={techId === t.id} onClick={() => setTechId(t.id)} title={t.name}
+                  meta={[`Aero ${t.aero}`, `Chassis ${t.chassis}`, `Rel ${t.reliability}`]} cost={costOf(t.cost)} />
+              ))}
+            </div>
+          </Card>
+        </div>
+      )}
+
       {/* STAFF */}
       {step === "Staff" && (
         <div className="grid gap-4 lg:grid-cols-2">
@@ -283,7 +320,7 @@ export default function SetupScreen({ cfg, onStart, onBack }: Props) {
                     }`}
                   >
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                         <span className="font-display font-bold">{e.name}</span>
                         <Tag>{e.department}</Tag>
                       </div>
@@ -335,36 +372,6 @@ export default function SetupScreen({ cfg, onStart, onBack }: Props) {
         </div>
       )}
 
-      {/* TECHNICAL */}
-      {step === "Technical" && (
-        <div className="grid gap-4 lg:grid-cols-3">
-          <Card title="Engine">
-            <div className="grid gap-2">
-              {engines.map((e) => (
-                <TechPick key={e.id} active={engineId === e.id} onClick={() => setEngineId(e.id)} title={e.name}
-                  meta={[`Power ${e.power}`, `Rel ${e.reliability}`, e.status, e.supplier]} cost={costOf(e.cost)} />
-              ))}
-            </div>
-          </Card>
-          <Card title="Gearbox">
-            <div className="grid gap-2">
-              {gearboxes.map((g) => (
-                <TechPick key={g.id} active={gearboxId === g.id} onClick={() => setGearboxId(g.id)} title={g.name}
-                  meta={[`Perf ${g.performance}`, `Rel ${g.reliability}`]} cost={costOf(g.cost)} />
-              ))}
-            </div>
-          </Card>
-          <Card title="Technical package">
-            <div className="grid gap-2">
-              {techs.map((t) => (
-                <TechPick key={t.id} active={techId === t.id} onClick={() => setTechId(t.id)} title={t.name}
-                  meta={[`Aero ${t.aero}`, `Chassis ${t.chassis}`, `Rel ${t.reliability}`]} cost={costOf(t.cost)} />
-              ))}
-            </div>
-          </Card>
-        </div>
-      )}
-
       {/* PHILOSOPHY */}
       {step === "Philosophy" && (
         <div className="grid gap-3 sm:grid-cols-2">
@@ -412,8 +419,21 @@ export default function SetupScreen({ cfg, onStart, onBack }: Props) {
             {sponsors.map((s) => {
               const signed = sponsorIds.includes(s.id);
               const canPay = remaining + sponsorCost >= costOf(s.signingBonus);
+              const locked = !signed && !canPay;
               return (
-                <div key={s.id} className={`rounded-md border p-3 ${signed ? "border-positive/50 bg-positive/10" : "border-hairline bg-surface"}`}>
+                <button
+                  key={s.id}
+                  type="button"
+                  disabled={locked}
+                  onClick={() => setSponsorIds(signed ? sponsorIds.filter((x) => x !== s.id) : [...sponsorIds, s.id])}
+                  className={`rounded-md border p-3 text-left transition ${
+                    signed
+                      ? "border-positive/50 bg-positive/10"
+                      : locked
+                        ? "cursor-not-allowed border-hairline bg-surface opacity-50"
+                        : "border-hairline bg-surface hover:border-ink-faint"
+                  }`}
+                >
                   <div className="flex items-center justify-between gap-2">
                     <div className="font-display font-bold">{s.name}</div>
                     <Tag tone={s.tier === "title" ? "elite" : s.tier === "major" ? "telemetry" : "ink"}>{s.tier}</Tag>
@@ -421,19 +441,21 @@ export default function SetupScreen({ cfg, onStart, onBack }: Props) {
                   <div className="mt-1 text-[11px] text-ink-soft">{s.objectiveTextEnjoyer}</div>
                   <div className="mt-2 flex items-center justify-between gap-2 text-xs">
                     <span className="text-ink-faint">
-                      +<Money value={costOf(s.signingBonus)} /> · <Money value={s.racePayment} />/race ·{" "}
-                      +<Money value={s.bonus} /> bonus
+                      +<Money value={costOf(s.signingBonus)} /> · <Money value={s.racePayment} />/race · +<Money value={s.bonus} /> bonus
                     </span>
-                    <Button
-                      small
-                      variant={signed ? "positive" : "ghost"}
-                      disabled={!signed && !canPay}
-                      onClick={() => setSponsorIds(signed ? sponsorIds.filter((x) => x !== s.id) : [...sponsorIds, s.id])}
+                    <span
+                      className={`inline-flex shrink-0 items-center rounded-sm border px-2 py-1 font-display text-[11px] font-bold uppercase tracking-widest ${
+                        signed
+                          ? "border-positive/40 bg-positive/15 text-positive"
+                          : locked
+                            ? "border-hairline text-ink-faint"
+                            : "border-hairline bg-raised text-ink-soft"
+                      }`}
                     >
-                      {signed ? "Signed" : "Sign"}
-                    </Button>
+                      {signed ? "Signed" : locked ? "Can't afford" : s.tier === "title" ? "Sign Title" : "Sign"}
+                    </span>
                   </div>
-                </div>
+                </button>
               );
             })}
           </div>
@@ -444,6 +466,20 @@ export default function SetupScreen({ cfg, onStart, onBack }: Props) {
       {step === "Review" && (
         <div className="grid gap-4 lg:grid-cols-2">
           <Card title="Team">
+            {ctor && (
+              <div className="mb-3 flex flex-col items-start gap-3 sm:flex-row sm:items-center">
+                <div className="flex items-center gap-3">
+                  <Img src={ctor.image} alt={ctor.name} className="h-14 w-14 shrink-0 rounded-sm object-cover" />
+                  <Img src={ctor.carImage} alt={`${ctor.name} car`} className="h-14 w-20 shrink-0 rounded-sm object-cover" />
+                </div>
+                <div className="min-w-0 text-sm">
+                  <div className="font-display font-bold">{ctor.fullName}</div>
+                  <div className="text-[11px] text-ink-faint">
+                    {cfg.season === 2013 ? "2013" : "2025"} · {ctor.nationality}
+                  </div>
+                </div>
+              </div>
+            )}
             <div className="space-y-1 text-sm">
               <Row k="Constructor" v={ctor?.name ?? "—"} />
               <Row k="Drivers" v={`${d1?.name ?? "—"} / ${d2?.name ?? "—"}`} />
@@ -458,11 +494,11 @@ export default function SetupScreen({ cfg, onStart, onBack }: Props) {
           </Card>
           <Card title="Budget">
             <div className="space-y-2 text-sm">
-              <Row k="Starting budget" v={money(startCash)} />
-              <Row k="Equipment" v={`-${money(equipmentCost)}`} />
-              <Row k="Staff signings" v={`-${money(staffCost)}`} />
-              <Row k="Sponsor signings" v={`-${money(sponsorCost)}`} />
-              <Row k="Cash at season start" v={money(remaining)} bold />
+              <Row inline k="Starting budget" v={money(startCash)} />
+              <Row inline k="Equipment" v={`-${money(equipmentCost)}`} />
+              <Row inline k="Staff signings" v={`-${money(staffCost)}`} />
+              <Row inline k="Sponsor signings" v={`-${money(sponsorCost)}`} />
+              <Row inline k="Cash at season start" v={money(remaining)} bold />
             </div>
             <div className="mt-4 text-xs text-ink-faint">
               Difficulty {diff.label} · {cfg.season === 2013 ? "2013, 19 races" : "2025, 24 races + sprints"} · detail level{" "}
@@ -472,7 +508,7 @@ export default function SetupScreen({ cfg, onStart, onBack }: Props) {
         </div>
       )}
 
-      <div className="mt-6 flex items-center justify-between">
+      <div className="fixed inset-x-3 bottom-3 z-40 flex items-center justify-between gap-3 rounded-md border border-hairline bg-surface/95 p-3 shadow-xl backdrop-blur lg:static lg:inset-auto lg:mt-6 lg:border-0 lg:bg-transparent lg:p-0 lg:shadow-none">
         <Button variant="ghost" onClick={() => (stepIndex > 0 ? setStep(STEPS[stepIndex - 1]) : onBack())}>
           Back
         </Button>
@@ -527,11 +563,15 @@ function TechPick({ active, onClick, title, meta, cost }: { active: boolean; onC
   );
 }
 
-function Row({ k, v, bold }: { k: string; v: string; bold?: boolean }) {
+function Row({ k, v, bold, inline }: { k: string; v: string; bold?: boolean; inline?: boolean }) {
   return (
-    <div className="flex justify-between gap-4 border-b border-hairline/50 py-1">
-      <span className="text-ink-faint">{k}</span>
-      <span className={`text-right ${bold ? "font-display text-base font-bold" : ""}`}>{v}</span>
+    <div
+      className={`border-b border-hairline/50 py-1 ${
+        inline ? "flex items-center justify-between gap-4" : "flex flex-col gap-0.5 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
+      }`}
+    >
+      <span className={inline ? "text-ink-faint" : "text-ink-faint"}>{k}</span>
+      <span className={`${bold ? "font-display text-base font-bold" : ""}`}>{v}</span>
     </div>
   );
 }

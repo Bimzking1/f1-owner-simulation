@@ -1,30 +1,65 @@
 import type { SimulationState } from "@/simulation/types";
-import { driverById } from "@/data";
-import { Bar, Card, Img, Tag } from "@/ui/kit";
+import { driverById, constructorById } from "@/data";
+import { Bar, Button, Card, Img, Tag } from "@/ui/kit";
 import { driverImage } from "@/data/assets";
 import { MiniBar, NextRaceCard, StandingsCard } from "./parts";
 
 interface Props {
   state: SimulationState;
   onNewsAction: (newsId: string, action: string) => void;
+  onRunRound: () => void;
 }
 
-export function OverviewTab({ state, onNewsAction }: Props) {
+export function OverviewTab({ state, onNewsAction, onRunRound }: Props) {
   const t = state.team!;
   const next = state.calendar[state.round];
   return (
     <div className="grid gap-4 lg:grid-cols-3">
       <div className="space-y-4 lg:col-span-2">
+        {next && (
+          <Card title={`Next round — ${next.grandPrix}`}>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm text-ink-soft">
+                Round {state.round + 1}/{state.calendar.length}. The weekend simulates qualifying
+                {next.sprint && state.gameLength !== "short" ? ", a sprint" : ""} and the race with lap-level events,
+                weather and mechanical risk.
+              </p>
+              <Button
+                onClick={onRunRound}
+                className="shrink-0"
+              >
+                Run the {next.grandPrix} →
+              </Button>
+            </div>
+          </Card>
+        )}
         {next && <NextRaceCard track={next} />}
 
         <Card title="Team">
+          <div className="mb-3 flex items-center gap-3">
+            {(() => {
+              const c = constructorById(t.constructorId);
+              return c ? (
+                <>
+                  <Img src={c.image} alt={c.name} className="h-14 w-14 shrink-0 rounded-sm object-cover" />
+                  <Img src={c.carImage} alt={`${c.name} car`} className="h-14 w-20 shrink-0 rounded-sm object-cover" />
+                  <div className="min-w-0">
+                    <div className="truncate font-display text-lg font-bold">{c.fullName}</div>
+                    <div className="text-[11px] text-ink-faint">
+                      {t.points} pts · P{state.standingsConstructors.findIndex((s) => s.teamId === t.constructorId) + 1} in constructors
+                    </div>
+                  </div>
+                </>
+              ) : null;
+            })()}
+          </div>
           <div className="grid gap-3 sm:grid-cols-2">
             {t.drivers.map((ds) => {
               const d = driverById(ds.driverId);
               if (!d) return null;
               return (
                 <div key={ds.driverId} className="flex items-center gap-3 rounded-md border border-hairline bg-raised/50 p-2">
-                  <Img src={driverImage(d.id)} alt={d.shortName} className="h-12 w-12 rounded-sm object-cover" />
+                  <Img src={driverImage(d.id, state.season)} alt={d.shortName} className="h-12 w-12 rounded-sm object-cover" />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <span className="font-display font-bold leading-tight">{d.name}</span>

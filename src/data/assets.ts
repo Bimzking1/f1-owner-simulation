@@ -118,6 +118,9 @@ export const assetManifest: AssetEntry[] = [
   { filename: "dummy127.png", category: "drivers", description: "Yuki Tsunoda photo", seasons: "2025", usedBy: ["tsunoda"] },
   { filename: "dummy128.png", category: "drivers", description: "Isack Hadjar photo", seasons: "2025", usedBy: ["hadjar"] },
   { filename: "dummy129.png", category: "drivers", description: "Gabriel Bortoleto photo", seasons: "2025", usedBy: ["bortoleto"] },
+  { filename: "dummy130.png", category: "drivers", description: "Lewis Hamilton photo (2025)", seasons: "2025", usedBy: ["hamilton"] },
+  { filename: "dummy131.png", category: "drivers", description: "Fernando Alonso photo (2025)", seasons: "2025", usedBy: ["alonso"] },
+  { filename: "dummy132.png", category: "drivers", description: "Nico Hulkenberg photo (2025)", seasons: "2025", usedBy: ["hulkenberg"] },
 
   // 141–165 Car images
   { filename: "dummy141.png", category: "cars", description: "Ferrari car image", seasons: "2025", usedBy: ["ferrari"] },
@@ -254,6 +257,9 @@ export const assetPaths = {
     tsunoda: A("drivers", "dummy127.png"),
     hadjar: A("drivers", "dummy128.png"),
     bortoleto: A("drivers", "dummy129.png"),
+    hamilton2025: A("drivers", "dummy130.png"),
+    alonso2025: A("drivers", "dummy131.png"),
+    hulkenberg2025: A("drivers", "dummy132.png"),
   },
   tracks: {
     melbourne: A("tracks", "dummy051.png"),
@@ -309,8 +315,11 @@ export const assetPaths = {
   },
 } as const;
 
-/** Resolve driver image by driver id (used by data + UI). */
-export function driverImage(id: string): string {
-  return (assetPaths.drivers as Record<string, unknown>)[id] as string | undefined ??
-    assetPaths.branding.fallbackLogo;
+/** Resolve driver image by driver id (used by data + UI). Season-aware so
+ *  drivers who appear in both eras (Hamilton, Alonso, Hulkenberg) get their
+ *  2025 photo when a season-specific asset exists. */
+export function driverImage(id: string, season?: number): string {
+  const map = assetPaths.drivers as Record<string, unknown>;
+  const seasonal = season === 2025 ? (map[`${id}2025`] as string | undefined) : undefined;
+  return (seasonal ?? map[id]) as string | undefined ?? assetPaths.branding.fallbackLogo;
 }
