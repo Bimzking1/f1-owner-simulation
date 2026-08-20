@@ -160,7 +160,7 @@ export default function SetupScreen({ cfg, onStart, onBack }: Props) {
   const sponsors = availableSponsors(cfg.season, ctor?.dna.reputation ?? 0);
 
   return (
-    <div className="mx-auto max-w-5xl px-6 pb-32 lg:pb-8">
+    <div className="mx-auto max-w-5xl px-6 pb-36 lg:pb-36">
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
         <div>
           <button type="button" onClick={onBack} className="text-[11px] uppercase tracking-widest text-ink-faint hover:text-ink">
@@ -590,7 +590,7 @@ export default function SetupScreen({ cfg, onStart, onBack }: Props) {
         </div>
       )}
 
-      <div className="fixed inset-x-3 bottom-3 z-40 flex items-center justify-between gap-3 rounded-md border border-hairline bg-surface/95 p-3 shadow-xl backdrop-blur">
+      <div className="fixed inset-x-3 bottom-3 z-40 flex items-center justify-between gap-3">
         <Button variant="ghost" onClick={() => (stepIndex > 0 ? setStep(STEPS[stepIndex - 1]) : onBack())}>
           Back
         </Button>
