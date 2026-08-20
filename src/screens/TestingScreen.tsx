@@ -51,7 +51,7 @@ export default function TestingScreen({ state, onRunTest, onStartSeason }: Props
   const confirmType = confirm ? TEST_INFO[confirm] : null;
 
   return (
-    <div className="mx-auto max-w-4xl px-6 pb-32 pt-10 lg:pb-10">
+    <div className="mx-auto max-w-4xl px-6 pb-36 pt-10">
       <h1 className="font-display text-3xl font-bold uppercase tracking-tight">Pre-Season Testing</h1>
       <p className="mt-1 max-w-xl text-sm text-ink-soft">
         Run tests before the first race to size up your starting package. Costs money; gives insight.
@@ -136,7 +136,7 @@ export default function TestingScreen({ state, onRunTest, onStartSeason }: Props
         </Card>
       </div>
 
-      <div className="fixed inset-x-3 bottom-3 z-40 flex items-center justify-end gap-3 rounded-md border border-hairline bg-surface/95 p-3 shadow-xl backdrop-blur lg:static lg:inset-auto lg:mt-8 lg:border-0 lg:bg-transparent lg:p-0 lg:shadow-none">
+      <div className="fixed inset-x-3 bottom-3 z-40 flex items-center justify-between gap-3">
         <Button onClick={onStartSeason}>Start the Season →</Button>
       </div>
     </div>
