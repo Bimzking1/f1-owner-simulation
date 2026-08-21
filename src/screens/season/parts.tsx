@@ -35,7 +35,7 @@ function attendanceFor(track: Track): number {
   return Math.round(raw / 1000) * 1000;
 }
 
-export function NextRaceCard({ track }: { track: Track }) {
+export function NextRaceCard({ track, round }: { track: Track; round?: number }) {
   const weatherNote =
     track.characteristics.weatherRisk > 65
       ? "High weather risk — strategy will matter."
@@ -44,7 +44,7 @@ export function NextRaceCard({ track }: { track: Track }) {
         : "Low weather risk.";
   const distanceKm = track.laps * track.lengthKm;
   return (
-    <Card title={`Next up — ${track.grandPrix}`}>
+    <Card title={`Next up — R${round ?? "?"} · ${track.grandPrix}`}>
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div className="min-w-0 flex-1">
           <div className="font-display text-2xl font-bold">{track.name}</div>
@@ -79,13 +79,18 @@ export function NextRaceCard({ track }: { track: Track }) {
             ))}
           </div>
         </div>
-        <div className="flex aspect-[4/3] h-36 shrink-0 items-center justify-center overflow-hidden rounded-sm bg-white p-2 md:h-44">
-          <Img
-            src={track.image}
-            alt={`${track.name} circuit layout`}
-            fallback={<span className="text-[10px] text-ink-faint">Layout</span>}
-            className="max-h-full max-w-full object-contain"
-          />
+        <div className="shrink-0">
+          <div className="flex aspect-[4/3] h-36 items-center justify-center overflow-hidden rounded-sm bg-white p-2 md:h-44">
+            <Img
+              src={track.image}
+              alt={`${track.name} circuit layout`}
+              fallback={<span className="text-[10px] text-ink-faint">Layout</span>}
+              className="max-h-full max-w-full object-contain"
+            />
+          </div>
+          <div className="mt-1 text-center text-[10px] uppercase tracking-widest text-ink-faint">
+            R{round ?? "?"} circuit map
+          </div>
         </div>
       </div>
     </Card>

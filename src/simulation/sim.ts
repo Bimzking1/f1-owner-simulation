@@ -16,6 +16,7 @@ import type {
 import { computeCarStats, carRating, driverAbility, trackWeights } from "./perf";
 import { simulateRaceWeekend, type Competitor, type RaceInput } from "./race";
 import { buildGridLineups } from "./grid";
+import { applyChatResponse } from "./systems";
 import {
   advanceDevelopment,
   advanceWear,
@@ -24,6 +25,7 @@ import {
   applyStandings,
   bankruptcyCheck,
   evaluateSponsors,
+  generateDriverChat,
   generatePaddockNews,
   scheduleSponsorObjectives,
 } from "./systems";
@@ -182,6 +184,7 @@ export function runRound(state: SimulationState): RoundOutcome {
   evaluateSponsors(state);
   advanceDevelopment(state);
   generatePaddockNews(state, rng);
+  generateDriverChat(state, rng);
   bankruptcyCheck(state);
   pushRaceNews(state, weekend);
 
@@ -324,8 +327,9 @@ function pushRaceNews(state: SimulationState, weekend: RaceWeekendResult) {
       id: `race-${weekend.round}-${e.lap}`,
       round: weekend.round,
       tag: e.severity === "danger" ? "breaking" : "driver",
+      priority: e.severity === "danger" ? "urgent" : e.severity === "warning" ? "warning" : "info",
       title: e.text.replace(e.actor ?? "", "").trim().replace(/^,/, "").trim(),
-      body: e.text,
+      body: `Round ${weekend.round}, lap ${e.lap}: ${e.text}`,
       bodyEnjoyer: e.textEnjoyer,
     });
   }
@@ -345,9 +349,11 @@ function pushRaceNews(state: SimulationState, weekend: RaceWeekendResult) {
     id: `result-${weekend.round}`,
     round: weekend.round,
     tag: "info",
+    priority: "info",
     title: `Round ${weekend.round} report`,
-    body: `${weekend.trackId} finished. ${summary}`,
+    body: `${weekend.trackId} finished. ${summary} Full classification and replay on the Race tab.`,
     bodyEnjoyer: `That's the ${weekend.trackId} round done. ${summary}`,
+    options: [{ label: "Open race tab", action: "goto:race" }],
   });
 }
 
@@ -360,6 +366,25 @@ export function resolveNewsAction(state: SimulationState, newsId: string, action
   const t = state.team;
   if (!t) return;
   const round = state.completedRounds + 1;
+
+  // UI navigation requests ("goto:sponsors") — nothing to simulate, just resolve.
+  if (action.startsWith("goto:") || action === "dismiss") {
+    item.resolved = true;
+    return;
+  }
+
+  // Driver conversation responses (from the news feed or Team Management).
+  if (action.startsWith("chat-")) {
+    const driverId = item.options?.find((o) => o.action === action)?.payload;
+    if (driverId) applyChatResponse(state, driverId, action);
+    const ds = t.drivers.find((x) => x.driverId === driverId);
+    item.resolved = true;
+    item.options = [];
+    if (ds) {
+      item.body += `\n\nYou answered. Morale ${ds.morale}, confidence ${ds.confidence}, frustration ${ds.frustration}.`;
+    }
+    return;
+  }
 
   if (action === "engineUpgrade") {
     const cost = state.season === 2013 ? 4.5 : 6.5;

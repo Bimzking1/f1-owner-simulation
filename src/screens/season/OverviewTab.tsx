@@ -1,6 +1,6 @@
-import type { SimulationState } from "@/simulation/types";
-import { driverById, constructorById } from "@/data";
-import { Bar, Button, Card, Img, Ovr, Tag } from "@/ui/kit";
+import type { NewsItem, SimulationState } from "@/simulation/types";
+import { driverById, constructorById, sponsorById } from "@/data";
+import { Bar, Button, Card, Img, Meter, Ovr, Tag } from "@/ui/kit";
 import { driverImage } from "@/data/assets";
 import { MiniBar, StandingsCard } from "./parts";
 
@@ -8,11 +8,21 @@ interface Props {
   state: SimulationState;
   onNewsAction: (newsId: string, action: string) => void;
   onRunRound: () => void;
+  onNavigate: (tab: "Overview" | "Race" | "Management" | "Market" | "Sponsors" | "Garage" | "Finance") => void;
 }
 
-export function OverviewTab({ state, onNewsAction, onRunRound }: Props) {
+export function OverviewTab({ state, onNewsAction, onRunRound, onNavigate }: Props) {
   const t = state.team!;
   const next = state.calendar[state.round];
+
+  // group the feed into per-GP blocks with separators
+  const groups: { round: number; items: NewsItem[] }[] = [];
+  for (const n of state.news.slice(0, 80)) {
+    const last = groups[groups.length - 1];
+    if (last && last.round === n.round) last.items.push(n);
+    else groups.push({ round: n.round, items: [n] });
+  }
+
   return (
     <div className="grid gap-4 lg:grid-cols-3">
       <div className="space-y-4 lg:col-span-2">
@@ -24,10 +34,7 @@ export function OverviewTab({ state, onNewsAction, onRunRound }: Props) {
                 {next.sprint && state.gameLength !== "short" ? ", a sprint" : ""} and the race with lap-level events,
                 weather and mechanical risk.
               </p>
-              <Button
-                onClick={onRunRound}
-                className="shrink-0"
-              >
+              <Button onClick={onRunRound} className="shrink-0">
                 Run the {next.grandPrix} →
               </Button>
             </div>
@@ -40,9 +47,13 @@ export function OverviewTab({ state, onNewsAction, onRunRound }: Props) {
               {next.country} · {next.laps} laps · {next.lengthKm.toFixed(3)} km
             </span>
             {next.sprint && <Tag tone="elite">Sprint</Tag>}
-            <span className="ml-auto text-[11px] uppercase tracking-widest text-ink-faint">
-              Details & map on the Race tab
-            </span>
+            <button
+              type="button"
+              onClick={() => onNavigate("Race")}
+              className="ml-auto text-[11px] uppercase tracking-widest text-telemetry hover:text-ink"
+            >
+              Details & map on the Race tab →
+            </button>
           </div>
         )}
 
@@ -123,37 +134,147 @@ export function OverviewTab({ state, onNewsAction, onRunRound }: Props) {
       </div>
 
       <div className="space-y-4">
-        <Card title="News" pad={false}>
-          <div className="max-h-[46rem] divide-y divide-hairline overflow-auto">
-            {state.news.length === 0 && <div className="p-4 text-xs text-ink-faint">No news yet.</div>}
-            {state.news.slice(0, 60).map((n) => (
-              <div key={n.id} className="p-3">
-                <div className="flex items-center gap-2">
-                  <Tag tone={n.tag === "breaking" ? "signal" : n.tag === "sponsor" ? "elite" : n.tag === "driver" ? "telemetry" : "ink"}>
-                    R{n.round}
-                  </Tag>
-                  <span className="min-w-0 flex-1 truncate text-sm font-semibold">{n.title}</span>
-                </div>
-                <p className="mt-1 text-xs text-ink-soft">{n.body}</p>
-                {n.options && !n.resolved && (
-                  <div className="mt-2 flex gap-2">
-                    {n.options.map((o) => (
-                      <button
-                        key={o.action}
-                        type="button"
-                        onClick={() => onNewsAction(n.id, o.action)}
-                        className="rounded-sm border border-telemetry/40 bg-telemetry/10 px-2 py-1 text-[11px] font-semibold uppercase tracking-wider text-telemetry hover:bg-telemetry/20"
-                      >
-                        {o.label}
-                      </button>
-                    ))}
+        <SponsorProgressWidget state={state} onNavigate={onNavigate} />
+
+        <Card title="Paddock feed" pad={false}>
+          <div className="max-h-[46rem] overflow-auto">
+            {groups.length === 0 && <div className="p-4 text-xs text-ink-faint">No news yet.</div>}
+            {groups.map((g, gi) => {
+              const gp = g.round > 0 ? state.calendar[g.round - 1]?.grandPrix : undefined;
+              return (
+                <div key={g.round} className={gi > 0 ? "border-t-2 border-hairline" : ""}>
+                  {/* GP separator header */}
+                  <div className="sticky top-0 z-10 flex items-center justify-between gap-2 border-b border-hairline bg-raised/95 px-3 py-1.5 backdrop-blur">
+                    <span className="font-display text-[11px] font-bold uppercase tracking-widest text-ink-soft">
+                      {g.round === 0 ? "Pre-season" : `R${g.round}${gp ? ` — ${gp}` : ""}`}
+                    </span>
+                    <span className="text-[10px] uppercase tracking-wider text-ink-faint">{g.items.length} items</span>
                   </div>
-                )}
-              </div>
-            ))}
+                  {g.items.map((n) => (
+                    <NewsRow key={n.id} n={n} onNewsAction={onNewsAction} onNavigate={onNavigate} />
+                  ))}
+                </div>
+              );
+            })}
           </div>
         </Card>
       </div>
     </div>
+  );
+}
+
+function NewsRow({
+  n,
+  onNewsAction,
+  onNavigate,
+}: {
+  n: NewsItem;
+  onNewsAction: (newsId: string, action: string) => void;
+  onNavigate: Props["onNavigate"];
+}) {
+  const urgent = n.priority === "urgent";
+  const warning = n.priority === "warning";
+  return (
+    <div
+      className={`border-b border-hairline/50 p-3 ${
+        urgent ? "border-l-2 border-l-signal bg-signal/5" : warning ? "border-l-2 border-l-caution bg-caution/5" : ""
+      }`}
+    >
+      <div className="flex flex-wrap items-center gap-2">
+        {urgent ? (
+          <Tag tone="signal">Urgent</Tag>
+        ) : warning ? (
+          <Tag tone="caution">Notice</Tag>
+        ) : n.kind === "chat" ? (
+          <Tag tone="telemetry">Driver</Tag>
+        ) : null}
+        <span className="min-w-0 flex-1 truncate text-sm font-semibold">{n.title}</span>
+      </div>
+      <p className="mt-1 whitespace-pre-line text-xs leading-relaxed text-ink-soft">{n.body}</p>
+      {n.options && !n.resolved && (
+        <div className="mt-2 flex flex-wrap gap-2">
+          {n.options.map((o) => (
+            <button
+              key={o.action}
+              type="button"
+              onClick={() => onNewsAction(n.id, o.action)}
+              className="rounded-sm border border-telemetry/40 bg-telemetry/10 px-2 py-1 text-[11px] font-semibold uppercase tracking-wider text-telemetry hover:bg-telemetry/20"
+            >
+              {o.label}
+            </button>
+          ))}
+        </div>
+      )}
+      {n.kind === "chat" && !n.resolved && (
+        <button
+          type="button"
+          onClick={() => onNavigate("Management")}
+          className="mt-2 rounded-sm border border-signal/40 bg-signal/10 px-2 py-1 text-[11px] font-semibold uppercase tracking-wider text-signal hover:bg-signal/20"
+        >
+          Respond in Team Management →
+        </button>
+      )}
+    </div>
+  );
+}
+
+function SponsorProgressWidget({
+  state,
+  onNavigate,
+}: {
+  state: SimulationState;
+  onNavigate: Props["onNavigate"];
+}) {
+  const t = state.team!;
+  const active = t.sponsors.filter((s) => s.active);
+  return (
+    <Card title="Sponsor objectives" right={<Tag tone="telemetry">{active.length}/5</Tag>}>
+      {active.length === 0 ? (
+        <div className="text-xs text-ink-faint">
+          No active sponsors.{" "}
+          <button type="button" onClick={() => onNavigate("Sponsors")} className="text-telemetry hover:text-ink">
+            Find one →
+          </button>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {active.map((s) => {
+            const spec = sponsorById(s.sponsorId);
+            if (!spec) return null;
+            const roundsLeft = s.deadlineRound > 0 ? s.deadlineRound - state.completedRounds : null;
+            return (
+              <div key={s.sponsorId}>
+                <div className="flex items-center gap-2">
+                  <Img src={spec.image} alt={spec.name} className="h-4 w-7 shrink-0 rounded-sm object-contain" />
+                  <span className="min-w-0 flex-1 truncate text-xs font-semibold">{spec.name}</span>
+                  <span className="shrink-0 text-[11px] tabular text-ink-faint">
+                    {s.deadlineRound > 0 ? `${s.progress}/${s.required}` : "pending"}
+                  </span>
+                </div>
+                <Meter
+                  value={s.progress}
+                  max={Math.max(1, s.required)}
+                  tone={s.progress >= s.required ? "positive" : roundsLeft != null && roundsLeft <= 2 ? "caution" : "telemetry"}
+                  className="mt-1"
+                />
+                <div className="mt-0.5 text-[10px] text-ink-faint">
+                  {s.deadlineRound > 0
+                    ? `Evaluated after R${s.deadlineRound}${roundsLeft != null && roundsLeft > 0 ? ` · ${roundsLeft} race(s) left` : ""}`
+                    : "Objective pending"}
+                  {" · "}patience {s.patience}
+                </div>
+              </div>
+            );
+          })}
+          <button
+            type="button"
+            onClick={() => onNavigate("Sponsors")}
+            className="text-[11px] uppercase tracking-widest text-telemetry hover:text-ink"
+          >
+            Manage sponsors →
+          </button>
+        </div>
+      )}
+    </Card>
   );
 }

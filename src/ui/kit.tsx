@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { ovrClass, ratingTextClass, ratingTone, type KitTone } from "./ratings";
 
 // ---------------------------------------------------------------------------
@@ -153,4 +153,80 @@ export function Stat({ label, value, sub, tone }: { label: string; value: ReactN
 
 export function Empty({ children }: { children: ReactNode }) {
   return <div className="rounded-md border border-dashed border-hairline p-6 text-center text-sm text-ink-faint">{children}</div>;
+}
+
+// ---------------------------------------------------------------------------
+// InfoTip — "i" help button.
+// Desktop: hover (or click) shows a floating tooltip next to the button.
+// Mobile / touch: press-and-hold ~450ms opens the explanation in a modal.
+// Can be controlled externally (open/onOpenChange) so parent cards can also
+// trigger the same modal via their own press-and-hold handling (useHoldOpen
+// from "@/ui/hooks").
+// ---------------------------------------------------------------------------
+
+export function InfoTip({
+  title,
+  children,
+  className = "",
+  open: openProp,
+  onOpenChange,
+}: {
+  title: string;
+  children: ReactNode;
+  className?: string;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+}) {
+  const [hover, setHover] = useState(false);
+  const [modalInternal, setModalInternal] = useState(false);
+  const modal = openProp ?? modalInternal;
+  const setModal = (v: boolean) => {
+    setModalInternal(v);
+    onOpenChange?.(v);
+  };
+  const timer = useRef<number | null>(null);
+
+  const holdStart = () => {
+    timer.current = window.setTimeout(() => setModal(true), 450);
+  };
+  const holdEnd = () => {
+    if (timer.current) {
+      clearTimeout(timer.current);
+      timer.current = null;
+    }
+  };
+
+  return (
+    <span
+      className={`relative inline-flex ${className}`}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      onTouchStart={holdStart}
+      onTouchEnd={holdEnd}
+      onTouchMove={holdEnd}
+    >
+      <button
+        type="button"
+        aria-label={`About ${title}`}
+        onClick={(e) => {
+          e.stopPropagation();
+          setModal(true);
+        }}
+        className="flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full border border-telemetry/50 bg-telemetry/10 px-1 text-[9px] font-bold leading-none text-telemetry transition hover:bg-telemetry/25"
+      >
+        i
+      </button>
+      {/* desktop hover tooltip */}
+      {hover && (
+        <span className="pointer-events-none absolute left-1/2 top-full z-[70] mt-1.5 hidden w-64 -translate-x-1/2 rounded-md border border-hairline bg-void p-3 text-left shadow-2xl md:block">
+          <span className="mb-1 block font-display text-xs font-bold uppercase tracking-widest text-telemetry">{title}</span>
+          <span className="block text-[11px] leading-relaxed text-ink-soft">{children}</span>
+        </span>
+      )}
+      {/* mobile long-press + click modal */}
+      <Modal open={modal} onClose={() => setModal(false)} title={title}>
+        <div className="text-sm leading-relaxed text-ink-soft">{children}</div>
+      </Modal>
+    </span>
+  );
 }

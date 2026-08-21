@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { SimulationState } from "@/simulation/types";
 import {
   generateDevOptions,
@@ -5,7 +6,7 @@ import {
   replacementCost,
 } from "@/simulation/systems";
 import { replaceEngine, replaceGearbox, startDev } from "@/actions";
-import { Button, Card, Empty, Meter, Money } from "@/ui/kit";
+import { Button, Card, Empty, Meter, Modal, Money } from "@/ui/kit";
 import { ratingTone } from "@/ui/ratings";
 import type { Act } from "./parts";
 
@@ -20,6 +21,7 @@ export function GarageTab({ state, act }: Props) {
   const options = generateDevOptions(state);
   const devInterval = Math.max(3, Math.round(state.calendar.length / 4));
   const roundsToWindow = devInterval - (state.completedRounds % devInterval);
+  const [confirmSwap, setConfirmSwap] = useState<"engine" | "gearbox" | null>(null);
 
   return (
     <div className="grid gap-4 lg:grid-cols-3">
@@ -90,7 +92,7 @@ export function GarageTab({ state, act }: Props) {
               replacements={t.components.engine.replacements}
               cost={replacementCost("engine", state) ?? 0}
               cash={t.cash}
-              onSwap={() => act((s) => replaceEngine(s).message)}
+              onSwap={() => setConfirmSwap("engine")}
             />
             <SwapRow
               label="Gearbox"
@@ -99,7 +101,7 @@ export function GarageTab({ state, act }: Props) {
               replacements={t.components.gearbox.replacements}
               cost={replacementCost("gearbox", state) ?? 0}
               cash={t.cash}
-              onSwap={() => act((s) => replaceGearbox(s).message)}
+              onSwap={() => setConfirmSwap("gearbox")}
             />
           </div>
           <p className="mt-3 text-[11px] text-ink-faint">
@@ -117,7 +119,86 @@ export function GarageTab({ state, act }: Props) {
           </div>
         </Card>
       </div>
+
+      {confirmSwap && (
+        <SwapConfirmModal
+          state={state}
+          component={confirmSwap}
+          onClose={() => setConfirmSwap(null)}
+          onConfirm={() => {
+            act((s) => (confirmSwap === "engine" ? replaceEngine(s).message : replaceGearbox(s).message));
+            setConfirmSwap(null);
+          }}
+        />
+      )}
     </div>
+  );
+}
+
+function SwapConfirmModal({
+  state,
+  component,
+  onClose,
+  onConfirm,
+}: {
+  state: SimulationState;
+  component: "engine" | "gearbox";
+  onClose: () => void;
+  onConfirm: () => void;
+}) {
+  const t = state.team!;
+  const cost = replacementCost(component, state) ?? 0;
+  const cur = t.components[component];
+  const cashAfter = Math.round((t.cash - cost) * 100) / 100;
+  const label = component === "engine" ? "Engine" : "Gearbox";
+  return (
+    <Modal open onClose={onClose} title={`Replace ${label}?`}>
+      <div className="space-y-3 text-sm">
+        <p className="text-ink-soft">
+          Buy a brand-new {label.toLowerCase()} unit for <Money value={cost} />? The old unit is scrapped — this is a
+          one-time purchase, not a recurring fee.
+        </p>
+        <div className="grid gap-2 rounded-md border border-hairline bg-raised/40 p-3 text-xs">
+          <div className="flex items-center justify-between">
+            <span className="text-ink-faint">Current condition</span>
+            <span className={`tabular font-semibold ${cur.condition < 50 ? "text-caution" : ""}`}>{cur.condition.toFixed(1)}%</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-ink-faint">Current age</span>
+            <span className="tabular">{cur.age} race(s)</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-ink-faint">After replacement</span>
+            <span className="tabular font-semibold text-positive">100% · age 0</span>
+          </div>
+          <div className="mt-1 flex items-center justify-between border-t border-hairline pt-2">
+            <span className="text-ink-faint">Cost</span>
+            <span className="tabular font-semibold text-caution">−<Money value={cost} /></span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-ink-faint">Cash now</span>
+            <Money value={t.cash} />
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-ink-faint">Cash after</span>
+            <span className={`tabular font-bold ${cashAfter < 0 ? "text-signal" : cashAfter < 10 ? "text-caution" : "text-positive"}`}>
+              ${cashAfter.toFixed(2)}M
+            </span>
+          </div>
+        </div>
+        {cashAfter < 10 && cashAfter >= 0 && (
+          <p className="rounded-md border-l-2 border-caution bg-caution/10 p-2 text-xs text-caution">
+            Warning: this leaves you with less than $10M. Race weekends cost several million in wages and operations.
+          </p>
+        )}
+        <div className="flex justify-end gap-2 pt-1">
+          <Button small variant="ghost" onClick={onClose}>Keep current unit</Button>
+          <Button small disabled={t.cash < cost} onClick={onConfirm}>
+            Replace for ${cost}M
+          </Button>
+        </div>
+      </div>
+    </Modal>
   );
 }
 

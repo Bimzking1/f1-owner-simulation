@@ -1,4 +1,4 @@
-import type { SimulationState } from "@/simulation/types";
+import type { DriverState, DriverStanding, SimulationState } from "@/simulation/types";
 import { constructorById, driverById } from "@/data";
 import { Button, Card, Money } from "@/ui/kit";
 import { exportReportImage } from "./reportImage";
@@ -6,6 +6,33 @@ import { exportReportImage } from "./reportImage";
 interface Props {
   state: SimulationState;
   onReset: () => void;
+}
+
+/** End-of-season comment from a driver towards the owner, based on results + mood. */
+function verdictFor(ds: DriverState, st: DriverStanding | undefined, teamPos: number): string {
+  const wins = st?.wins ?? 0;
+  const great = teamPos <= 2 || ds.points >= 180 || wins >= 3;
+  const poor = teamPos >= 8 || ds.points <= 12;
+  if (ds.frustration >= 60) {
+    return poor
+      ? "I gave everything, but this project went backwards. I need serious answers about next year before I commit to anything."
+      : "We scored points, sure — but the way we got there was chaos. Fix the strategy calls or find someone else.";
+  }
+  if (great && ds.morale >= 60) {
+    return wins >= 3
+      ? "What a season. You believed in this team and it showed every single weekend — thank you for backing us."
+      : "Best year I've had in a long time. The direction of this team is exactly right — keep pushing.";
+  }
+  if (poor && ds.confidence <= 40) {
+    return "Honestly? A season to forget. I still believe in the people here, but the car needs a reset from top to bottom.";
+  }
+  if (ds.dnfs >= 4) {
+    return "My driving was fine — the car just kept breaking. Reliability has to be the winter priority, boss.";
+  }
+  if (ds.morale >= 70) {
+    return "Solid season. The garage atmosphere you've built makes me want to fight for podiums next year.";
+  }
+  return "Mid-table again. Not a disaster, not good enough — I know you want more, and so do I.";
 }
 
 export function EndScreens({ state, onReset }: Props) {
@@ -48,6 +75,12 @@ export function EndScreens({ state, onReset }: Props) {
   const myDrivers = state.standingsDrivers
     .map((s, i) => ({ s, i }))
     .filter(({ s }) => s.driverId === t.driver1Id || s.driverId === t.driver2Id);
+
+  const driverQuotes = t.drivers.map((ds) => {
+    const d = driverById(ds.driverId, state.season);
+    const st = state.standingsDrivers.find((s) => s.driverId === ds.driverId);
+    return { shortName: d?.shortName ?? ds.driverId, text: verdictFor(ds, st, pos) };
+  });
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10">
@@ -146,8 +179,21 @@ export function EndScreens({ state, onReset }: Props) {
           </Card>
         </div>
 
+        <div className="mt-3">
+          <Card title="Driver verdicts — what they say about you">
+            <div className="grid gap-2 sm:grid-cols-2">
+              {driverQuotes.map((q) => (
+                <div key={q.shortName} className="rounded-md border border-hairline bg-raised/40 p-3">
+                  <p className="text-sm italic leading-relaxed text-ink-soft">“{q.text}”</p>
+                  <p className="mt-2 text-right text-[10px] uppercase tracking-widest text-ink-faint">— {q.shortName}</p>
+                </div>
+              ))}
+            </div>
+          </Card>
+        </div>
+
         <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
-          <Button onClick={() => exportReportImage(state, "portrait")}>Export 9:16</Button>
+          <Button onClick={() => exportReportImage(state, "portrait", driverQuotes)}>Export 9:16</Button>
           <Button variant="ghost" onClick={() => exportReportImage(state, "landscape")}>Export 16:9</Button>
           <Button variant="ghost" onClick={onReset}>Back to menu</Button>
         </div>

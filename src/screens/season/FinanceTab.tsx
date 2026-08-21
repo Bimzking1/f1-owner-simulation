@@ -16,19 +16,35 @@ export function FinanceTab({ state }: { state: SimulationState }) {
   return (
     <div className="grid gap-4 lg:grid-cols-3">
       <div className="lg:col-span-2">
-        <Card title="Cash flow by round">
-          <div className="divide-y divide-hairline/60">
-            {[...byRound.entries()].map(([r, d]) => (
-              <div key={r} className="grid grid-cols-[3.5rem_1fr_1fr_1fr] gap-2 py-1 text-sm">
-                <span className="tabular text-ink-faint">R{r}</span>
-                <span className="tabular text-positive">+{d.inc.toFixed(1)}</span>
-                <span className="tabular text-signal">{d.exp.toFixed(1)}</span>
-                <span className={`tabular ${d.inc + d.exp < 0 ? "text-signal" : "text-ink"}`}>
-                  {(d.inc + d.exp) >= 0 ? "+" : ""}{(d.inc + d.exp).toFixed(1)}
-                </span>
-              </div>
-            ))}
+        <Card title="Cash flow by round" right={<span className="text-[10px] uppercase tracking-wider text-ink-faint">all values $M</span>}>
+          <div className="grid grid-cols-[1fr_5rem_5rem_5rem] gap-2 border-b border-hairline pb-1 text-[10px] font-semibold uppercase tracking-widest text-ink-faint">
+            <span>Race weekend</span>
+            <span className="text-right">Income</span>
+            <span className="text-right">Expenses</span>
+            <span className="text-right">Net</span>
           </div>
+          <div className="divide-y divide-hairline/60">
+            {[...byRound.entries()].map(([r, d]) => {
+              const gp = state.calendar[r - 1]?.grandPrix;
+              return (
+                <div key={r} className="grid grid-cols-[1fr_5rem_5rem_5rem] gap-2 py-1 text-sm">
+                  <span className="min-w-0 truncate text-ink-soft" title={`Round ${r}${gp ? ` — ${gp}` : ""}`}>
+                    R{r}{gp ? ` — ${gp}` : ""}
+                  </span>
+                  <span className="tabular text-positive">+{d.inc.toFixed(1)}</span>
+                  <span className="tabular text-signal">{d.exp.toFixed(1)}</span>
+                  <span className={`tabular ${d.inc + d.exp < 0 ? "text-signal" : "text-ink"}`}>
+                    {(d.inc + d.exp) >= 0 ? "+" : ""}{(d.inc + d.exp).toFixed(1)}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+          <p className="mt-2 text-[11px] leading-relaxed text-ink-faint">
+            Income = sponsor race payments + promoter share (points × $0.45M). Expenses = driver & staff wages, team
+            operations and the power-unit lease, all paid per weekend. One-time purchases (parts, development,
+            transfers) appear only in the ledger.
+          </p>
         </Card>
       </div>
       <div className="space-y-4">
@@ -50,35 +66,45 @@ export function FinanceTab({ state }: { state: SimulationState }) {
             </div>
           </div>
         </Card>
-        <Card title="Ledger">
+        <Card title="Ledger" right={<span className="text-[10px] uppercase tracking-wider text-ink-faint">newest first</span>}>
+          <div className="grid grid-cols-[3.2rem_1fr_4.5rem] gap-2 border-b border-hairline pb-1 text-[10px] font-semibold uppercase tracking-widest text-ink-faint">
+            <span>Weekend</span>
+            <span>Detail</span>
+            <span className="text-right">Amount</span>
+          </div>
           <div className="max-h-96 divide-y divide-hairline/60 overflow-auto">
-            {[...t.history].reverse().map((h, i) => (
-              <div
-                key={i}
-                onClick={() => h.detail && setSelected(h)}
-                className={`group flex items-center justify-between gap-2 py-1 text-xs ${
-                  h.detail ? "cursor-pointer hover:bg-raised/40" : ""
-                }`}
-              >
-                <span className="tabular text-ink-faint">R{h.round}</span>
-                <span className="min-w-0 flex-1 truncate text-ink-soft">{h.label}</span>
-                {h.detail ? (
-                  <span className="shrink-0 rounded-sm border border-transparent px-1 text-[10px] leading-4 text-ink-faint group-hover:border-hairline group-hover:text-ink">
-                    ⓘ
+            {[...t.history].reverse().map((h, i) => {
+              const gp = state.calendar[h.round - 1]?.grandPrix;
+              return (
+                <div
+                  key={i}
+                  onClick={() => h.detail && setSelected(h)}
+                  className={`group grid grid-cols-[3.2rem_1fr_4.5rem] items-center gap-2 py-1 text-xs ${
+                    h.detail ? "cursor-pointer hover:bg-raised/40" : ""
+                  }`}
+                >
+                  <span className="tabular text-ink-faint" title={`Round ${h.round}${gp ? ` — ${gp}` : ""}`}>
+                    R{h.round}
                   </span>
-                ) : (
-                  <span className="w-4 shrink-0" />
-                )}
-                <Money value={h.amount} className="shrink-0" />
-              </div>
-            ))}
+                  <span className="min-w-0 truncate text-ink-soft">{h.label}</span>
+                  {h.detail ? (
+                    <span className="shrink-0 rounded-sm border border-transparent px-1 text-[10px] leading-4 text-ink-faint group-hover:border-hairline group-hover:text-ink">
+                      ⓘ
+                    </span>
+                  ) : (
+                    <span className="w-4 shrink-0" />
+                  )}
+                  <Money value={h.amount} className="shrink-0 justify-self-end" />
+                </div>
+              );
+            })}
           </div>
         </Card>
       </div>
       <Modal
         open={!!selected}
         onClose={() => setSelected(null)}
-        title={selected ? `${selected.label} · R${selected.round}` : ""}
+        title={selected ? `${selected.label} · R${selected.round}${state.calendar[selected.round - 1] ? ` — ${state.calendar[selected.round - 1].grandPrix}` : ""}` : ""}
       >
         {selected && (
           <div className="space-y-3 text-sm">

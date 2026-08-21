@@ -368,6 +368,13 @@ export interface UpgradeProject {
   underperformed?: boolean;
 }
 
+/** Owner → driver management actions (speech, bonus, fine, rant) for cooldowns. */
+export interface MgmtLog {
+  driverId: string; // "*team*" for whole-team activities
+  action: "speech" | "bonus" | "fine" | "rant" | "teambuilding" | "trainingcamp" | "psych";
+  round: number;
+}
+
 export type TransactionCategory =
   | "sponsor"
   | "salary"
@@ -419,6 +426,7 @@ export interface TeamState {
   sponsors: SponsorState[];
   pitCrew: number; // 0-100 pit crew level (upgradeable)
   history: FinancialTransaction[];
+  mgmt?: MgmtLog[]; // owner interventions per driver (cooldown tracking)
   points: number;
   wins: number;
   podiums: number;
@@ -439,6 +447,8 @@ export interface TestReport {
   cost: number;
 }
 
+export type NewsPriority = "urgent" | "warning" | "info";
+
 export interface NewsItem {
   id: string;
   round: number;
@@ -448,6 +458,8 @@ export interface NewsItem {
   bodyEnjoyer: string;
   options?: { label: string; action: string; payload?: string }[];
   resolved?: boolean;
+  priority?: NewsPriority; // urgent = red alert, warning = amber, info = default
+  kind?: "chat"; // driver → owner conversation (lives in Team Management)
 }
 
 export interface SimulationState {

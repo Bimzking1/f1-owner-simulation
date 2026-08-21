@@ -118,7 +118,7 @@ function aroundPlayer(rows: StandRow[], above: number, below: number): StandRow[
   return rows.slice(lo, hi + 1);
 }
 
-export function exportReportImage(state: SimulationState, ratio: Ratio) {
+export function exportReportImage(state: SimulationState, ratio: Ratio, quotes?: { shortName: string; text: string }[]) {
   const t = state.team;
   if (!t) return;
   const ctor = constructorById(t.constructorId, state.season);
@@ -130,7 +130,7 @@ export function exportReportImage(state: SimulationState, ratio: Ratio) {
   canvas.height = h;
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
-  drawReport(ctx, w, h, state, accent, ratio);
+  drawReport(ctx, w, h, state, accent, ratio, quotes);
   canvas.toBlob((blob) => {
     if (!blob) return;
     const url = URL.createObjectURL(blob);
@@ -142,6 +142,25 @@ export function exportReportImage(state: SimulationState, ratio: Ratio) {
   }, "image/png");
 }
 
+/** Word-wrap text to a pixel width using the body font. */
+function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number, size: number): string[] {
+  ctx.font = `400 ${size}px ${BODY}`;
+  const words = text.split(/\s+/);
+  const lines: string[] = [];
+  let cur = "";
+  for (const word of words) {
+    const test = cur ? `${cur} ${word}` : word;
+    if (ctx.measureText(test).width > maxWidth && cur) {
+      lines.push(cur);
+      cur = word;
+    } else {
+      cur = test;
+    }
+  }
+  if (cur) lines.push(cur);
+  return lines;
+}
+
 function drawReport(
   ctx: CanvasRenderingContext2D,
   w: number,
@@ -149,6 +168,7 @@ function drawReport(
   state: SimulationState,
   accent: string,
   ratio: Ratio,
+  quotes?: { shortName: string; text: string }[],
 ) {
   const t = state.team!;
   const diff = difficultyOf(state);
@@ -178,8 +198,8 @@ function drawReport(
   ctx.fillStyle = accent;
   ctx.fillRect(0, 0, w, ratio === "portrait" ? 14 : 16);
 
-  if (ratio === "portrait") return drawPortrait(ctx, state, accent, pos, income, spend, net, prize, wccRows, wdcRows, teamName, myStandings, diff.label);
-  return drawLandscape(ctx, state, accent, pos, income, spend, net, prize, wccRows, wdcRows, teamName, myStandings, diff.label);
+  if (ratio === "portrait") return drawPortrait(ctx, state, accent, pos, income, spend, net, prize, wccRows, wdcRows, teamName, myStandings, diff.label, quotes);
+  return drawLandscape(ctx, state, accent, pos, income, spend, net, prize, wccRows, wdcRows, teamName, myStandings, diff.label, quotes);
 }
 
 function ctor(state: SimulationState) {
@@ -205,6 +225,7 @@ function drawPortrait(
   teamName: string,
   myStandings: { s: { driverId: string; points: number; dnfs: number }; i: number }[],
   diffLabel: string,
+  quotes?: { shortName: string; text: string }[],
 ) {
   const W = 1080;
   const H = 1920;
@@ -279,6 +300,23 @@ function drawPortrait(
     fillText(ctx, `${s.points} pts · ${s.dnfs} DNF`, dx + 70, driverTop + 116, 16, C.faint, { font: BODY, weight: 500 });
   });
 
+  // driver verdicts — what they say about the owner
+  if (quotes && quotes.length > 0) {
+    const vy = driverTop + 152;
+    fillText(ctx, "DRIVER VERDICTS", pad, vy, 20, C.purple, { weight: 700 });
+    const bw = (W - pad * 2 - 16) / 2;
+    quotes.slice(0, 2).forEach((q, idx) => {
+      const bx = pad + idx * (bw + 16);
+      roundRect(ctx, bx, vy + 14, bw, 118, 10);
+      ctx.fillStyle = C.panel2;
+      ctx.fill();
+      fillText(ctx, q.shortName.toUpperCase(), bx + 16, vy + 40, 15, C.yellow, { font: BODY, weight: 700 });
+      let lines = wrapText(ctx, `“${q.text}”`, bw - 32, 14);
+      if (lines.length > 3) lines = lines.slice(0, 3).map((l, li, arr) => (li === arr.length - 1 ? `${l}…` : l));
+      lines.forEach((ln, li) => fillText(ctx, ln, bx + 16, vy + 62 + li * 19, 14, C.ink, { font: BODY, weight: 400 }));
+    });
+  }
+
   fillText(ctx, "F1 OWNER — SEASON REPORT", W / 2, H - 36, 20, C.faint, { weight: 600, font: BODY, align: "center" });
   ctx.textAlign = "left";
 }
@@ -297,6 +335,7 @@ function drawLandscape(
   teamName: string,
   myStandings: { s: { driverId: string; points: number; dnfs: number }; i: number }[],
   diffLabel: string,
+  quotes?: { shortName: string; text: string }[],
 ) {
   const W = 1920;
   const H = 1080;
@@ -337,6 +376,24 @@ function drawLandscape(
   fillText(ctx, money(prize), pad + 18, 740, 30, C.yellow, { weight: 700 });
   fillText(ctx, `NET FLOW ${money(net)}`, pad + cardW + 32, 740, 26, net >= 0 ? C.green : C.red, { weight: 700 });
   fillText(ctx, `INCOME ${money(income)}  ·  SPEND ${money(spend)}`, pad + cardW + 32, 692, 17, C.faint, { font: BODY, weight: 600 });
+
+  // driver verdicts — bottom-left free zone
+  if (quotes && quotes.length > 0) {
+    let qy = 806;
+    fillText(ctx, "DRIVER VERDICTS", pad, qy, 20, C.purple, { weight: 700 });
+    qy += 32;
+    for (const q of quotes.slice(0, 2)) {
+      fillText(ctx, q.shortName.toUpperCase(), pad, qy, 15, C.yellow, { font: BODY, weight: 700 });
+      qy += 22;
+      let lines = wrapText(ctx, `“${q.text}”`, 680, 15);
+      if (lines.length > 2) lines = lines.slice(0, 2).map((l, li, arr) => (li === arr.length - 1 ? `${l}…` : l));
+      for (const ln of lines) {
+        fillText(ctx, ln, pad, qy, 15, C.muted, { font: BODY, weight: 400 });
+        qy += 21;
+      }
+      qy += 12;
+    }
+  }
 
   const tablesX = 820;
   const tablesW = W - tablesX - pad;

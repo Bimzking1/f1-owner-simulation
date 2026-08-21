@@ -348,6 +348,167 @@ export function replaceGearbox(state: SimulationState): ActionResult {
   return doReplace(state, "gearbox");
 }
 
+// ---------------------------------------------------------------------------
+// Team management — owner interventions on driver morale (spec: owner tools)
+
+export type MgmtAction = "speech" | "bonus" | "fine" | "rant";
+
+export const MGMT_INFO: Record<MgmtAction, { label: string; cost: number; cooldown: number; desc: string }> = {
+  speech: { label: "Motivational speech", cost: 0, cooldown: 3, desc: "Rally the driver in front of the garage. Free, small morale + confidence boost." },
+  bonus: { label: "Performance bonus", cost: 2, cooldown: 5, desc: "A $2M cash sweetener paid now. Big morale + confidence boost." },
+  fine: { label: "Fine", cost: 1, cooldown: 6, desc: "Formally fine the driver — $1M lands in the team account. Resets frustration hard, hurts morale." },
+  rant: { label: "Private rant", cost: 0, cooldown: 4, desc: "Let them have it behind closed doors. Crushes frustration but damages morale and confidence." },
+};
+
+/** Rounds remaining before the action is available again (0 = ready). */
+export function mgmtCooldown(state: SimulationState, driverId: string, action: MgmtAction): number {
+  const t = state.team!;
+  const last = [...(t.mgmt ?? [])].reverse().find((m) => m.driverId === driverId && m.action === action);
+  if (!last) return 0;
+  const elapsed = state.completedRounds - last.round;
+  return Math.max(0, MGMT_INFO[action].cooldown - elapsed);
+}
+
+export function manageDriver(state: SimulationState, driverId: string, action: MgmtAction): ActionResult {
+  const result: ActionResult = { ok: false, message: "" };
+  const t = state.team!;
+  const ds = t.drivers.find((x) => x.driverId === driverId);
+  if (!ds) return msg(result, false, "Driver not under contract.");
+  if (mgmtCooldown(state, driverId, action) > 0)
+    return msg(result, false, `${MGMT_INFO[action].label} available in ${mgmtCooldown(state, driverId, action)} round(s).`);
+  const info = MGMT_INFO[action];
+  if (t.cash < info.cost) return msg(result, false, `Need $${info.cost}M for that.`);
+
+  t.mgmt ??= [];
+  t.mgmt.push({ driverId, action, round: state.completedRounds });
+  if (action === "bonus") {
+    t.cash = Math.round((t.cash - info.cost) * 100) / 100;
+    t.history.push({
+      round: state.completedRounds + 1,
+      label: `${info.label} payment`,
+      amount: -info.cost,
+      category: "other",
+      detail: `${info.label} for ${driverById(driverId, state.season)?.name ?? driverId}.\nOne-time owner intervention costing $${info.cost}M.`,
+    });
+  }
+  if (action === "fine") {
+    // the driver pays the fine into the team's account
+    t.cash = Math.round((t.cash + info.cost) * 100) / 100;
+    t.history.push({
+      round: state.completedRounds + 1,
+      label: `Fine collected`,
+      amount: info.cost,
+      category: "other",
+      detail: `${driverById(driverId, state.season)?.name ?? driverId} fined $${info.cost}M for a formal disciplinary breach.\nThe money is deducted from the driver's next payout and lands in the team account.`,
+    });
+  }
+
+  let effect = "";
+  switch (action) {
+    case "speech":
+      ds.morale = clamp(ds.morale + 5, 0, 100);
+      ds.confidence = clamp(ds.confidence + 2, 0, 100);
+      effect = "morale +5, confidence +2";
+      break;
+    case "bonus":
+      ds.morale = clamp(ds.morale + 10, 0, 100);
+      ds.confidence = clamp(ds.confidence + 5, 0, 100);
+      effect = "morale +10, confidence +5";
+      break;
+    case "fine":
+      ds.frustration = clamp(ds.frustration - 10, 0, 100);
+      ds.morale = clamp(ds.morale - 5, 0, 100);
+      effect = "frustration −10, morale −5";
+      break;
+    case "rant":
+      ds.frustration = clamp(ds.frustration - 6, 0, 100);
+      ds.morale = clamp(ds.morale - 8, 0, 100);
+      ds.confidence = clamp(ds.confidence - 2, 0, 100);
+      effect = "frustration −6, morale −8, confidence −2";
+      break;
+  }
+  return msg(result, true, `${info.label}: ${effect}.`);
+}
+
+// ---------------------------------------------------------------------------
+// Team activities — paid whole-team boosts (team building, training camp, ...)
+
+export type TeamAction = "teambuilding" | "trainingcamp" | "psych";
+
+export const TEAM_INFO: Record<TeamAction, { label: string; cost: number; cooldown: number; desc: string }> = {
+  teambuilding: {
+    label: "Team building day",
+    cost: 3,
+    cooldown: 5,
+    desc: "Karting, BBQ and a few beers with the whole crew. Both drivers feel the lift, frustration eases and the pit garage gels (+1 pit crew).",
+  },
+  trainingcamp: {
+    label: "Training camp",
+    cost: 5,
+    cooldown: 8,
+    desc: "A week at a private facility: simulator work, fitness and race-craft drills. Sharpens both drivers' confidence noticeably.",
+  },
+  psych: {
+    label: "Sports psychology",
+    cost: 2.5,
+    cooldown: 6,
+    desc: "One-on-one mental coaching for each driver. Clears heads, rebuilds self-belief and takes the edge off frustration.",
+  },
+};
+
+/** Rounds remaining before the team activity is available again (0 = ready). */
+export function teamCooldown(state: SimulationState, action: TeamAction): number {
+  const t = state.team!;
+  const last = [...(t.mgmt ?? [])].reverse().find((m) => m.driverId === "*team*" && m.action === action);
+  if (!last) return 0;
+  const elapsed = state.completedRounds - last.round;
+  return Math.max(0, TEAM_INFO[action].cooldown - elapsed);
+}
+
+export function manageTeam(state: SimulationState, action: TeamAction): ActionResult {
+  const result: ActionResult = { ok: false, message: "" };
+  const t = state.team!;
+  if (teamCooldown(state, action) > 0) {
+    return msg(result, false, `${TEAM_INFO[action].label} available in ${teamCooldown(state, action)} round(s).`);
+  }
+  const info = TEAM_INFO[action];
+  if (t.cash < info.cost) return msg(result, false, `Need $${info.cost}M for that.`);
+
+  t.mgmt ??= [];
+  t.mgmt.push({ driverId: "*team*", action, round: state.completedRounds });
+  t.cash = Math.round((t.cash - info.cost) * 100) / 100;
+  t.history.push({
+    round: state.completedRounds + 1,
+    label: info.label,
+    amount: -info.cost,
+    category: "other",
+    detail: `${info.label} — whole-team activity costing $${info.cost}M.\nBoosts morale/confidence of both drivers${action === "teambuilding" ? " and +1 pit crew cohesion" : ""}.`,
+  });
+
+  let effect = "";
+  for (const ds of t.drivers) {
+    switch (action) {
+      case "teambuilding":
+        ds.morale = clamp(ds.morale + 6, 0, 100);
+        ds.frustration = clamp(ds.frustration - 4, 0, 100);
+        effect = "morale +6, frustration −4 (both drivers), pit crew +1";
+        break;
+      case "trainingcamp":
+        ds.confidence = clamp(ds.confidence + 8, 0, 100);
+        ds.morale = clamp(ds.morale + 3, 0, 100);
+        effect = "confidence +8, morale +3 (both drivers)";
+        break;
+      case "psych":
+        ds.confidence = clamp(ds.confidence + 5, 0, 100);
+        ds.frustration = clamp(ds.frustration - 5, 0, 100);
+        effect = "confidence +5, frustration −5 (both drivers)";
+        break;
+    }
+  }
+  if (action === "teambuilding") t.pitCrew = clamp(t.pitCrew + 1, 0, 100);
+  return msg(result, true, `${info.label}: ${effect}.`);
+}
+
 function doReplace(state: SimulationState, component: "engine" | "gearbox"): ActionResult {
   const result: ActionResult = { ok: false, message: "" };
   const t = state.team!;
