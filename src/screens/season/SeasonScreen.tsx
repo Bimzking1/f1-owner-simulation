@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { SimulationState } from "@/simulation/types";
 import { constructorById } from "@/data";
 import { difficultyOf, ownerTitle } from "@/state";
-import { Button, Img, Modal, Money, Stat } from "@/ui/kit";
+import { Button, Img, Modal, Money } from "@/ui/kit";
 import type { Act } from "./parts";
 import { OverviewTab } from "./OverviewTab";
 import { RaceTab } from "./RaceTab";
@@ -64,47 +64,56 @@ export default function SeasonScreen({ state, onRunRound, onNewsAction, act, onR
 
   return (
     <div className="mx-auto max-w-6xl px-4 pb-16">
-      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-hairline bg-surface/70 px-5 py-3">
-        <div className="flex items-center gap-3">
-          <span className="h-8 w-8 rounded-sm" style={{ background: ctor?.colors.primary ?? "gray" }} />
-          <div>
-            <div className="font-display text-xl font-bold leading-none">{ctor?.name}</div>
-            <div className="text-[11px] uppercase tracking-widest text-ink-faint">
+      <header className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-hairline bg-surface/70 px-3 py-3 sm:px-5">
+        <div className="flex w-full min-w-0 items-center gap-3 md:w-auto">
+          <span className="h-8 w-8 shrink-0 rounded-sm" style={{ background: ctor?.colors.primary ?? "gray" }} />
+          <div className="min-w-0">
+            <div className="truncate font-display text-xl font-bold leading-none">{ctor?.name}</div>
+            <div className="truncate text-[11px] uppercase tracking-widest text-ink-faint">
               Round {Math.min(state.round + 1, state.calendar.length)}/{state.calendar.length} · WCC P{wccPos} ·{" "}
               {difficultyOf(state).label} · {state.seed}
             </div>
           </div>
         </div>
-        <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:flex-nowrap">
-          {t.owner && (
-            <span className="flex h-14 items-center gap-2 rounded-md border border-hairline bg-raised/60 px-3" title={t.owner.name}>
-              {t.owner.image ? (
-                <Img src={t.owner.image} alt={t.owner.name} className="h-8 w-8 rounded-full object-cover" />
-              ) : (
-                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-signal/15 font-display text-sm font-bold text-signal">
-                  {t.owner.name.charAt(0).toUpperCase()}
+        <div className="flex w-full flex-wrap items-center gap-2 md:w-auto md:flex-nowrap">
+          {/* scoreboard strip — principal on its own row on mobile; hidden on desktop */}
+          <div className="flex min-w-0 flex-1 flex-col gap-2 rounded-md border border-hairline bg-raised/60 p-2 md:flex-none md:flex-row md:items-stretch md:gap-0 md:p-0">
+            {t.owner && (
+              <div className="flex min-w-0 items-center gap-2 px-1 md:hidden" title={t.owner.name}>
+                {t.owner.image ? (
+                  <Img src={t.owner.image} alt={t.owner.name} className="h-9 w-9 shrink-0 rounded-full object-cover" />
+                ) : (
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-signal/15 font-display text-sm font-bold text-signal">
+                    {t.owner.name.charAt(0).toUpperCase()}
+                  </span>
+                )}
+                <span className="min-w-0 leading-tight">
+                  <span className="block text-[9px] font-semibold uppercase tracking-widest text-ink-faint">Principal</span>
+                  <span className="block truncate font-display text-sm font-bold">{ownerTitle(state)}</span>
                 </span>
-              )}
-              <span className="flex flex-col leading-tight">
-                <span className="text-[10px] font-semibold uppercase tracking-widest text-ink-faint">Principal</span>
-                <span className="font-display text-sm font-bold">{ownerTitle(state)}</span>
-              </span>
-            </span>
-          )}
-          <Stat label="Cash" value={<Money value={t.cash} />} tone={t.cash < 0 ? "caution" : undefined} />
-          <Stat label="Reputation" value={t.reputation} />
-          <Stat label="WCC Pts" value={t.points} />
-          {!seasonDone && (
-            <Button onClick={onRunRound} className="hidden h-14 shrink-0 md:inline-flex">
-              Run R{state.round + 1} · {next.grandPrix} →
-            </Button>
-          )}
-          <Button variant="ghost" small onClick={() => setConfirmMenu(true)} className="ml-auto h-14 md:ml-0">
+              </div>
+            )}
+            <div className="flex items-stretch divide-x divide-hairline">
+              <div className="flex-1 px-2.5 py-1 sm:px-3 sm:py-2">
+                <div className="text-[9px] font-semibold uppercase tracking-widest text-ink-faint">Cash</div>
+                <Money value={t.cash} className="font-display text-sm font-bold tabular sm:text-base" />
+              </div>
+              <div className="flex-1 px-2.5 py-1 sm:px-3 sm:py-2">
+                <div className="text-[9px] font-semibold uppercase tracking-widest text-ink-faint">Reputation</div>
+                <div className="font-display text-sm font-bold tabular sm:text-base">{t.reputation}</div>
+              </div>
+              <div className="flex-1 px-2.5 py-1 sm:px-3 sm:py-2">
+                <div className="text-[9px] font-semibold uppercase tracking-widest text-ink-faint">WCC Pts</div>
+                <div className="font-display text-sm font-bold tabular sm:text-base">{t.points}</div>
+              </div>
+            </div>
+          </div>
+
+          <Button variant="ghost" small onClick={() => setConfirmMenu(true)} className="ml-auto h-14 shrink-0 px-3 md:ml-0">
             Menu
           </Button>
-          {/* mobile: the long run label gets its own full-width row below the stats */}
           {!seasonDone && (
-            <Button onClick={onRunRound} className="w-full md:hidden">
+            <Button onClick={onRunRound} className="w-full md:h-14 md:w-auto md:shrink-0">
               Run R{state.round + 1} · {next.grandPrix} →
             </Button>
           )}

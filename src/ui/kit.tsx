@@ -70,7 +70,7 @@ export function Bar({ label, value, tone, right, max = 100 }: { label: string; v
     <div className="flex items-center gap-2">
       <span className="w-24 shrink-0 text-xs text-ink-soft">{label}</span>
       <Meter value={value} max={max} tone={tone ?? ratingTone(value)} />
-      <span className={`w-8 shrink-0 text-right text-xs tabular ${tone ? "text-ink-soft" : ratingTextClass(value)}`}>{right ?? Math.round(value)}</span>
+      <span className={`min-w-8 shrink-0 text-right text-xs tabular ${tone ? "text-ink-soft" : ratingTextClass(value)}`}>{right ?? Math.round(value)}</span>
     </div>
   );
 }
@@ -101,7 +101,7 @@ export function Button({ children, onClick, variant = "primary", disabled, class
       type="button"
       disabled={disabled}
       onClick={onClick}
-      className={`${small ? "px-2 py-1 text-[11px]" : "px-3.5 py-2 text-sm"} rounded-sm font-display font-bold uppercase tracking-widest transition disabled:cursor-not-allowed disabled:opacity-40 ${vars[variant]} ${className}`}
+      className={`inline-flex items-center justify-center gap-1.5 ${small ? "px-2 py-1 text-[11px]" : "px-3.5 py-2 text-sm"} rounded-sm font-display font-bold uppercase tracking-widest transition disabled:cursor-not-allowed disabled:opacity-40 ${vars[variant]} ${className}`}
     >
       {children}
     </button>
