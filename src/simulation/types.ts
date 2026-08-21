@@ -405,8 +405,18 @@ export interface FinancialTransaction {
   detail?: string; // human-readable breakdown/formula, shown in FinanceTab ⓘ
 }
 
+/** The player's in-game identity — used for callouts ("Ms. Clark") and the report. */
+export interface OwnerProfile {
+  honorific: "Mr" | "Ms";
+  /** Full display name; required. */
+  name: string;
+  /** Optional data-URL portrait, only set when the user uploads one. */
+  image?: string;
+}
+
 export interface TeamState {
   constructorId: string;
+  owner?: OwnerProfile;
   philosophy: Philosophy;
   teamOrders: TeamOrders;
   driver1Id: string;

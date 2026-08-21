@@ -1,8 +1,8 @@
 import { useState } from "react";
 import type { SimulationState } from "@/simulation/types";
 import { constructorById } from "@/data";
-import { difficultyOf } from "@/state";
-import { Button, Modal, Money, Stat } from "@/ui/kit";
+import { difficultyOf, ownerTitle } from "@/state";
+import { Button, Img, Modal, Money, Stat } from "@/ui/kit";
 import type { Act } from "./parts";
 import { OverviewTab } from "./OverviewTab";
 import { RaceTab } from "./RaceTab";
@@ -76,6 +76,12 @@ export default function SeasonScreen({ state, onRunRound, onNewsAction, act, onR
           </div>
         </div>
         <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:flex-nowrap">
+          {t.owner && (
+            <span className="flex items-center gap-1.5 rounded-sm border border-hairline bg-raised/40 px-1.5 py-1" title={t.owner.name}>
+              {t.owner.image && <Img src={t.owner.image} alt={t.owner.name} className="h-6 w-6 rounded-full object-cover" />}
+              <span className="text-xs font-semibold">{ownerTitle(state)}</span>
+            </span>
+          )}
           <Stat label="Cash" value={<Money value={t.cash} />} tone={t.cash < 0 ? "caution" : undefined} />
           <Stat label="Reputation" value={t.reputation} />
           <Stat label="WCC Pts" value={t.points} />

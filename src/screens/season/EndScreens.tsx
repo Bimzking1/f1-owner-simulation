@@ -1,5 +1,6 @@
 import type { DriverState, DriverStanding, SimulationState } from "@/simulation/types";
 import { constructorById, driverById, engineerById, mechanicById } from "@/data";
+import { ownerTitle } from "@/state";
 import { Button, Card, Money } from "@/ui/kit";
 import { exportReportImage } from "./reportImage";
 
@@ -9,25 +10,25 @@ interface Props {
 }
 
 /** End-of-season comment from a driver towards the owner, based on results + mood. */
-function verdictFor(ds: DriverState, st: DriverStanding | undefined, teamPos: number): string {
+function verdictFor(ds: DriverState, st: DriverStanding | undefined, teamPos: number, title: string): string {
   const wins = st?.wins ?? 0;
   const great = teamPos <= 2 || ds.points >= 180 || wins >= 3;
   const poor = teamPos >= 8 || ds.points <= 12;
   if (ds.frustration >= 60) {
     return poor
-      ? "I gave everything, but this project went backwards. I need serious answers about next year before I commit to anything."
+      ? `I gave everything, but this project went backwards. I need serious answers about next year before I commit to anything, ${title}.`
       : "We scored points, sure — but the way we got there was chaos. Fix the strategy calls or find someone else.";
   }
   if (great && ds.morale >= 60) {
     return wins >= 3
-      ? "What a season. You believed in this team and it showed every single weekend — thank you for backing us."
+      ? `What a season. You believed in this team and it showed every single weekend — thank you for backing us, ${title}.`
       : "Best year I've had in a long time. The direction of this team is exactly right — keep pushing.";
   }
   if (poor && ds.confidence <= 40) {
     return "Honestly? A season to forget. I still believe in the people here, but the car needs a reset from top to bottom.";
   }
   if (ds.dnfs >= 4) {
-    return "My driving was fine — the car just kept breaking. Reliability has to be the winter priority, boss.";
+    return `My driving was fine — the car just kept breaking. Reliability has to be the winter priority, ${title}.`;
   }
   if (ds.morale >= 70) {
     return "Solid season. The garage atmosphere you've built makes me want to fight for podiums next year.";
@@ -61,15 +62,16 @@ function staffVerdicts(state: SimulationState, pos: number): { shortName: string
 
   const mech = mechanicById(t.mechanicIds[0]);
   if (mech) {
+    const title = ownerTitle(state);
     let text: string;
     if (t.pitCrew >= 70 && !poor) {
-      text = "Pit lane ran like clockwork every Sunday. The crew would follow you through a wall, boss — best garage I've ever run.";
+      text = `Pit lane ran like clockwork every Sunday. The crew would follow you through a wall, ${title} — best garage I've ever run.`;
     } else if (t.pitCrew < 45) {
       text = "Half our stops were a fire drill. You spent on everything except the people who actually touch the car. Think about it.";
     } else if (great) {
       text = "Clean stops, happy mechanics, silverware on the shelf. That culture comes from the top — cheers for backing us.";
     } else if (poor) {
-      text = "The car kept coming home in pieces. We can rebuild gearboxes, not morale — something has to change upstairs.";
+      text = `The car kept coming home in pieces. We can rebuild gearboxes, not morale — something has to change, ${title}.`;
     } else {
       text = "The lads worked flat out every weekend and never complained. A few more results and this garage gets loud — in a good way.";
     }
@@ -123,7 +125,7 @@ export function EndScreens({ state, onReset }: Props) {
   const driverQuotes = t.drivers.map((ds) => {
     const d = driverById(ds.driverId, state.season);
     const st = state.standingsDrivers.find((s) => s.driverId === ds.driverId);
-    return { shortName: d?.shortName ?? ds.driverId, text: verdictFor(ds, st, pos) };
+    return { shortName: d?.shortName ?? ds.driverId, text: verdictFor(ds, st, pos, ownerTitle(state)) };
   });
 
   const staffQuotes = staffVerdicts(state, pos);

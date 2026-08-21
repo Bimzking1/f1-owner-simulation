@@ -122,7 +122,7 @@ function WeekendClassification({ state, weekend }: { state: SimulationState; wee
         </div>
       }
     >
-      <div className="max-h-80 divide-y divide-hairline/60 overflow-auto pr-2 [scrollbar-gutter:stable]">
+      <div className="max-h-80 divide-y divide-hairline/60 overflow-auto pr-4 [scrollbar-gutter:stable]">
         {view === "quali" &&
           quali.map((q) => (
             <div key={q.driverId} className={`flex items-center gap-2 py-1 text-sm ${mine(q.driverId) ? "font-semibold text-ink" : "text-ink-soft"}`}>

@@ -104,7 +104,7 @@ export function StandingsCard({ state, rows }: { state: SimulationState; rows?: 
   return (
     <Card title="Championship" right={<Tag tone="telemetry">WCC / WDC · full grid</Tag>}>
       <div className="grid gap-4 sm:grid-cols-2">
-        <div className="max-h-96 divide-y divide-hairline/60 overflow-auto pr-1">
+        <div className="max-h-96 divide-y divide-hairline/60 overflow-auto pr-3 [scrollbar-gutter:stable]">
           {teams.map((s, i) => (
             <div key={s.teamId} className={`flex items-center gap-2 py-1 text-sm ${s.teamId === t.constructorId ? "font-semibold text-ink" : "text-ink-soft"}`}>
               <span className="w-5 tabular text-ink-faint">{i + 1}</span>
@@ -113,7 +113,7 @@ export function StandingsCard({ state, rows }: { state: SimulationState; rows?: 
             </div>
           ))}
         </div>
-        <div className="max-h-96 divide-y divide-hairline/60 overflow-auto pr-1">
+        <div className="max-h-96 divide-y divide-hairline/60 overflow-auto pr-3 [scrollbar-gutter:stable]">
           {drivers.map((s, i) => {
             const mine = s.driverId === t.driver1Id || s.driverId === t.driver2Id;
             return (

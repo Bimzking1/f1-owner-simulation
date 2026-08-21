@@ -366,6 +366,20 @@ const CHAT_LABELS: Record<string, string> = {
   "chat-tough": "Tough love",
 };
 
+const CHAT_ACKS: Record<string, string> = {
+  "chat-support": "Thank you for standing by me",
+  "chat-promise": "I'll hold you to that",
+  "chat-tough": "...message received",
+};
+
+/** "Ms. Clark" — how characters address the owner. */
+function ownerTitleOf(state: SimulationState): string {
+  const o = state.team?.owner;
+  if (!o?.name) return "Boss";
+  const parts = o.name.trim().split(/\s+/);
+  return `${o.honorific} ${parts[parts.length - 1]}`;
+}
+
 export function resolveNewsAction(state: SimulationState, newsId: string, action: string) {
   const item = state.news.find((n) => n.id === newsId);
   if (!item || item.resolved) return;
@@ -393,7 +407,8 @@ export function resolveNewsAction(state: SimulationState, newsId: string, action
         return `${k} ${d > 0 ? "+" : ""}${d}`;
       };
       const label = CHAT_LABELS[action] ?? "You responded";
-      item.body += `\n\n${label} — ${delta("morale")} · ${delta("confidence")} · ${delta("frustration")}.\nNow: morale ${ds.morale} · confidence ${ds.confidence} · frustration ${ds.frustration}.`;
+      const ack = CHAT_ACKS[action];
+      item.body += `\n\n${label} — ${delta("morale")} · ${delta("confidence")} · ${delta("frustration")}.\nNow: morale ${ds.morale} · confidence ${ds.confidence} · frustration ${ds.frustration}.${ack ? `\n"${ack}, ${ownerTitleOf(state)}."` : ""}`;
     }
     return;
   }

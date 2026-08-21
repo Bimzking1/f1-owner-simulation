@@ -142,3 +142,11 @@ export function difficultyOf(state: SimulationState) {
 export function constructorName(team: TeamState): string {
   return constructorById(team.constructorId)?.name ?? team.constructorId;
 }
+
+/** "Ms. Clark" — honorific + surname, used when characters address the owner. */
+export function ownerTitle(state: SimulationState): string {
+  const o = state.team?.owner;
+  if (!o?.name) return "Boss";
+  const parts = o.name.trim().split(/\s+/);
+  return `${o.honorific} ${parts[parts.length - 1]}`;
+}

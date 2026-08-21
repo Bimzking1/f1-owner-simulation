@@ -708,20 +708,35 @@ export function applyChatResponse(state: SimulationState, driverId: string, resp
   const ds = t.drivers.find((x) => x.driverId === driverId);
   if (!ds) return null;
   switch (response) {
-    case "chat-support":
+    case "chat-support": {
       ds.morale = clamp(ds.morale + 6, 0, 100);
       ds.confidence = clamp(ds.confidence + 3, 0, 100);
+      ds.boosts ??= [];
+      const ex = ds.boosts.find((b) => b.label === "Public backing");
+      if (ex) ex.racesLeft = Math.max(ex.racesLeft, 2);
+      else ds.boosts.push({ label: "Public backing", morale: 2, racesLeft: 2 });
       return "Public backing delivered.";
-    case "chat-promise":
+    }
+    case "chat-promise": {
       ds.morale = clamp(ds.morale + 4, 0, 100);
       ds.confidence = clamp(ds.confidence + 2, 0, 100);
       ds.frustration = clamp(ds.frustration + 2, 0, 100); // promises add pressure
+      ds.boosts ??= [];
+      const ex = ds.boosts.find((b) => b.label === "Upgrade promise");
+      if (ex) ex.racesLeft = Math.max(ex.racesLeft, 3);
+      else ds.boosts.push({ label: "Upgrade promise", confidence: 2, racesLeft: 3 });
       return "Upgrade promise made — expectations rise.";
-    case "chat-tough":
+    }
+    case "chat-tough": {
       ds.frustration = clamp(ds.frustration - 8, 0, 100);
       ds.morale = clamp(ds.morale - 3, 0, 100);
       ds.confidence = clamp(ds.confidence + 2, 0, 100);
+      ds.boosts ??= [];
+      const ex = ds.boosts.find((b) => b.label === "Tough love");
+      if (ex) ex.racesLeft = Math.max(ex.racesLeft, 2);
+      else ds.boosts.push({ label: "Tough love", frustration: -2, racesLeft: 2 });
       return "Tough love. Frustration drops, mood dips.";
+    }
     default:
       return null;
   }

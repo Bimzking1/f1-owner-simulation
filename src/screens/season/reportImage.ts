@@ -5,7 +5,7 @@
 
 import type { SimulationState } from "@/simulation/types";
 import { constructorById, driverById } from "@/data";
-import { difficultyOf } from "@/state";
+import { difficultyOf, ownerTitle } from "@/state";
 
 type Ratio = "portrait" | "landscape";
 
@@ -130,16 +130,46 @@ export function exportReportImage(state: SimulationState, ratio: Ratio, quotes?:
   canvas.height = h;
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
-  drawReport(ctx, w, h, state, accent, ratio, quotes);
-  canvas.toBlob((blob) => {
-    if (!blob) return;
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `f1-owner-report-${ratio === "portrait" ? "9x16" : "16x9"}.png`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }, "image/png");
+
+  const render = (ownerImg?: HTMLImageElement) => {
+    drawReport(ctx, w, h, state, accent, ratio, quotes, ownerImg);
+    canvas.toBlob((blob) => {
+      if (!blob) return;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `f1-owner-report-${ratio === "portrait" ? "9x16" : "16x9"}.png`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }, "image/png");
+  };
+
+  const src = t.owner?.image;
+  if (src) {
+    const img = new Image();
+    img.onload = () => render(img);
+    img.onerror = () => render();
+    img.src = src;
+  } else {
+    render();
+  }
+}
+
+/** Circular-cropped owner portrait on the canvas. */
+function drawAvatar(ctx: CanvasRenderingContext2D, img: HTMLImageElement, cx: number, cy: number, r: number) {
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.closePath();
+  ctx.clip();
+  const side = Math.min(img.width, img.height);
+  ctx.drawImage(img, (img.width - side) / 2, (img.height - side) / 2, side, side, cx - r, cy - r, r * 2, r * 2);
+  ctx.restore();
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.strokeStyle = C.line;
+  ctx.lineWidth = 3;
+  ctx.stroke();
 }
 
 /** Word-wrap text to a pixel width using the body font. */
@@ -175,9 +205,12 @@ function drawReport(
   accent: string,
   ratio: Ratio,
   quotes?: { shortName: string; text: string }[],
+  ownerImg?: HTMLImageElement,
 ) {
   const t = state.team!;
   const diff = difficultyOf(state);
+  const owner = t.owner ?? null;
+  const ownerLabel = owner ? ownerTitle(state) : null;
   const pos = state.standingsConstructors.findIndex((c) => c.teamId === t.constructorId) + 1;
   const income = t.history.reduce((a, x) => a + Math.max(0, x.amount), 0);
   const spend = t.history.reduce((a, x) => a + Math.min(0, x.amount), 0);
@@ -204,8 +237,8 @@ function drawReport(
   ctx.fillStyle = accent;
   ctx.fillRect(0, 0, w, ratio === "portrait" ? 14 : 16);
 
-  if (ratio === "portrait") return drawPortrait(ctx, state, accent, pos, income, spend, net, prize, wccRows, wdcRows, teamName, myStandings, diff.label, quotes);
-  return drawLandscape(ctx, state, accent, pos, income, spend, net, prize, wccRows, wdcRows, teamName, myStandings, diff.label, quotes);
+  if (ratio === "portrait") return drawPortrait(ctx, state, accent, pos, income, spend, net, prize, wccRows, wdcRows, teamName, myStandings, diff.label, quotes, ownerImg, ownerLabel);
+  return drawLandscape(ctx, state, accent, pos, income, spend, net, prize, wccRows, wdcRows, teamName, myStandings, diff.label, quotes, ownerImg, ownerLabel);
 }
 
 function ctor(state: SimulationState) {
@@ -232,6 +265,8 @@ function drawPortrait(
   myStandings: { s: { driverId: string; points: number; dnfs: number }; i: number }[],
   diffLabel: string,
   quotes?: { shortName: string; text: string }[],
+  ownerImg?: HTMLImageElement,
+  ownerLabel?: string | null,
 ) {
   const W = 1080;
   const H = 1920;
@@ -250,7 +285,15 @@ function drawPortrait(
     fillText(ctx, ".", pad + pw - 8, 224, 128, accent, { weight: 700 });
   }
   fillText(ctx, teamName.toUpperCase(), pad, 276, 46, C.ink, { weight: 700 });
-  fillText(ctx, `SEASON ${state.season} · ${diffLabel.toUpperCase()} · SEED ${state.seed}`, pad, 316, 22, C.faint, { font: MONO, weight: 500 });
+  fillText(
+    ctx,
+    `SEASON ${state.season} · ${diffLabel.toUpperCase()} · SEED ${state.seed}${ownerLabel ? ` · PRINCIPAL ${ownerLabel.toUpperCase()}` : ""}`,
+    pad,
+    316,
+    22,
+    C.faint,
+    { font: MONO, weight: 500 },
+  );
 
   const stats: [string, string, string][] = [
     ["Points", `${t.points}`, C.ink],
@@ -283,7 +326,7 @@ function drawPortrait(
   fillText(ctx, `NET ${money(net)}`, pad + cardW + 30 + l2w + 28, rewardY + 76, 26, net >= 0 ? C.green : C.red, { weight: 700 });
 
   // flowing layout: every section advances a cursor and verdicts only draw if they fit
-  const footerReserve = 70;
+  const footerReserve = ownerLabel ? 150 : 70;
   let y = rewardY + 108 + 50;
 
   fillText(ctx, "CONSTRUCTORS CHAMPIONSHIP", pad, y, 24, C.muted, { weight: 700 });
@@ -336,6 +379,14 @@ function drawPortrait(
     }
   }
 
+  // owner sign-off — portrait + name at the bottom, only when a profile exists
+  if (ownerLabel) {
+    const by = H - 118;
+    if (ownerImg) drawAvatar(ctx, ownerImg, pad + 34, by + 40, 34);
+    fillText(ctx, "TEAM PRINCIPAL", pad + (ownerImg ? 84 : 16), by + 28, 15, C.faint, { font: BODY, weight: 600 });
+    fillText(ctx, ownerLabel.toUpperCase(), pad + (ownerImg ? 84 : 16), by + 60, 30, C.ink, { weight: 700 });
+  }
+
   fillText(ctx, "F1 OWNER — SEASON REPORT", W / 2, H - 36, 20, C.faint, { weight: 600, font: BODY, align: "center" });
   ctx.textAlign = "left";
 }
@@ -355,6 +406,8 @@ function drawLandscape(
   myStandings: { s: { driverId: string; points: number; dnfs: number }; i: number }[],
   diffLabel: string,
   quotes?: { shortName: string; text: string }[],
+  ownerImg?: HTMLImageElement,
+  ownerLabel?: string | null,
 ) {
   const W = 1920;
   const H = 1080;
@@ -424,6 +477,16 @@ function drawLandscape(
   fillText(ctx, "DRIVERS", tablesX + colW + 24, 118, 18, C.faint, { font: BODY, weight: 600 });
   standingsTable(ctx, tablesX, 136, colW, wccRows.slice(0, 10), 44, accent);
   standingsTable(ctx, tablesX + colW + 24, 136, colW, wdcRows.slice(0, 10), 44, accent);
+
+  // owner sign-off — bottom-right, only when a profile exists
+  if (ownerLabel) {
+    const label = `${ownerLabel.toUpperCase()} · TEAM PRINCIPAL`;
+    ctx.font = `600 18px ${BODY}`;
+    const lw = ctx.measureText(label).width;
+    if (ownerImg) drawAvatar(ctx, ownerImg, W - pad - lw - 34, H - 46, 24);
+    fillText(ctx, label, W - pad, H - 40, 18, C.muted, { font: BODY, weight: 600, align: "right" });
+    ctx.textAlign = "left";
+  }
 
   fillText(ctx, `F1 OWNER — SEASON REPORT · SEED ${state.seed}`, W / 2, H - 34, 20, C.faint, { weight: 600, font: BODY, align: "center" });
   ctx.textAlign = "left";
