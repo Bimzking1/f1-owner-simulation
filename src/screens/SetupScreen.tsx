@@ -603,7 +603,7 @@ export default function SetupScreen({ cfg, onStart, onBack }: Props) {
             <div className="space-y-2 text-sm">
               <Row k="Starting budget" v={money(startCash)} />
               <Row k="Equipment (one-time)" v={`-${money(equipmentCost)}`} />
-              <Row k="Driver wages" v={d1 && d2 ? `${money(d1.salary + d2.salary)}/weekend` : "—"} />
+              <Row k="Driver wages" v={d1 && d2 ? `${money((d1.salary + d2.salary) / totalRounds)}/weekend (${money(d1.salary + d2.salary)}/season)` : "—"} />
               <Row k="Staff wages" v={`${money(staffWeekly)}/weekend`} />
               <Row k="Cash at season start" v={money(remaining)} bold />
             </div>
@@ -625,22 +625,24 @@ export default function SetupScreen({ cfg, onStart, onBack }: Props) {
                     if (!sp) return null;
                     const seasonTotal = Math.round((sp.racePayment * totalRounds + sp.bonus) * 100) / 100;
                     return (
-                      <div key={id} className="flex items-center gap-3 rounded-md border border-hairline bg-raised/30 p-2">
-                        <Img src={sp.image} alt={sp.name} className="h-10 w-20 shrink-0 rounded-sm bg-white object-contain p-1" />
-                        <div className="min-w-0 flex-1 text-xs">
-                          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                      <div key={id} className="rounded-md border border-hairline bg-raised/30 p-2 sm:flex sm:items-center sm:gap-3">
+                        <div className="flex items-center gap-3">
+                          <Img src={sp.image} alt={sp.name} className="h-10 w-20 shrink-0 rounded-sm bg-white object-contain p-1" />
+                          <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
                             <span className="font-display text-sm font-bold">{sp.name}</span>
                             <Tag tone={sp.tier === "title" ? "elite" : sp.tier === "major" ? "telemetry" : "ink"}>{sp.tier}</Tag>
                           </div>
-                          <div className="mt-0.5 text-ink-soft">
+                        </div>
+                        <div className="mt-2 min-w-0 text-xs sm:mt-0 sm:flex-1">
+                          <div className="text-ink-soft">
                             Pays {money(sp.racePayment)}/race · bonus +{money(sp.bonus)} if objective met
                           </div>
-                          <div className="mt-0.5 text-[11px] leading-snug text-ink-faint">Requirement: {sp.objectiveTextEnjoyer}</div>
-                          <div className="mt-0.5 text-[11px] text-ink-faint">
+                          <div className="mt-1 text-[11px] leading-snug text-ink-faint">Requirement: {sp.objectiveTextEnjoyer}</div>
+                          <div className="mt-1 text-[11px] text-ink-faint">
                             Length: full season ({totalRounds} races) · terminable anytime
                           </div>
                         </div>
-                        <div className="shrink-0 text-right">
+                        <div className="mt-2 shrink-0 border-t border-hairline pt-2 text-right sm:ml-auto sm:mt-0 sm:border-t-0 sm:pt-0">
                           <div className="text-[10px] uppercase tracking-widest text-ink-faint">Per season</div>
                           <div className="tabular text-sm font-bold text-positive">{money(seasonTotal)}</div>
                         </div>

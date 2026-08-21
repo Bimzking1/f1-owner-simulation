@@ -122,7 +122,7 @@ function WeekendClassification({ state, weekend }: { state: SimulationState; wee
         </div>
       }
     >
-      <div className="max-h-80 divide-y divide-hairline/60 overflow-auto">
+      <div className="max-h-80 divide-y divide-hairline/60 overflow-auto pr-2 [scrollbar-gutter:stable]">
         {view === "quali" &&
           quali.map((q) => (
             <div key={q.driverId} className={`flex items-center gap-2 py-1 text-sm ${mine(q.driverId) ? "font-semibold text-ink" : "text-ink-soft"}`}>
@@ -345,7 +345,7 @@ function RaceResultReplay({ weekend, season, onClose }: { weekend: RaceWeekendRe
         </div>
         <div>
           <Card title="Race classification" pad={false}>
-            <div className="max-h-[26rem] divide-y divide-hairline/60 overflow-auto">
+            <div className="max-h-[26rem] divide-y divide-hairline/60 overflow-auto pr-2 [scrollbar-gutter:stable]">
               {weekend.race.map((r) => {
                 const d = driverById(r.driverId, season);
                 return (

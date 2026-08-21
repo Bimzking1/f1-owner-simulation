@@ -97,13 +97,15 @@ export function NextRaceCard({ track, round }: { track: Track; round?: number })
   );
 }
 
-export function StandingsCard({ state, rows = 10 }: { state: SimulationState; rows?: number }) {
+export function StandingsCard({ state, rows }: { state: SimulationState; rows?: number }) {
   const t = state.team!;
+  const teams = rows ? state.standingsConstructors.slice(0, rows) : state.standingsConstructors;
+  const drivers = rows ? state.standingsDrivers.slice(0, rows) : state.standingsDrivers;
   return (
-    <Card title="Championship" right={<Tag tone="telemetry">WCC / WDC</Tag>}>
+    <Card title="Championship" right={<Tag tone="telemetry">WCC / WDC · full grid</Tag>}>
       <div className="grid gap-4 sm:grid-cols-2">
-        <div className="divide-y divide-hairline/60">
-          {state.standingsConstructors.slice(0, rows).map((s, i) => (
+        <div className="max-h-96 divide-y divide-hairline/60 overflow-auto pr-1">
+          {teams.map((s, i) => (
             <div key={s.teamId} className={`flex items-center gap-2 py-1 text-sm ${s.teamId === t.constructorId ? "font-semibold text-ink" : "text-ink-soft"}`}>
               <span className="w-5 tabular text-ink-faint">{i + 1}</span>
               <span className="min-w-0 flex-1 truncate">{constructorById(s.teamId, state.season)?.name ?? s.teamId}</span>
@@ -111,8 +113,8 @@ export function StandingsCard({ state, rows = 10 }: { state: SimulationState; ro
             </div>
           ))}
         </div>
-        <div className="divide-y divide-hairline/60">
-          {state.standingsDrivers.slice(0, rows).map((s, i) => {
+        <div className="max-h-96 divide-y divide-hairline/60 overflow-auto pr-1">
+          {drivers.map((s, i) => {
             const mine = s.driverId === t.driver1Id || s.driverId === t.driver2Id;
             return (
               <div key={s.driverId} className={`flex items-center gap-2 py-1 text-sm ${mine ? "font-semibold text-ink" : "text-ink-soft"}`}>

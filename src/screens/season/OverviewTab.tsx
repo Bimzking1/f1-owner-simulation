@@ -152,8 +152,6 @@ export function OverviewTab({ state, onNewsAction, onRunRound, onNavigate }: Pro
       </div>
 
       <div className="space-y-4">
-        <SponsorProgressWidget state={state} onNavigate={onNavigate} />
-
         <Card title="Paddock feed" pad={false}>
           <div className="max-h-[46rem] overflow-auto">
             {groups.length === 0 && <div className="p-4 text-xs text-ink-faint">No news yet.</div>}
@@ -176,6 +174,8 @@ export function OverviewTab({ state, onNewsAction, onRunRound, onNavigate }: Pro
             })}
           </div>
         </Card>
+
+        <SponsorProgressWidget state={state} onNavigate={onNavigate} />
       </div>
     </div>
   );

@@ -1,5 +1,5 @@
 import type { DriverState, DriverStanding, SimulationState } from "@/simulation/types";
-import { constructorById, driverById } from "@/data";
+import { constructorById, driverById, engineerById, mechanicById } from "@/data";
 import { Button, Card, Money } from "@/ui/kit";
 import { exportReportImage } from "./reportImage";
 
@@ -33,6 +33,50 @@ function verdictFor(ds: DriverState, st: DriverStanding | undefined, teamPos: nu
     return "Solid season. The garage atmosphere you've built makes me want to fight for podiums next year.";
   }
   return "Mid-table again. Not a disaster, not good enough — I know you want more, and so do I.";
+}
+
+/** End-of-season comments from the lead engineer and chief mechanic. */
+function staffVerdicts(state: SimulationState, pos: number): { shortName: string; text: string }[] {
+  const t = state.team!;
+  const out: { shortName: string; text: string }[] = [];
+  const great = pos <= 3;
+  const poor = pos >= 8;
+
+  const eng = engineerById(t.engineerIds[0]);
+  if (eng) {
+    let text: string;
+    if (great) {
+      text = "Every upgrade you funded went on the car and it showed. Thank you for trusting the numbers — this team is built to win now.";
+    } else if (t.cash < 0) {
+      text = "Brilliant engineering done on fumes all year. Sort the finances and this group will build you a proper car.";
+    } else if (poor) {
+      text = "We asked for parts and got patience. If the budget stays this tight, expect the same championship table next year.";
+    } else if (t.upgrades.length > 0 || t.points > 40) {
+      text = "The development path is working — the car was quicker at the end than at the start. One more winter and the midfield should be worried.";
+    } else {
+      text = "An honest season's work with an honest car. Give us a real dev budget and we'll give you a season to shout about.";
+    }
+    out.push({ shortName: `${eng.name} · lead engineer`, text });
+  }
+
+  const mech = mechanicById(t.mechanicIds[0]);
+  if (mech) {
+    let text: string;
+    if (t.pitCrew >= 70 && !poor) {
+      text = "Pit lane ran like clockwork every Sunday. The crew would follow you through a wall, boss — best garage I've ever run.";
+    } else if (t.pitCrew < 45) {
+      text = "Half our stops were a fire drill. You spent on everything except the people who actually touch the car. Think about it.";
+    } else if (great) {
+      text = "Clean stops, happy mechanics, silverware on the shelf. That culture comes from the top — cheers for backing us.";
+    } else if (poor) {
+      text = "The car kept coming home in pieces. We can rebuild gearboxes, not morale — something has to change upstairs.";
+    } else {
+      text = "The lads worked flat out every weekend and never complained. A few more results and this garage gets loud — in a good way.";
+    }
+    out.push({ shortName: `${mech.name} · chief mechanic`, text });
+  }
+
+  return out;
 }
 
 export function EndScreens({ state, onReset }: Props) {
@@ -81,6 +125,9 @@ export function EndScreens({ state, onReset }: Props) {
     const st = state.standingsDrivers.find((s) => s.driverId === ds.driverId);
     return { shortName: d?.shortName ?? ds.driverId, text: verdictFor(ds, st, pos) };
   });
+
+  const staffQuotes = staffVerdicts(state, pos);
+  const allQuotes = [...driverQuotes, ...staffQuotes];
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10">
@@ -180,10 +227,10 @@ export function EndScreens({ state, onReset }: Props) {
         </div>
 
         <div className="mt-3">
-          <Card title="Driver verdicts — what they say about you">
+          <Card title="Paddock verdicts — what they say about you">
             <div className="grid gap-2 sm:grid-cols-2">
-              {driverQuotes.map((q) => (
-                <div key={q.shortName} className="rounded-md border border-hairline bg-raised/40 p-3">
+              {allQuotes.map((q, qi) => (
+                <div key={`${q.shortName}-${qi}`} className="rounded-md border border-hairline bg-raised/40 p-3">
                   <p className="text-sm italic leading-relaxed text-ink-soft">“{q.text}”</p>
                   <p className="mt-2 text-right text-[10px] uppercase tracking-widest text-ink-faint">— {q.shortName}</p>
                 </div>
@@ -193,8 +240,8 @@ export function EndScreens({ state, onReset }: Props) {
         </div>
 
         <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
-          <Button onClick={() => exportReportImage(state, "portrait", driverQuotes)}>Export 9:16</Button>
-          <Button variant="ghost" onClick={() => exportReportImage(state, "landscape")}>Export 16:9</Button>
+          <Button onClick={() => exportReportImage(state, "portrait", allQuotes)}>Export 9:16</Button>
+          <Button variant="ghost" onClick={() => exportReportImage(state, "landscape", allQuotes)}>Export 16:9</Button>
           <Button variant="ghost" onClick={onReset}>Back to menu</Button>
         </div>
         <div className="mt-2 text-center text-[11px] text-ink-faint">

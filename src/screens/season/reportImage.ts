@@ -161,6 +161,12 @@ function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number,
   return lines;
 }
 
+/** Trim wrapped lines to `max`, appending an ellipsis to the last kept line. */
+function clampLines(lines: string[], max: number): string[] {
+  if (lines.length <= max) return lines;
+  return lines.slice(0, max).map((l, li, arr) => (li === arr.length - 1 ? `${l}…` : l));
+}
+
 function drawReport(
   ctx: CanvasRenderingContext2D,
   w: number,
@@ -276,45 +282,58 @@ function drawPortrait(
   fillText(ctx, teamName, pad + cardW + 30, rewardY + 76, 26, C.ink, { weight: 700 });
   fillText(ctx, `NET ${money(net)}`, pad + cardW + 30 + l2w + 28, rewardY + 76, 26, net >= 0 ? C.green : C.red, { weight: 700 });
 
-  const tableTop = rewardY + 108 + 50;
-  fillText(ctx, "CONSTRUCTORS CHAMPIONSHIP", pad, tableTop, 24, C.muted, { weight: 700 });
+  // flowing layout: every section advances a cursor and verdicts only draw if they fit
+  const footerReserve = 70;
+  let y = rewardY + 108 + 50;
+
+  fillText(ctx, "CONSTRUCTORS CHAMPIONSHIP", pad, y, 24, C.muted, { weight: 700 });
+  y += 46;
   const wccShown = aroundPlayer(wccRows, 2, 2);
-  standingsTable(ctx, pad, tableTop + 46, W - pad * 2, wccShown, 58, accent);
+  standingsTable(ctx, pad, y, W - pad * 2, wccShown, 58, accent);
+  y += wccShown.length * 58 + 58;
 
-  const wdcTop = tableTop + 46 + wccShown.length * 58 + 58;
-  fillText(ctx, "DRIVERS CHAMPIONSHIP", pad, wdcTop, 24, C.muted, { weight: 700 });
+  fillText(ctx, "DRIVERS CHAMPIONSHIP", pad, y, 24, C.muted, { weight: 700 });
+  y += 46;
   const wdcShown = aroundPlayer(wdcRows, 2, 2);
-  standingsTable(ctx, pad, wdcTop + 46, W - pad * 2, wdcShown, 56, accent);
+  standingsTable(ctx, pad, y, W - pad * 2, wdcShown, 56, accent);
+  y += wdcShown.length * 56 + 56;
 
-  const driverTop = wdcTop + 46 + wdcShown.length * 56 + 56;
-  fillText(ctx, "YOUR DRIVERS", pad, driverTop, 24, C.muted, { weight: 700 });
+  fillText(ctx, "YOUR DRIVERS", pad, y, 24, C.muted, { weight: 700 });
   myStandings.forEach(({ s, i }, idx) => {
     const d = driverById(s.driverId, state.season);
     const dx = pad + idx * ((W - pad * 2 - 16) / 2 + 8);
     const dw = (W - pad * 2 - 16) / 2;
-    roundRect(ctx, dx, driverTop + 44, dw, 84, 10);
+    roundRect(ctx, dx, y + 44, dw, 84, 10);
     ctx.fillStyle = C.panel;
     ctx.fill();
-    fillText(ctx, `P${i + 1}`, dx + 18, driverTop + 102, 26, i === 0 ? C.green : C.muted, { font: MONO, weight: 700 });
-    fillText(ctx, d?.name ?? s.driverId, dx + 70, driverTop + 95, 22, C.ink, { weight: 700 });
-    fillText(ctx, `${s.points} pts · ${s.dnfs} DNF`, dx + 70, driverTop + 116, 16, C.faint, { font: BODY, weight: 500 });
+    fillText(ctx, `P${i + 1}`, dx + 18, y + 102, 26, i === 0 ? C.green : C.muted, { font: MONO, weight: 700 });
+    fillText(ctx, d?.name ?? s.driverId, dx + 70, y + 95, 22, C.ink, { weight: 700 });
+    fillText(ctx, `${s.points} pts · ${s.dnfs} DNF`, dx + 70, y + 116, 16, C.faint, { font: BODY, weight: 500 });
   });
+  y += 44 + 84 + 34;
 
-  // driver verdicts — what they say about the owner
-  if (quotes && quotes.length > 0) {
-    const vy = driverTop + 152;
-    fillText(ctx, "DRIVER VERDICTS", pad, vy, 20, C.purple, { weight: 700 });
+  // paddock verdicts — drivers + staff; boxes are sized to their text and
+  // rows that would run past the footer are skipped instead of overcutting
+  if (quotes && quotes.length > 0 && y < H - footerReserve - 60) {
+    fillText(ctx, "PADDOCK VERDICTS", pad, y, 20, C.purple, { weight: 700 });
+    y += 34;
     const bw = (W - pad * 2 - 16) / 2;
-    quotes.slice(0, 2).forEach((q, idx) => {
-      const bx = pad + idx * (bw + 16);
-      roundRect(ctx, bx, vy + 14, bw, 118, 10);
-      ctx.fillStyle = C.panel2;
-      ctx.fill();
-      fillText(ctx, q.shortName.toUpperCase(), bx + 16, vy + 40, 15, C.yellow, { font: BODY, weight: 700 });
-      let lines = wrapText(ctx, `“${q.text}”`, bw - 32, 14);
-      if (lines.length > 3) lines = lines.slice(0, 3).map((l, li, arr) => (li === arr.length - 1 ? `${l}…` : l));
-      lines.forEach((ln, li) => fillText(ctx, ln, bx + 16, vy + 62 + li * 19, 14, C.ink, { font: BODY, weight: 400 }));
-    });
+    for (let i = 0; i < quotes.length; i += 2) {
+      const pair = quotes.slice(i, i + 2);
+      const linesArr = pair.map((q) => clampLines(wrapText(ctx, `“${q.text}”`, bw - 32, 14), 4));
+      const maxLines = Math.max(...linesArr.map((l) => l.length));
+      const bh = 52 + maxLines * 19;
+      if (y + bh > H - footerReserve) break;
+      pair.forEach((q, idx) => {
+        const bx = pad + idx * (bw + 16);
+        roundRect(ctx, bx, y, bw, bh, 10);
+        ctx.fillStyle = C.panel2;
+        ctx.fill();
+        fillText(ctx, q.shortName.toUpperCase(), bx + 16, y + 26, 15, C.yellow, { font: BODY, weight: 700 });
+        linesArr[idx].forEach((ln, li) => fillText(ctx, ln, bx + 16, y + 48 + li * 19, 14, C.ink, { font: BODY, weight: 400 }));
+      });
+      y += bh + 14;
+    }
   }
 
   fillText(ctx, "F1 OWNER — SEASON REPORT", W / 2, H - 36, 20, C.faint, { weight: 600, font: BODY, align: "center" });
@@ -377,16 +396,18 @@ function drawLandscape(
   fillText(ctx, `NET FLOW ${money(net)}`, pad + cardW + 32, 740, 26, net >= 0 ? C.green : C.red, { weight: 700 });
   fillText(ctx, `INCOME ${money(income)}  ·  SPEND ${money(spend)}`, pad + cardW + 32, 692, 17, C.faint, { font: BODY, weight: 600 });
 
-  // driver verdicts — bottom-left free zone
+  // paddock verdicts — bottom-left free zone; stop before the footer instead of overcutting
   if (quotes && quotes.length > 0) {
     let qy = 806;
-    fillText(ctx, "DRIVER VERDICTS", pad, qy, 20, C.purple, { weight: 700 });
+    fillText(ctx, "PADDOCK VERDICTS", pad, qy, 20, C.purple, { weight: 700 });
     qy += 32;
-    for (const q of quotes.slice(0, 2)) {
+    const limitY = H - 60;
+    for (const q of quotes.slice(0, 3)) {
+      const lines = clampLines(wrapText(ctx, `“${q.text}”`, 680, 15), 3);
+      const need = 22 + lines.length * 21 + 12;
+      if (qy + need > limitY) break;
       fillText(ctx, q.shortName.toUpperCase(), pad, qy, 15, C.yellow, { font: BODY, weight: 700 });
       qy += 22;
-      let lines = wrapText(ctx, `“${q.text}”`, 680, 15);
-      if (lines.length > 2) lines = lines.slice(0, 2).map((l, li, arr) => (li === arr.length - 1 ? `${l}…` : l));
       for (const ln of lines) {
         fillText(ctx, ln, pad, qy, 15, C.muted, { font: BODY, weight: 400 });
         qy += 21;

@@ -360,6 +360,12 @@ function pushRaceNews(state: SimulationState, weekend: RaceWeekendResult) {
 // ---------------------------------------------------------------------------
 // News interactions
 
+const CHAT_LABELS: Record<string, string> = {
+  "chat-support": "Backed him publicly",
+  "chat-promise": "Promised upgrades",
+  "chat-tough": "Tough love",
+};
+
 export function resolveNewsAction(state: SimulationState, newsId: string, action: string) {
   const item = state.news.find((n) => n.id === newsId);
   if (!item || item.resolved) return;
@@ -376,12 +382,18 @@ export function resolveNewsAction(state: SimulationState, newsId: string, action
   // Driver conversation responses (from the news feed or Team Management).
   if (action.startsWith("chat-")) {
     const driverId = item.options?.find((o) => o.action === action)?.payload;
-    if (driverId) applyChatResponse(state, driverId, action);
     const ds = t.drivers.find((x) => x.driverId === driverId);
+    const before = ds ? { morale: ds.morale, confidence: ds.confidence, frustration: ds.frustration } : null;
+    if (driverId) applyChatResponse(state, driverId, action);
     item.resolved = true;
     item.options = [];
-    if (ds) {
-      item.body += `\n\nYou answered. Morale ${ds.morale}, confidence ${ds.confidence}, frustration ${ds.frustration}.`;
+    if (ds && before) {
+      const delta = (k: "morale" | "confidence" | "frustration") => {
+        const d = ds[k] - before[k];
+        return `${k} ${d > 0 ? "+" : ""}${d}`;
+      };
+      const label = CHAT_LABELS[action] ?? "You responded";
+      item.body += `\n\n${label} — ${delta("morale")} · ${delta("confidence")} · ${delta("frustration")}.\nNow: morale ${ds.morale} · confidence ${ds.confidence} · frustration ${ds.frustration}.`;
     }
     return;
   }

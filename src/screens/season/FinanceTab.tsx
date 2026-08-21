@@ -2,6 +2,30 @@ import { useState } from "react";
 import type { FinancialTransaction, SimulationState } from "@/simulation/types";
 import { Card, Modal, Money } from "@/ui/kit";
 
+const CAT_DOT: Record<string, string> = {
+  sponsor: "bg-positive",
+  prize: "bg-caution",
+  salary: "bg-signal",
+  staff: "bg-signal",
+  operations: "bg-signal",
+  supplier: "bg-telemetry",
+  development: "bg-telemetry",
+  testing: "bg-telemetry",
+  other: "bg-hairline",
+};
+
+const CAT_LABEL: Record<string, string> = {
+  sponsor: "Sponsor payment",
+  prize: "Prize money",
+  salary: "Driver wages",
+  staff: "Staff wages",
+  operations: "Team operations",
+  supplier: "Supplier / engine lease",
+  development: "Development project",
+  testing: "Testing programme",
+  other: "Other",
+};
+
 export function FinanceTab({ state }: { state: SimulationState }) {
   const t = state.team!;
   const [selected, setSelected] = useState<FinancialTransaction | null>(null);
@@ -68,23 +92,35 @@ export function FinanceTab({ state }: { state: SimulationState }) {
           </div>
         </Card>
         <Card title="Ledger" right={<span className="text-[10px] uppercase tracking-wider text-ink-faint">newest first</span>}>
-          <div className="grid grid-cols-[3.2rem_1fr_4.5rem] gap-2 border-b border-hairline pb-1 text-[10px] font-semibold uppercase tracking-widest text-ink-faint">
+          <div className="mb-2 flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-ink-faint">
+            <span className="flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-positive" />Sponsor</span>
+            <span className="flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-caution" />Prize</span>
+            <span className="flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-signal" />Wages & ops</span>
+            <span className="flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-telemetry" />Dev & supplier</span>
+            <span className="flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-hairline" />Other</span>
+          </div>
+          <div className="grid grid-cols-[3.6rem_1fr_auto_5rem] gap-2 border-b border-hairline pb-1 text-[10px] font-semibold uppercase tracking-widest text-ink-faint">
             <span>Weekend</span>
             <span>Detail</span>
+            <span />
             <span className="text-right">Amount</span>
           </div>
-          <div className="max-h-96 divide-y divide-hairline/60 overflow-auto">
+          <div className="max-h-96 divide-y divide-hairline/60 overflow-auto pr-1 [scrollbar-gutter:stable]">
             {[...t.history].reverse().map((h, i) => {
               const gp = state.calendar[h.round - 1]?.grandPrix;
               return (
                 <div
                   key={i}
                   onClick={() => h.detail && setSelected(h)}
-                  className={`group grid grid-cols-[3.2rem_1fr_4.5rem] items-center gap-2 py-1 text-xs ${
+                  className={`group grid grid-cols-[3.6rem_1fr_auto_5rem] items-center gap-2 py-1 text-xs ${
                     h.detail ? "cursor-pointer hover:bg-raised/40" : ""
                   }`}
                 >
-                  <span className="tabular text-ink-faint" title={`Round ${h.round}${gp ? ` — ${gp}` : ""}`}>
+                  <span
+                    className="flex items-center gap-1.5 tabular text-ink-faint"
+                    title={`${CAT_LABEL[h.category] ?? h.category} · Round ${h.round}${gp ? ` — ${gp}` : ""}`}
+                  >
+                    <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${CAT_DOT[h.category] ?? "bg-hairline"}`} />
                     R{h.round}
                   </span>
                   <span className="min-w-0 truncate text-ink-soft">{h.label}</span>
