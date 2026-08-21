@@ -136,7 +136,7 @@ export default function TestingScreen({ state, onRunTest, onStartSeason }: Props
         </Card>
       </div>
 
-      <div className="fixed inset-x-3 bottom-3 z-40 flex items-center justify-between gap-3">
+      <div className="fixed inset-x-3 bottom-3 z-40 flex items-center justify-end gap-3">
         <Button onClick={onStartSeason}>Start the Season →</Button>
       </div>
     </div>

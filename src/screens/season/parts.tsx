@@ -35,7 +35,7 @@ function attendanceFor(track: Track): number {
   return Math.round(raw / 1000) * 1000;
 }
 
-export function NextRaceCard({ track }: { track: Track }) {
+export function NextRaceCard({ track, round }: { track: Track; round?: number }) {
   const weatherNote =
     track.characteristics.weatherRisk > 65
       ? "High weather risk — strategy will matter."
@@ -44,7 +44,7 @@ export function NextRaceCard({ track }: { track: Track }) {
         : "Low weather risk.";
   const distanceKm = track.laps * track.lengthKm;
   return (
-    <Card title={`Next up — ${track.grandPrix}`}>
+    <Card title={`Next up — R${round ?? "?"} · ${track.grandPrix}`}>
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div className="min-w-0 flex-1">
           <div className="font-display text-2xl font-bold">{track.name}</div>
@@ -79,26 +79,33 @@ export function NextRaceCard({ track }: { track: Track }) {
             ))}
           </div>
         </div>
-        <div className="flex aspect-[4/3] h-36 shrink-0 items-center justify-center overflow-hidden rounded-sm bg-white p-2 md:h-44">
-          <Img
-            src={track.image}
-            alt={`${track.name} circuit layout`}
-            fallback={<span className="text-[10px] text-ink-faint">Layout</span>}
-            className="max-h-full max-w-full object-contain"
-          />
+        <div className="w-full shrink-0 md:w-auto">
+          <div className="flex aspect-[4/3] w-full items-center justify-center overflow-hidden rounded-sm bg-white p-2 md:h-44 md:w-auto">
+            <Img
+              src={track.image}
+              alt={`${track.name} circuit layout`}
+              fallback={<span className="text-[10px] text-ink-faint">Layout</span>}
+              className="max-h-full max-w-full object-contain"
+            />
+          </div>
+          <div className="mt-1 text-center text-[10px] uppercase tracking-widest text-ink-faint">
+            R{round ?? "?"} circuit map
+          </div>
         </div>
       </div>
     </Card>
   );
 }
 
-export function StandingsCard({ state, rows = 10 }: { state: SimulationState; rows?: number }) {
+export function StandingsCard({ state, rows }: { state: SimulationState; rows?: number }) {
   const t = state.team!;
+  const teams = rows ? state.standingsConstructors.slice(0, rows) : state.standingsConstructors;
+  const drivers = rows ? state.standingsDrivers.slice(0, rows) : state.standingsDrivers;
   return (
-    <Card title="Championship" right={<Tag tone="telemetry">WCC / WDC</Tag>}>
+    <Card title="Championship" right={<Tag tone="telemetry">WCC / WDC · full grid</Tag>}>
       <div className="grid gap-4 sm:grid-cols-2">
-        <div className="divide-y divide-hairline/60">
-          {state.standingsConstructors.slice(0, rows).map((s, i) => (
+        <div className="max-h-96 divide-y divide-hairline/60 overflow-auto pr-3 [scrollbar-gutter:stable]">
+          {teams.map((s, i) => (
             <div key={s.teamId} className={`flex items-center gap-2 py-1 text-sm ${s.teamId === t.constructorId ? "font-semibold text-ink" : "text-ink-soft"}`}>
               <span className="w-5 tabular text-ink-faint">{i + 1}</span>
               <span className="min-w-0 flex-1 truncate">{constructorById(s.teamId, state.season)?.name ?? s.teamId}</span>
@@ -106,8 +113,8 @@ export function StandingsCard({ state, rows = 10 }: { state: SimulationState; ro
             </div>
           ))}
         </div>
-        <div className="divide-y divide-hairline/60">
-          {state.standingsDrivers.slice(0, rows).map((s, i) => {
+        <div className="max-h-96 divide-y divide-hairline/60 overflow-auto pr-3 [scrollbar-gutter:stable]">
+          {drivers.map((s, i) => {
             const mine = s.driverId === t.driver1Id || s.driverId === t.driver2Id;
             return (
               <div key={s.driverId} className={`flex items-center gap-2 py-1 text-sm ${mine ? "font-semibold text-ink" : "text-ink-soft"}`}>

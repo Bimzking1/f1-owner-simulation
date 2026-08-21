@@ -1,11 +1,15 @@
 import { useState, type ReactNode } from "react";
 import type {
   DifficultyId,
+  EngineSpec,
   GameLengthId,
+  GearboxSpec,
+  OwnerProfile,
   Philosophy,
   SeasonId,
   TeamOrders,
   TeamState,
+  TechPackageSpec,
 } from "@/simulation/types";
 import {
   constructorsBySeason,
@@ -24,13 +28,20 @@ import {
   sponsorById,
 } from "@/data";
 import { DIFFICULTIES, PHILOSOPHIES } from "@/data/config";
-import { Bar, Button, Card, Img, Money, Ovr, Rating, Tag } from "@/ui/kit";
+import { Bar, Button, Card, Img, InfoTip, Money, Ovr, Rating, Tag } from "@/ui/kit";
+import { useHoldOpen } from "@/ui/hooks";
 import { driverImage } from "@/data/assets";
+import {
+  DEPARTMENT_INFO,
+  MECHANIC_TIER_INFO,
+  SENIORITY_INFO,
+} from "@/data/staff";
 
 export interface SetupConfig {
   season: SeasonId;
   difficulty: DifficultyId;
   gameLength: GameLengthId;
+  owner: OwnerProfile;
 }
 
 interface Props {
@@ -78,7 +89,6 @@ export default function SetupScreen({ cfg, onStart, onBack }: Props) {
     engineerIds.reduce((a, id) => a + (engineerById(id)?.cost ?? 0), 0) +
     mechanicIds.reduce((a, id) => a + (mechanicById(id)?.cost ?? 0), 0);
   const staffWeekly = totalRounds > 0 ? Math.round((staffCost / totalRounds) * 100) / 100 : 0;
-  const sponsorRaceIncome = sponsorIds.reduce((a, id) => a + (sponsorById(id)?.racePayment ?? 0), 0);
   const remaining = Math.round((startCash - equipmentCost) * 100) / 100;
 
   const d1 = driverById(driver1Id, cfg.season);
@@ -126,6 +136,7 @@ export default function SetupScreen({ cfg, onStart, onBack }: Props) {
     const c = teams.find((x) => x.id === constructorId)!;
     return {
       constructorId,
+      owner: cfg.owner,
       philosophy,
       teamOrders: orders,
       driver1Id,
@@ -318,11 +329,12 @@ export default function SetupScreen({ cfg, onStart, onBack }: Props) {
       {/* TECHNICAL */}
       {step === "Technical" && (
         <div className="grid gap-4 lg:grid-cols-3">
-          <Card title="Engine">
+          <Card title="Engine" right={<span className="text-[10px] uppercase tracking-wider text-ink-faint">hover / hold ⓘ for details</span>}>
             <div className="grid gap-2">
               {engines.map((e) => (
                 <TechPick key={e.id} active={engineId === e.id} onClick={() => setEngineId(e.id)} title={e.name}
-                  stats={[{ label: "Power", value: e.power }, { label: "Rel", value: e.reliability }]} extra={[e.status, e.supplier]} cost={costOf(e.cost)} />
+                  stats={[{ label: "Power", value: e.power }, { label: "Rel", value: e.reliability }]} extra={[e.status, e.supplier]} cost={costOf(e.cost)}
+                  tip={engineTip(e)} />
               ))}
             </div>
           </Card>
@@ -330,7 +342,8 @@ export default function SetupScreen({ cfg, onStart, onBack }: Props) {
             <div className="grid gap-2">
               {gearboxes.map((g) => (
                 <TechPick key={g.id} active={gearboxId === g.id} onClick={() => setGearboxId(g.id)} title={g.name}
-                  stats={[{ label: "Perf", value: g.performance }, { label: "Rel", value: g.reliability }]} cost={costOf(g.cost)} />
+                  stats={[{ label: "Perf", value: g.performance }, { label: "Rel", value: g.reliability }]} cost={costOf(g.cost)}
+                  tip={gearboxTip(g)} />
               ))}
             </div>
           </Card>
@@ -338,7 +351,8 @@ export default function SetupScreen({ cfg, onStart, onBack }: Props) {
             <div className="grid gap-2">
               {techs.map((t) => (
                 <TechPick key={t.id} active={techId === t.id} onClick={() => setTechId(t.id)} title={t.name}
-                  stats={[{ label: "Aero", value: t.aero }, { label: "Chassis", value: t.chassis }, { label: "Rel", value: t.reliability }]} cost={costOf(t.cost)} />
+                  stats={[{ label: "Aero", value: t.aero }, { label: "Chassis", value: t.chassis }, { label: "Rel", value: t.reliability }]} cost={costOf(t.cost)}
+                  tip={techTip(t)} />
               ))}
             </div>
           </Card>
@@ -348,35 +362,44 @@ export default function SetupScreen({ cfg, onStart, onBack }: Props) {
       {/* STAFF */}
       {step === "Staff" && (
         <div className="grid gap-4 lg:grid-cols-2">
-          <Card title={`Engineers (${engineerIds.length}/3 minimum)`}>
+          <Card title={`Engineers (${engineerIds.length}/3 minimum)`} right={<span className="text-[10px] uppercase tracking-wider text-ink-faint">hold ⓘ for details</span>}>
             <div className="grid gap-2">
               {engineerPool.map((e) => {
                 const hired = engineerIds.includes(e.id);
+                const sen = engineerSeniority(e);
                 return (
-                  <button
+                  <StaffCard
                     key={e.id}
-                    type="button"
+                    hired={hired}
                     disabled={!hired && engineerIds.length >= 5}
                     onClick={() => setEngineerIds(hired ? engineerIds.filter((x) => x !== e.id) : [...engineerIds, e.id])}
-                    className={`flex items-center gap-3 rounded-md border p-2 text-left transition ${
-                      hired ? "border-positive/50 bg-positive/10" : "border-hairline bg-surface hover:border-ink-faint"
-                    }`}
-                  >
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                        <span className="font-display font-bold">{e.name}</span>
-                        <Tag tone={engineerSeniority(e).tone}>{engineerSeniority(e).label}</Tag>
-                      </div>
-                      <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-ink-soft">
-                        <Tag tone="telemetry">{engineerRole(e)}</Tag>
+                    name={e.name}
+                    cost={e.cost}
+                    badge={<SeniorityBadge tone={sen.tone} label={sen.label} />}
+                    meta={<Tag tone="ink">{engineerRole(e)}</Tag>}
+                    ratings={
+                      <>
                         <Rating label="Expertise" value={e.expertise} />
                         <Rating label="Innov" value={e.innovation} />
                         <Rating label="Dev speed" value={e.developmentSpeed} />
                         <Rating label="Rel" value={e.reliabilityFocus} />
-                      </div>
-                    </div>
-                    <Money value={e.cost} className="text-sm font-bold" />
-                  </button>
+                      </>
+                    }
+                    tip={
+                      <>
+                        <p className="mb-2">
+                          <span className="font-semibold uppercase tracking-wider text-telemetry">{engineerRole(e)}</span>
+                          {" — "}
+                          {DEPARTMENT_INFO[e.department] ?? "Specialist engineering department."}
+                        </p>
+                        <p>
+                          <span className="font-semibold uppercase tracking-wider text-elite">{sen.label}</span>
+                          {" — "}
+                          {SENIORITY_INFO[sen.label]}
+                        </p>
+                      </>
+                    }
+                  />
                 );
               })}
             </div>
@@ -385,30 +408,38 @@ export default function SetupScreen({ cfg, onStart, onBack }: Props) {
             <div className="grid gap-2">
               {mechanicPool.map((m) => {
                 const hired = mechanicIds.includes(m.id);
+                const tier = mechanicTier(m);
                 return (
-                  <button
+                  <StaffCard
                     key={m.id}
-                    type="button"
+                    hired={hired}
                     disabled={!hired && mechanicIds.length >= 5}
                     onClick={() => setMechanicIds(hired ? mechanicIds.filter((x) => x !== m.id) : [...mechanicIds, m.id])}
-                    className={`flex items-center gap-3 rounded-md border p-2 text-left transition ${
-                      hired ? "border-positive/50 bg-positive/10" : "border-hairline bg-surface hover:border-ink-faint"
-                    }`}
-                  >
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                        <span className="font-display font-bold">{m.name}</span>
-                        <Tag tone={mechanicTier(m).tone}>{mechanicTier(m).label}</Tag>
-                      </div>
-                      <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-ink-soft">
-                        <Tag tone="telemetry">Pit crew</Tag>
+                    name={m.name}
+                    cost={m.cost}
+                    badge={<SeniorityBadge tone={tier.tone} label={tier.label} />}
+                    meta={<Tag tone="ink">Pit crew</Tag>}
+                    ratings={
+                      <>
                         <Rating label="Pit" value={`${m.pitStop.toFixed(2)}s`} rank={100 - Math.round((m.pitStop - 2) * 40)} />
                         <Rating label="Error" value={`${m.errorChance}%`} rank={100 - Math.round(m.errorChance * 10)} />
                         <Rating label="Repair" value={m.repairEfficiency} />
-                      </div>
-                    </div>
-                    <Money value={m.cost} className="text-sm font-bold" />
-                  </button>
+                      </>
+                    }
+                    tip={
+                      <>
+                        <p className="mb-2">
+                          Pit crew execute your race stops: pit time sets stop duration, error chance is the odds of a
+                          botched stop (slow getaway, unsafe release), repair efficiency speeds up in-race damage fixes.
+                        </p>
+                        <p>
+                          <span className="font-semibold uppercase tracking-wider text-elite">{tier.label}</span>
+                          {" — "}
+                          {MECHANIC_TIER_INFO[tier.label]}
+                        </p>
+                      </>
+                    }
+                  />
                 );
               })}
             </div>
@@ -515,7 +546,22 @@ export default function SetupScreen({ cfg, onStart, onBack }: Props) {
 
       {/* REVIEW */}
       {step === "Review" && (
-        <div className="grid gap-4 lg:grid-cols-2">
+        <>
+          <div className="flex items-center gap-3 rounded-md border border-hairline bg-raised/30 p-3">
+            {cfg.owner.image ? (
+              <Img src={cfg.owner.image} alt={cfg.owner.name} className="h-14 w-14 shrink-0 rounded-full object-cover" />
+            ) : (
+              <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-signal/15 font-display text-xl font-bold text-signal">
+                {(cfg.owner.name || "O").charAt(0).toUpperCase()}
+              </span>
+            )}
+            <div className="min-w-0">
+              <div className="text-[10px] font-semibold uppercase tracking-widest text-ink-faint">Team principal</div>
+              <div className="truncate font-display text-lg font-bold leading-tight">{cfg.owner.name}</div>
+              <div className="text-[11px] text-ink-faint">The paddock calls you “{cfg.owner.callout}”</div>
+            </div>
+          </div>
+          <div className="grid gap-4 lg:grid-cols-2">
           <Card title="Team">
             {ctor && (
               <div className="mb-3">
@@ -548,6 +594,7 @@ export default function SetupScreen({ cfg, onStart, onBack }: Props) {
               </div>
             )}
             <div className="space-y-1 text-sm">
+              <Row k="Principal" v={cfg.owner.callout} />
               <Row k="Constructor" v={ctor?.name ?? "—"} />
               <Row
                 k="Seat 1"
@@ -559,14 +606,12 @@ export default function SetupScreen({ cfg, onStart, onBack }: Props) {
                 v={d2 ? `${d2.name} (${d2.teamId === constructorId ? "your team" : "from " + d2.teamId}, $${d2.salary}M/yr)` : "—"}
                 thumb={d2 ? <Img src={driverImage(d2.id, cfg.season)} alt={d2.shortName} className="h-8 w-8 rounded-sm object-cover" /> : undefined}
               />
-              <Row k="Driver wages" v={d1 && d2 ? `$${d1.salary + d2.salary}M/yr` : "—"} />
               <Row k="Engine" v={eng?.name ?? "—"} />
               <Row k="Gearbox" v={gb?.name ?? "—"} />
               <Row k="Package" v={tech?.name ?? "—"} />
               <Row k="Philosophy" v={philosophy} />
               <Row k="Orders" v={orders} />
               <Row k="Staff" v={`${engineerIds.length} engineers, ${mechanicIds.length} mechanics`} />
-              <Row k="Sponsors" v={sponsorIds.map((id) => sponsorById(id)?.name).join(", ") || "none"} />
             </div>
             <p className="mt-3 text-[11px] leading-relaxed text-ink-faint">
               The grid rebalances at season start: vacancies created by cross-team signings are filled at random by the
@@ -577,17 +622,70 @@ export default function SetupScreen({ cfg, onStart, onBack }: Props) {
             <div className="space-y-2 text-sm">
               <Row k="Starting budget" v={money(startCash)} />
               <Row k="Equipment (one-time)" v={`-${money(equipmentCost)}`} />
-              <Row k="Driver wages" v={d1 && d2 ? `${money(d1.salary + d2.salary)}/yr · paid per weekend` : "—"} />
-              <Row k="Staff wages" v={`${money(staffCost)}/yr · ${money(staffWeekly)}/weekend`} />
-              <Row k="Sponsors" v={sponsorIds.length > 0 ? `${money(sponsorRaceIncome)}/race income, no sign fee` : "none"} />
+              <Row k="Driver wages" v={d1 && d2 ? `${money((d1.salary + d2.salary) / totalRounds)}/weekend (${money(d1.salary + d2.salary)}/season)` : "—"} />
+              <Row k="Staff wages" v={`${money(staffWeekly)}/weekend`} />
               <Row k="Cash at season start" v={money(remaining)} bold />
             </div>
             <div className="mt-4 text-xs text-ink-faint">
               Difficulty {diff.label} · {cfg.season === 2013 ? "2013, 19 races" : "2025, 24 races + sprints"} · detail level{" "}
               {cfg.gameLength} · driver & staff wages paid per weekend; parts (engine, gearbox, tech) bought up front
             </div>
+            <div className="mt-3 border-t border-hairline pt-3">
+              <div className="mb-2 flex items-center justify-between">
+                <span className="font-display text-sm font-bold uppercase tracking-wider">Sponsors</span>
+                <span className="text-[11px] text-ink-faint">{sponsorIds.length}/5 slots</span>
+              </div>
+              {sponsorIds.length === 0 ? (
+                <p className="text-xs text-ink-faint">No sponsors signed yet.</p>
+              ) : (
+                <div className="space-y-2">
+                  {sponsorIds.map((id) => {
+                    const sp = sponsorById(id);
+                    if (!sp) return null;
+                    const seasonTotal = Math.round((sp.racePayment * totalRounds + sp.bonus) * 100) / 100;
+                    return (
+                      <div key={id} className="rounded-md border border-hairline bg-raised/30 p-2">
+                        <div className="flex items-center gap-3">
+                          <Img src={sp.image} alt={sp.name} className="h-10 w-20 shrink-0 rounded-sm bg-white object-contain p-1" />
+                          <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
+                            <span className="font-display text-sm font-bold">{sp.name}</span>
+                            <Tag tone={sp.tier === "title" ? "elite" : sp.tier === "major" ? "telemetry" : "ink"}>{sp.tier}</Tag>
+                          </div>
+                          <div className="ml-auto hidden shrink-0 text-right sm:block">
+                            <div className="text-[10px] uppercase tracking-widest text-ink-faint">Per season</div>
+                            <div className="tabular text-sm font-bold text-positive">{money(seasonTotal)}</div>
+                          </div>
+                        </div>
+                        <div className="mt-2 space-y-0.5 text-xs">
+                          <div className="text-ink-soft">Pays {money(sp.racePayment)}/race</div>
+                          <div className="text-ink-soft">Bonus +{money(sp.bonus)} if objective met</div>
+                          <div className="pt-1 text-[11px] leading-snug text-ink-faint">Requirement: {sp.objectiveTextEnjoyer}</div>
+                          <div className="text-[11px] text-ink-faint">Length: full season ({totalRounds} races) · terminable anytime</div>
+                        </div>
+                        <div className="mt-2 border-t border-hairline pt-2 text-right sm:hidden">
+                          <span className="text-[10px] uppercase tracking-widest text-ink-faint">Per season </span>
+                          <span className="tabular text-sm font-bold text-positive">{money(seasonTotal)}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  <div className="flex items-center justify-between border-t border-hairline pt-2 text-sm">
+                    <span className="text-ink-faint">Total sponsor income per season</span>
+                    <span className="tabular font-bold text-positive">
+                      {money(
+                        sponsorIds.reduce((a, id) => {
+                          const sp = sponsorById(id);
+                          return a + (sp ? sp.racePayment * totalRounds + sp.bonus : 0);
+                        }, 0),
+                      )}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
           </Card>
-        </div>
+          </div>
+        </>
       )}
 
       <div className="fixed inset-x-3 bottom-3 z-40 flex items-center justify-between gap-3">
@@ -629,22 +727,192 @@ const MECHANIC_IDS: Record<SeasonId, string[]> = {
   2025: ["mech-budget25", "mech-standard25", "mech-elite25"],
 };
 
-function TechPick({ active, onClick, title, stats, extra, cost }: { active: boolean; onClick: () => void; title: string; stats: { label: string; value: number }[]; extra?: string[]; cost: number }) {
+function TechPick({ active, onClick, title, stats, extra, cost, tip }: { active: boolean; onClick: () => void; title: string; stats: { label: string; value: number }[]; extra?: string[]; cost: number; tip?: ReactNode }) {
+  const [open, setOpen] = useState(false);
+  const hold = useHoldOpen(() => setOpen(true));
   return (
-    <button
-      type="button"
+    <div
+      role="button"
+      tabIndex={0}
       onClick={onClick}
-      className={`flex items-center justify-between gap-2 rounded-md border p-2 text-left transition ${active ? "border-signal bg-signal/10" : "border-hairline bg-surface hover:border-ink-faint"}`}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onClick();
+        }
+      }}
+      {...(tip ? hold : {})}
+      className={`flex cursor-pointer items-center justify-between gap-2 rounded-md border p-2 text-left transition ${active ? "border-signal bg-signal/10" : "border-hairline bg-surface hover:border-ink-faint"}`}
     >
       <div className="min-w-0">
-        <div className="font-display text-sm font-bold">{title}</div>
+        <div className="flex items-center gap-1.5">
+          <span className="font-display text-sm font-bold">{title}</span>
+          {tip && (
+            <InfoTip title={title} open={open} onOpenChange={setOpen}>
+              {tip}
+            </InfoTip>
+          )}
+        </div>
         <div className="mt-0.5 flex flex-wrap gap-x-2 gap-y-0.5 text-[11px] text-ink-soft">
           {stats.map((s) => <Rating key={s.label} label={s.label} value={s.value} />)}
           {extra?.map((x) => <span key={x} className="text-ink-faint">{x}</span>)}
         </div>
       </div>
       <Money value={cost} className="shrink-0 text-sm font-bold" />
-    </button>
+    </div>
+  );
+}
+
+/** Seniority / tier badge — outlined diamond pill, visually distinct from role Tags. */
+function SeniorityBadge({ tone, label }: { tone: "ink" | "telemetry" | "elite" | "caution"; label: string }) {
+  const cls = {
+    elite: "border-elite/60 bg-elite/10 text-elite",
+    telemetry: "border-telemetry/50 bg-telemetry/10 text-telemetry",
+    caution: "border-caution/50 bg-caution/10 text-caution",
+    ink: "border-hairline bg-transparent text-ink-faint",
+  }[tone];
+  return (
+    <span className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-px text-[9px] font-bold uppercase tracking-widest ${cls}`}>
+      ◆ {label}
+    </span>
+  );
+}
+
+function StaffCard({
+  hired,
+  disabled,
+  onClick,
+  name,
+  cost,
+  badge,
+  meta,
+  ratings,
+  tip,
+}: {
+  hired: boolean;
+  disabled: boolean;
+  onClick: () => void;
+  name: string;
+  cost: number;
+  badge: ReactNode;
+  meta: ReactNode;
+  ratings: ReactNode;
+  tip: ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  const hold = useHoldOpen(() => setOpen(true));
+  return (
+    <div
+      role="button"
+      tabIndex={disabled ? -1 : 0}
+      aria-disabled={disabled}
+      onClick={() => !disabled && onClick()}
+      onKeyDown={(e) => {
+        if (!disabled && (e.key === "Enter" || e.key === " ")) {
+          e.preventDefault();
+          onClick();
+        }
+      }}
+      {...hold}
+      className={`rounded-md border p-2 text-left transition ${
+        hired
+          ? "border-positive/50 bg-positive/10"
+          : disabled
+            ? "cursor-not-allowed border-hairline bg-surface opacity-50"
+            : "cursor-pointer border-hairline bg-surface hover:border-ink-faint"
+      }`}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <span className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1">
+          <span className="font-display font-bold">{name}</span>
+          <InfoTip title={name} open={open} onOpenChange={setOpen}>
+            {tip}
+          </InfoTip>
+        </span>
+        <Money value={cost} className="shrink-0 text-sm font-bold" />
+      </div>
+      <div className="mt-1 flex flex-wrap items-center gap-1.5">
+        {badge}
+        {meta}
+      </div>
+      <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-ink-soft">{ratings}</div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Tooltip content for the Technical step (desktop hover / mobile long-press)
+
+function engineTip(e: EngineSpec): ReactNode {
+  const works = e.status === "works";
+  return (
+    <span className="block space-y-2">
+      <span className="block">{e.description}</span>
+      <span className="block">
+        <span className="font-semibold uppercase tracking-wider text-positive">Works vs customer — </span>
+        a <b>works</b> deal makes you the supplier's flagship team: latest-spec hardware, first access to upgrades and
+        factory engineers at the track. A <b>customer</b> deal buys the same engine family off the shelf.
+      </span>
+      <span className="block">
+        <span className="font-semibold text-positive">Advantages of this deal: </span>
+        {works
+          ? `maximum power (${e.power}) and efficiency (${e.efficiency}), upgrade priority, direct supplier support.`
+          : `about half the lease cost ($${e.cost}M), proven spec, frees budget for aero, staff and development.`}
+      </span>
+      <span className="block">
+        <span className="font-semibold text-caution">Disadvantages: </span>
+        {works
+          ? `the most expensive lease on the market ($${e.cost}M) — a bad season hurts twice.`
+          : `a few points less power/efficiency than the works unit; the supplier's upgrade program reaches you last.`}
+      </span>
+    </span>
+  );
+}
+
+function gearboxTip(g: GearboxSpec): ReactNode {
+  const kind = g.performance >= 92 ? "performance" : g.performance >= 85 ? "balanced" : "reliability";
+  return (
+    <span className="block space-y-2">
+      <span className="block">{g.description}</span>
+      <span className="block">
+        <span className="font-semibold text-positive">Strengths: </span>
+        {kind === "performance"
+          ? `fastest shift speed and acceleration out of corners (perf ${g.performance}).`
+          : kind === "balanced"
+            ? `good shift speed with strong durability (perf ${g.performance}, rel ${g.reliability}).`
+            : `almost unbreakable (rel ${g.reliability}) — fewer gearbox failures and replacements all season.`}
+      </span>
+      <span className="block">
+        <span className="font-semibold text-caution">Trade-offs: </span>
+        {kind === "performance"
+          ? `weakest reliability (${g.reliability}) — budget for replacements if you run this all year.`
+          : kind === "balanced"
+            ? `master of none: beaten on pace by the performance box, on toughness by the reliability box.`
+            : `slowest shifts (perf ${g.performance}) — you bleed time every single race.`}
+      </span>
+    </span>
+  );
+}
+
+function techTip(t: TechPackageSpec): ReactNode {
+  const tier = t.cost >= 10 ? "elite" : t.cost >= 5 ? "race" : "basic";
+  return (
+    <span className="block space-y-2">
+      <span className="block">{t.description}</span>
+      <span className="block">
+        <span className="font-semibold text-positive">What it sets: </span>
+        baseline aero ({t.aero}), chassis ({t.chassis}), reliability ({t.reliability}) and tire behavior ({t.tireBehavior})
+        before DNA and staff modifiers are applied.
+      </span>
+      <span className="block">
+        <span className="font-semibold text-caution">Consider: </span>
+        {tier === "elite"
+          ? `the full factory package — championship-level numbers, but $${t.cost}M up front leaves less cash for in-season development.`
+          : tier === "race"
+            ? `the sweet spot for most teams: real performance at a mid price ($${t.cost}M).`
+            : `a honest baseline ($${t.cost}M) — expect to rely on development windows and staff to close the gap.`}
+      </span>
+    </span>
   );
 }
 

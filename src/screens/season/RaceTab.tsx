@@ -37,9 +37,9 @@ export function RaceTab({ state, onRunRound }: Props) {
             </div>
           )}
         </Card>
-        {next && <NextRaceCard track={next} />}
         {last && <ResultCard weekend={last} season={state.season} />}
         {last && <WeekendClassification state={state} weekend={last} />}
+        {next && <NextRaceCard track={next} round={state.round + 1} />}
       </div>
       <div className="space-y-4">
         <Card title="Components">
@@ -122,7 +122,7 @@ function WeekendClassification({ state, weekend }: { state: SimulationState; wee
         </div>
       }
     >
-      <div className="max-h-80 divide-y divide-hairline/60 overflow-auto">
+      <div className="max-h-80 divide-y divide-hairline/60 overflow-auto pr-4 [scrollbar-gutter:stable]">
         {view === "quali" &&
           quali.map((q) => (
             <div key={q.driverId} className={`flex items-center gap-2 py-1 text-sm ${mine(q.driverId) ? "font-semibold text-ink" : "text-ink-soft"}`}>
@@ -169,7 +169,44 @@ function ResultCard({ weekend, season }: { weekend: RaceWeekendResult; season: n
       title={`Round ${weekend.round} — ${track?.grandPrix ?? weekend.trackId} result`}
       right={<Button small variant="ghost" onClick={() => setOpen(true)}>Replay</Button>}
     >
-      <div className="mb-3 grid grid-cols-2 gap-2 text-xs lg:grid-cols-4">
+      <div className="flex flex-col gap-3 lg:flex-row">
+        <div className="grid flex-1 gap-2 text-sm sm:grid-cols-2">
+          {weekend.playerEntries.map((p) => {
+            const d = driverById(p.driverId, season);
+            const grid = gridOf(p.driverId);
+            return (
+              <div key={p.driverId} className="flex items-center gap-2 rounded-md border border-hairline bg-raised/50 px-2 py-1.5">
+                <Img src={d ? driverImage(d.id, season) : ""} alt={d?.shortName ?? p.driverId} className="h-6 w-6 rounded-sm object-cover" />
+                <span className="min-w-0 flex-1 truncate">{d?.shortName ?? p.driverId}</span>
+                {grid != null && <span className="text-[10px] tabular text-ink-faint">Q{grid}</span>}
+                {p.dnf ? (
+                  <Tag tone="signal">DNF</Tag>
+                ) : (
+                  <span className={`tabular font-bold ${best === p.position ? "text-positive" : ""}`}>
+                    P{p.position} · {p.points} pts
+                  </span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+        {track && (
+          <div className="shrink-0 lg:w-44">
+            <div className="flex h-28 items-center justify-center overflow-hidden rounded-sm bg-white p-1.5">
+              <Img
+                src={track.image}
+                alt={`${track.name} circuit layout`}
+                fallback={<span className="text-[10px] text-ink-faint">Layout</span>}
+                className="max-h-full max-w-full object-contain"
+              />
+            </div>
+            <div className="mt-1 text-center text-[10px] uppercase tracking-widest text-ink-faint">
+              R{weekend.round} circuit map
+            </div>
+          </div>
+        )}
+      </div>
+      <div className="mt-3 mb-3 grid grid-cols-2 gap-2 text-xs lg:grid-cols-4">
         <div className="rounded-md border border-hairline bg-raised/40 p-2">
           <div className="text-[10px] font-semibold uppercase tracking-widest text-ink-faint">Fastest lap</div>
           {hl.fastest ? (
@@ -214,26 +251,6 @@ function ResultCard({ weekend, season }: { weekend: RaceWeekendResult; season: n
             <div className="mt-0.5 text-ink-faint">none</div>
           )}
         </div>
-      </div>
-      <div className="grid gap-2 text-sm sm:grid-cols-2">
-        {weekend.playerEntries.map((p) => {
-          const d = driverById(p.driverId, season);
-          const grid = gridOf(p.driverId);
-          return (
-            <div key={p.driverId} className="flex items-center gap-2 rounded-md border border-hairline bg-raised/50 px-2 py-1.5">
-              <Img src={d ? driverImage(d.id, season) : ""} alt={d?.shortName ?? p.driverId} className="h-6 w-6 rounded-sm object-cover" />
-              <span className="min-w-0 flex-1 truncate">{d?.shortName ?? p.driverId}</span>
-              {grid != null && <span className="text-[10px] tabular text-ink-faint">Q{grid}</span>}
-              {p.dnf ? (
-                <Tag tone="signal">DNF</Tag>
-              ) : (
-                <span className={`tabular font-bold ${best === p.position ? "text-positive" : ""}`}>
-                  P{p.position} · {p.points} pts
-                </span>
-              )}
-            </div>
-          );
-        })}
       </div>
       <div className="mt-3 flex flex-wrap gap-3 text-[11px] text-ink-faint">
         <span>Weather: {weekend.weather}</span>
@@ -328,7 +345,7 @@ function RaceResultReplay({ weekend, season, onClose }: { weekend: RaceWeekendRe
         </div>
         <div>
           <Card title="Race classification" pad={false}>
-            <div className="max-h-[26rem] divide-y divide-hairline/60 overflow-auto">
+            <div className="max-h-[26rem] divide-y divide-hairline/60 overflow-auto pr-2 [scrollbar-gutter:stable]">
               {weekend.race.map((r) => {
                 const d = driverById(r.driverId, season);
                 return (

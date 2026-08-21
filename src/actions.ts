@@ -3,7 +3,7 @@
 // Each takes a SimulationState and returns a user-facing message.
 // ============================================================================
 
-import type { Driver, DriverState, SimulationState, TestReport, TestType } from "@/simulation/types";
+import type { Driver, DriverBoost, DriverState, SimulationState, TestReport, TestType } from "@/simulation/types";
 import type { DevOption } from "@/simulation/systems";
 import {
   generateDevOptions,
@@ -17,6 +17,15 @@ import { driverById, engineerById, mechanicById, sponsorById } from "@/data";
 import { difficultyOf } from "./state";
 
 export type ActionResult = { ok: boolean; message: string };
+
+/** Move paddock trust after a decision; returns the delta for messaging. */
+function addTrust(t: SimulationState["team"], delta: number): number {
+  if (!t) return 0;
+  t.trust = Math.max(0, Math.min(100, (t.trust ?? 50) + delta));
+  return delta;
+}
+
+const trustNote = (delta: number) => (delta !== 0 ? ` Trust ${delta > 0 ? "+" : ""}${delta}.` : "");
 
 function msg(result: ActionResult, ok: boolean, message: string): ActionResult {
   result.ok = ok;
@@ -57,7 +66,7 @@ export function fireEngineer(state: SimulationState, engineerId: string): Action
     category: "staff",
     detail: `${eng.name} released.\nOne-time severance = 50% of the $${eng.cost}M seasonal salary = $${cost}M.`,
   });
-  return msg(result, true, `${eng.name} released (severance $${cost}M).`);
+  return msg(result, true, `${eng.name} released (severance $${cost}M).${trustNote(addTrust(t, -1))}`);
 }
 
 export function hireMechanic(state: SimulationState, mechanicId: string): ActionResult {
@@ -93,7 +102,7 @@ export function fireMechanic(state: SimulationState, mechanicId: string): Action
     category: "staff",
     detail: `${mech.name} released.\nOne-time severance = 50% of the $${mech.cost}M seasonal salary = $${cost}M.`,
   });
-  return msg(result, true, `${mech.name} released (severance $${cost}M).`);
+  return msg(result, true, `${mech.name} released (severance $${cost}M).${trustNote(addTrust(t, -1))}`);
 }
 
 export interface SwapQuote {
@@ -172,7 +181,7 @@ export function swapDriver(state: SimulationState, slot: 1 | 2, driverId: string
     fee: total,
     round: state.completedRounds + 1,
   };
-  return msg(result, true, `${target.name} signed ($${total}M).`);
+  return msg(result, true, `${target.name} signed ($${total}M).${trustNote(addTrust(t, -2))}`);
 }
 
 /** Refund the last driver swap before any race has been run (undo). */
@@ -227,7 +236,7 @@ export function signSponsor(state: SimulationState, sponsorId: string): ActionRe
     category: "sponsor",
     detail: `${spec.name} signed.\nNo up-front fee — pays $${spec.racePayment}M per race weekend.\nBonus: +$${Math.round(spec.bonus * 100) / 100}M if the objective is met.`,
   });
-  return msg(result, true, `${spec.name} signed. No up-front fee — pays per race.`);
+  return msg(result, true, `${spec.name} signed. No up-front fee — pays per race.${trustNote(addTrust(t, 1))}`);
 }
 
 function scheduleObjective(state: SimulationState, sponsorId: string, round: number) {
@@ -346,6 +355,204 @@ export function replaceEngine(state: SimulationState): ActionResult {
 }
 export function replaceGearbox(state: SimulationState): ActionResult {
   return doReplace(state, "gearbox");
+}
+
+// ---------------------------------------------------------------------------
+// Team management — owner interventions on driver morale (spec: owner tools)
+
+export type MgmtAction = "speech" | "bonus" | "fine" | "rant";
+
+export const MGMT_INFO: Record<MgmtAction, { label: string; cost: number; cooldown: number; desc: string }> = {
+  speech: { label: "Motivational speech", cost: 0, cooldown: 3, desc: "Rally the driver in front of the garage. Free, small morale + confidence boost." },
+  bonus: { label: "Performance bonus", cost: 2, cooldown: 5, desc: "A $2M cash sweetener paid now. Big morale + confidence boost." },
+  fine: { label: "Fine", cost: 1, cooldown: 6, desc: "Formally fine the driver — $1M lands in the team account. Resets frustration hard, hurts morale." },
+  rant: { label: "Private rant", cost: 0, cooldown: 4, desc: "Let them have it behind closed doors. Crushes frustration but damages morale and confidence." },
+};
+
+/** How each owner decision moves paddock trust. */
+const TRUST_DELTA: Record<MgmtAction, number> = {
+  speech: 1,
+  bonus: 2,
+  fine: -3,
+  rant: -4,
+};
+
+/** Rounds remaining before the action is available again (0 = ready). */
+export function mgmtCooldown(state: SimulationState, driverId: string, action: MgmtAction): number {
+  const t = state.team!;
+  const last = [...(t.mgmt ?? [])].reverse().find((m) => m.driverId === driverId && m.action === action);
+  if (!last) return 0;
+  const elapsed = state.completedRounds - last.round;
+  return Math.max(0, MGMT_INFO[action].cooldown - elapsed);
+}
+
+export function manageDriver(state: SimulationState, driverId: string, action: MgmtAction): ActionResult {
+  const result: ActionResult = { ok: false, message: "" };
+  const t = state.team!;
+  const ds = t.drivers.find((x) => x.driverId === driverId);
+  if (!ds) return msg(result, false, "Driver not under contract.");
+  if (mgmtCooldown(state, driverId, action) > 0)
+    return msg(result, false, `${MGMT_INFO[action].label} available in ${mgmtCooldown(state, driverId, action)} round(s).`);
+  const info = MGMT_INFO[action];
+  if (t.cash < info.cost) return msg(result, false, `Need $${info.cost}M for that.`);
+
+  t.mgmt ??= [];
+  t.mgmt.push({ driverId, action, round: state.completedRounds });
+  if (action === "bonus") {
+    t.cash = Math.round((t.cash - info.cost) * 100) / 100;
+    t.history.push({
+      round: state.completedRounds + 1,
+      label: `${info.label} payment`,
+      amount: -info.cost,
+      category: "other",
+      detail: `${info.label} for ${driverById(driverId, state.season)?.name ?? driverId}.\nOne-time owner intervention costing $${info.cost}M.`,
+    });
+  }
+  if (action === "fine") {
+    // the driver pays the fine into the team's account
+    t.cash = Math.round((t.cash + info.cost) * 100) / 100;
+    t.history.push({
+      round: state.completedRounds + 1,
+      label: `Fine collected`,
+      amount: info.cost,
+      category: "other",
+      detail: `${driverById(driverId, state.season)?.name ?? driverId} fined $${info.cost}M for a formal disciplinary breach.\nThe money is deducted from the driver's next payout and lands in the team account.`,
+    });
+  }
+
+  let effect = "";
+  let tail: DriverBoost | null = null;
+  switch (action) {
+    case "speech":
+      ds.morale = clamp(ds.morale + 5, 0, 100);
+      ds.confidence = clamp(ds.confidence + 2, 0, 100);
+      tail = { label: "Speech", morale: 2, racesLeft: 2 };
+      effect = "morale +5, confidence +2";
+      break;
+    case "bonus":
+      ds.morale = clamp(ds.morale + 10, 0, 100);
+      ds.confidence = clamp(ds.confidence + 5, 0, 100);
+      tail = { label: "Bonus", morale: 3, confidence: 2, racesLeft: 4 };
+      effect = "morale +10, confidence +5";
+      break;
+    case "fine":
+      ds.frustration = clamp(ds.frustration - 10, 0, 100);
+      ds.morale = clamp(ds.morale - 5, 0, 100);
+      tail = { label: "Fine", morale: -2, racesLeft: 3 };
+      effect = "frustration −10, morale −5";
+      break;
+    case "rant":
+      ds.frustration = clamp(ds.frustration - 6, 0, 100);
+      ds.morale = clamp(ds.morale - 8, 0, 100);
+      ds.confidence = clamp(ds.confidence - 2, 0, 100);
+      tail = { label: "Rant", morale: -2, racesLeft: 3 };
+      effect = "frustration −6, morale −8, confidence −2";
+      break;
+  }
+  if (tail) {
+    ds.boosts ??= [];
+    const existing = ds.boosts.find((b) => b.label === tail.label);
+    if (existing) existing.racesLeft = Math.max(existing.racesLeft, tail.racesLeft);
+    else ds.boosts.push(tail);
+  }
+  return msg(result, true, `${info.label}: ${effect}.${tail ? ` Lingering: ${boostDesc(tail)}.` : ""}${trustNote(addTrust(t, TRUST_DELTA[action]))}`);
+}
+
+/** Human-readable summary of a lingering boost, e.g. "morale +2 per weekend ×3". */
+export function boostDesc(b: DriverBoost): string {
+  const parts: string[] = [];
+  const sign = (v: number) => `${v > 0 ? "+" : ""}${v}`;
+  if (b.morale) parts.push(`morale ${sign(b.morale)}`);
+  if (b.confidence) parts.push(`confidence ${sign(b.confidence)}`);
+  if (b.frustration) parts.push(`frustration ${sign(b.frustration)}`);
+  return `${parts.join(", ")} per weekend ×${b.racesLeft}`;
+}
+
+// ---------------------------------------------------------------------------
+// Team activities — paid whole-team boosts (team building, training camp, ...)
+
+export type TeamAction = "teambuilding" | "trainingcamp" | "psych";
+
+export const TEAM_INFO: Record<TeamAction, { label: string; cost: number; cooldown: number; desc: string }> = {
+  teambuilding: {
+    label: "Team building day",
+    cost: 3,
+    cooldown: 5,
+    desc: "Karting, BBQ and a few beers with the whole crew. Both drivers feel the lift, frustration eases and the pit garage gels (+1 pit crew).",
+  },
+  trainingcamp: {
+    label: "Training camp",
+    cost: 5,
+    cooldown: 8,
+    desc: "A week at a private facility: simulator work, fitness and race-craft drills. Sharpens both drivers' confidence noticeably.",
+  },
+  psych: {
+    label: "Sports psychology",
+    cost: 2.5,
+    cooldown: 6,
+    desc: "One-on-one mental coaching for each driver. Clears heads, rebuilds self-belief and takes the edge off frustration.",
+  },
+};
+
+/** Rounds remaining before the team activity is available again (0 = ready). */
+export function teamCooldown(state: SimulationState, action: TeamAction): number {
+  const t = state.team!;
+  const last = [...(t.mgmt ?? [])].reverse().find((m) => m.driverId === "*team*" && m.action === action);
+  if (!last) return 0;
+  const elapsed = state.completedRounds - last.round;
+  return Math.max(0, TEAM_INFO[action].cooldown - elapsed);
+}
+
+export function manageTeam(state: SimulationState, action: TeamAction): ActionResult {
+  const result: ActionResult = { ok: false, message: "" };
+  const t = state.team!;
+  if (teamCooldown(state, action) > 0) {
+    return msg(result, false, `${TEAM_INFO[action].label} available in ${teamCooldown(state, action)} round(s).`);
+  }
+  const info = TEAM_INFO[action];
+  if (t.cash < info.cost) return msg(result, false, `Need $${info.cost}M for that.`);
+
+  t.mgmt ??= [];
+  t.mgmt.push({ driverId: "*team*", action, round: state.completedRounds });
+  t.cash = Math.round((t.cash - info.cost) * 100) / 100;
+  t.history.push({
+    round: state.completedRounds + 1,
+    label: info.label,
+    amount: -info.cost,
+    category: "other",
+    detail: `${info.label} — whole-team activity costing $${info.cost}M.\nBoosts morale/confidence of both drivers${action === "teambuilding" ? " and +1 pit crew cohesion" : ""}.`,
+  });
+
+  let effect = "";
+  const tails: Record<TeamAction, DriverBoost> = {
+    teambuilding: { label: "Team building", morale: 2, racesLeft: 3 },
+    trainingcamp: { label: "Training camp", confidence: 3, racesLeft: 4 },
+    psych: { label: "Psychology", frustration: -3, confidence: 2, racesLeft: 3 },
+  };
+  for (const ds of t.drivers) {
+    switch (action) {
+      case "teambuilding":
+        ds.morale = clamp(ds.morale + 6, 0, 100);
+        ds.frustration = clamp(ds.frustration - 4, 0, 100);
+        effect = "morale +6, frustration −4 (both drivers), pit crew +1";
+        break;
+      case "trainingcamp":
+        ds.confidence = clamp(ds.confidence + 8, 0, 100);
+        ds.morale = clamp(ds.morale + 3, 0, 100);
+        effect = "confidence +8, morale +3 (both drivers)";
+        break;
+      case "psych":
+        ds.confidence = clamp(ds.confidence + 5, 0, 100);
+        ds.frustration = clamp(ds.frustration - 5, 0, 100);
+        effect = "confidence +5, frustration −5 (both drivers)";
+        break;
+    }
+    ds.boosts ??= [];
+    ds.boosts.push({ ...tails[action] });
+  }
+  if (action === "teambuilding") t.pitCrew = clamp(t.pitCrew + 1, 0, 100);
+  const teamTrust: Record<TeamAction, number> = { teambuilding: 2, trainingcamp: 2, psych: 1 };
+  return msg(result, true, `${info.label}: ${effect}. Lingering: ${boostDesc(tails[action])} each.${trustNote(addTrust(t, teamTrust[action]))}`);
 }
 
 function doReplace(state: SimulationState, component: "engine" | "gearbox"): ActionResult {

@@ -142,3 +142,14 @@ export function difficultyOf(state: SimulationState) {
 export function constructorName(team: TeamState): string {
   return constructorById(team.constructorId)?.name ?? team.constructorId;
 }
+
+/** "Ms. Clark" / "Sir" / "Boss" — how characters address the owner. */
+export function ownerTitle(state: SimulationState): string {
+  const o = state.team?.owner;
+  return o?.callout?.trim() || o?.name?.trim() || "Boss";
+}
+
+/** Paddock trust in the owner (0-100); defaults to 50 for older saves. */
+export function trustOf(state: SimulationState): number {
+  return state.team?.trust ?? 50;
+}

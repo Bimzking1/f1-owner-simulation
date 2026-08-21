@@ -16,6 +16,7 @@ import type {
 import { computeCarStats, carRating, driverAbility, trackWeights } from "./perf";
 import { simulateRaceWeekend, type Competitor, type RaceInput } from "./race";
 import { buildGridLineups } from "./grid";
+import { applyChatResponse } from "./systems";
 import {
   advanceDevelopment,
   advanceWear,
@@ -24,6 +25,7 @@ import {
   applyStandings,
   bankruptcyCheck,
   evaluateSponsors,
+  generateDriverChat,
   generatePaddockNews,
   scheduleSponsorObjectives,
 } from "./systems";
@@ -182,6 +184,7 @@ export function runRound(state: SimulationState): RoundOutcome {
   evaluateSponsors(state);
   advanceDevelopment(state);
   generatePaddockNews(state, rng);
+  generateDriverChat(state, rng);
   bankruptcyCheck(state);
   pushRaceNews(state, weekend);
 
@@ -324,8 +327,9 @@ function pushRaceNews(state: SimulationState, weekend: RaceWeekendResult) {
       id: `race-${weekend.round}-${e.lap}`,
       round: weekend.round,
       tag: e.severity === "danger" ? "breaking" : "driver",
+      priority: e.severity === "danger" ? "urgent" : e.severity === "warning" ? "warning" : "info",
       title: e.text.replace(e.actor ?? "", "").trim().replace(/^,/, "").trim(),
-      body: e.text,
+      body: `Round ${weekend.round}, lap ${e.lap}: ${e.text}`,
       bodyEnjoyer: e.textEnjoyer,
     });
   }
@@ -345,14 +349,34 @@ function pushRaceNews(state: SimulationState, weekend: RaceWeekendResult) {
     id: `result-${weekend.round}`,
     round: weekend.round,
     tag: "info",
+    priority: "info",
     title: `Round ${weekend.round} report`,
-    body: `${weekend.trackId} finished. ${summary}`,
+    body: `${weekend.trackId} finished. ${summary} Full classification and replay on the Race tab.`,
     bodyEnjoyer: `That's the ${weekend.trackId} round done. ${summary}`,
+    options: [{ label: "Open race tab", action: "goto:race" }],
   });
 }
 
 // ---------------------------------------------------------------------------
 // News interactions
+
+const CHAT_LABELS: Record<string, string> = {
+  "chat-support": "Backed him publicly",
+  "chat-promise": "Promised upgrades",
+  "chat-tough": "Tough love",
+};
+
+const CHAT_ACKS: Record<string, string> = {
+  "chat-support": "Thank you for standing by me",
+  "chat-promise": "I'll hold you to that",
+  "chat-tough": "...message received",
+};
+
+/** "Ms. Clark" / "Sir" / "Boss" — how characters address the owner. */
+function ownerTitleOf(state: SimulationState): string {
+  const o = state.team?.owner;
+  return o?.callout?.trim() || o?.name?.trim() || "Boss";
+}
 
 export function resolveNewsAction(state: SimulationState, newsId: string, action: string) {
   const item = state.news.find((n) => n.id === newsId);
@@ -360,6 +384,34 @@ export function resolveNewsAction(state: SimulationState, newsId: string, action
   const t = state.team;
   if (!t) return;
   const round = state.completedRounds + 1;
+
+  // UI navigation requests ("goto:sponsors") — nothing to simulate, just resolve.
+  if (action.startsWith("goto:") || action === "dismiss") {
+    item.resolved = true;
+    return;
+  }
+
+  // Driver conversation responses (from the news feed or Team Management).
+  if (action.startsWith("chat-")) {
+    const driverId = item.options?.find((o) => o.action === action)?.payload;
+    const ds = t.drivers.find((x) => x.driverId === driverId);
+    const before = ds ? { morale: ds.morale, confidence: ds.confidence, frustration: ds.frustration } : null;
+    const trustBefore = t.trust ?? 50;
+    if (driverId) applyChatResponse(state, driverId, action);
+    item.resolved = true;
+    item.options = [];
+    if (ds && before) {
+      const delta = (k: "morale" | "confidence" | "frustration") => {
+        const d = ds[k] - before[k];
+        return `${k} ${d > 0 ? "+" : ""}${d}`;
+      };
+      const trustDelta = (t.trust ?? 50) - trustBefore;
+      const label = CHAT_LABELS[action] ?? "You responded";
+      const ack = CHAT_ACKS[action];
+      item.body += `\n\n${label} — ${delta("morale")} · ${delta("confidence")} · ${delta("frustration")}.\nPaddock trust ${trustDelta > 0 ? "+" : ""}${trustDelta} (${t.trust ?? 50}/100).\nNow: morale ${ds.morale} · confidence ${ds.confidence} · frustration ${ds.frustration}.${ack ? `\n"${ack}, ${ownerTitleOf(state)}."` : ""}`;
+    }
+    return;
+  }
 
   if (action === "engineUpgrade") {
     const cost = state.season === 2013 ? 4.5 : 6.5;

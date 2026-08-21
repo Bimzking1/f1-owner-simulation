@@ -85,6 +85,17 @@ export interface DriverState {
   form: number; // -10..+10 seasonal form offset
   dnfs: number;
   points: number;
+  /** Owner interventions with lingering per-weekend effects (spec §24). */
+  boosts?: DriverBoost[];
+}
+
+/** A temporary morale effect applied once per weekend for `racesLeft` weekends. */
+export interface DriverBoost {
+  label: string;
+  morale?: number;
+  confidence?: number;
+  frustration?: number;
+  racesLeft: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -368,6 +379,13 @@ export interface UpgradeProject {
   underperformed?: boolean;
 }
 
+/** Owner → driver management actions (speech, bonus, fine, rant) for cooldowns. */
+export interface MgmtLog {
+  driverId: string; // "*team*" for whole-team activities
+  action: "speech" | "bonus" | "fine" | "rant" | "teambuilding" | "trainingcamp" | "psych";
+  round: number;
+}
+
 export type TransactionCategory =
   | "sponsor"
   | "salary"
@@ -387,8 +405,19 @@ export interface FinancialTransaction {
   detail?: string; // human-readable breakdown/formula, shown in FinanceTab ⓘ
 }
 
+/** The player's in-game identity — used for callouts ("Ms. Clark") and the report. */
+export interface OwnerProfile {
+  /** Full display name; required. */
+  name: string;
+  /** How the paddock addresses the owner, e.g. "Ms. Clark", "Sir", "Boss". */
+  callout: string;
+  /** Optional data-URL portrait, only set when the user uploads one. */
+  image?: string;
+}
+
 export interface TeamState {
   constructorId: string;
+  owner?: OwnerProfile;
   philosophy: Philosophy;
   teamOrders: TeamOrders;
   driver1Id: string;
@@ -401,6 +430,8 @@ export interface TeamState {
   sponsorIds: string[];
   cash: number;
   reputation: number;
+  /** Paddock trust in the owner, 0-100 — moves with every decision (spec §24). */
+  trust?: number;
   startCash: number;
   car: {
     aero: number;
@@ -419,6 +450,7 @@ export interface TeamState {
   sponsors: SponsorState[];
   pitCrew: number; // 0-100 pit crew level (upgradeable)
   history: FinancialTransaction[];
+  mgmt?: MgmtLog[]; // owner interventions per driver (cooldown tracking)
   points: number;
   wins: number;
   podiums: number;
@@ -439,6 +471,8 @@ export interface TestReport {
   cost: number;
 }
 
+export type NewsPriority = "urgent" | "warning" | "info";
+
 export interface NewsItem {
   id: string;
   round: number;
@@ -448,6 +482,8 @@ export interface NewsItem {
   bodyEnjoyer: string;
   options?: { label: string; action: string; payload?: string }[];
   resolved?: boolean;
+  priority?: NewsPriority; // urgent = red alert, warning = amber, info = default
+  kind?: "chat"; // driver → owner conversation (lives in Team Management)
 }
 
 export interface SimulationState {

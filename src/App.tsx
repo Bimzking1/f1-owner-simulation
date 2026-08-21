@@ -39,7 +39,7 @@ export default function App() {
   };
 
   const newGame = (c: SetupConfig & { seed: string }) => {
-    setCfg({ season: c.season, difficulty: c.difficulty, gameLength: c.gameLength });
+    setCfg({ season: c.season, difficulty: c.difficulty, gameLength: c.gameLength, owner: c.owner });
     setSeed(c.seed);
     setSim(null);
     setScreen("setup");

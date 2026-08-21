@@ -3,7 +3,7 @@ import type { SimulationState, SponsorSpec } from "@/simulation/types";
 import { sponsorById } from "@/data";
 import { availableSponsors } from "@/data";
 import { signSponsor, terminateSponsor } from "@/actions";
-import { Button, Card, Empty, Img, Modal, Money, Tag } from "@/ui/kit";
+import { Button, Card, Empty, Img, Meter, Modal, Money, Tag } from "@/ui/kit";
 import type { Act } from "./parts";
 
 interface Props {
@@ -40,23 +40,32 @@ export function SponsorsTab({ state, act }: Props) {
                     <Tag tone={spec.tier === "title" ? "elite" : spec.tier === "major" ? "telemetry" : "ink"}>{spec.tier}</Tag>
                   </div>
                   <div className="mt-1 text-[11px] text-ink-soft">{spec.objectiveTextEnjoyer}</div>
+                  {s.deadlineRound > 0 ? (
+                    <div className="mt-2">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className={s.progress >= s.required ? "text-positive" : "text-ink-faint"}>
+                          Goal {s.progress}/{s.required}
+                        </span>
+                        <span className={s.deadlineRound - state.completedRounds <= 2 ? "text-caution" : "text-ink-faint"}>
+                          eval after R{s.deadlineRound} · {Math.max(0, s.deadlineRound - state.completedRounds)} race(s) left
+                        </span>
+                      </div>
+                      <Meter
+                        value={s.progress}
+                        max={Math.max(1, s.required)}
+                        tone={s.progress >= s.required ? "positive" : s.deadlineRound - state.completedRounds <= 2 ? "caution" : "telemetry"}
+                        className="mt-1"
+                      />
+                    </div>
+                  ) : (
+                    <div className="mt-2 text-xs text-ink-faint">Objective pending — assigned next weekend.</div>
+                  )}
                   <div className="mt-2 flex items-center justify-between text-xs text-ink-faint">
-                    <span>
-                      {s.deadlineRound > 0 ? (
-                        <>
-                          Progress {s.progress}/{s.required}
-                        </>
-                      ) : (
-                        "Objective pending"
-                      )}
-                      {" · "}paid <Money value={s.totalPaid} />
-                    </span>
+                    <span>paid <Money value={s.totalPaid} /> · patience {s.patience}</span>
                     <Button small variant="danger" onClick={() => act((x) => terminateSponsor(x, s.sponsorId).message)}>
                       Terminate
                     </Button>
                   </div>
-                  {s.deadlineRound > 0 && <div className="mt-1 text-[11px] text-caution">Evaluation at round {s.deadlineRound}</div>}
-                  <div className="mt-1 text-[11px] text-ink-faint">Patience {s.patience}</div>
                 </div>
               );
             })}

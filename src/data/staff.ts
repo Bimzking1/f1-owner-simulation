@@ -77,3 +77,28 @@ export function mechanicTier(m: MechanicSpec): StaffMeta {
   if (m.name.startsWith("Standard")) return { label: "Standard", tone: "telemetry" };
   return { label: "Elite", tone: "elite" };
 }
+
+// ---------------------------------------------------------------------------
+// Explanations for setup-screen tooltips (departments, seniority, pit crews)
+
+export const DEPARTMENT_INFO: Record<string, string> = {
+  aero: "Aerodynamics — designs wings, floors and diffusers. Drives downforce gains from development projects: more downforce means faster corners. The single biggest performance department.",
+  dynamics: "Vehicle Dynamics — suspension, weight transfer and platform behavior. Boosts chassis upgrades and how kindly the car treats its tires over a stint.",
+  powertrain: "Powertrain — engine installation, cooling and energy recovery. Supports the power and reliability of whichever engine unit you lease.",
+  race: "Race Engineering — runs the car at the track: strategy calls, setup sheets, driver feedback. Raises your strategy rating every weekend.",
+  reliability: "Reliability — hunts failures before they happen. Directly reduces mechanical DNF risk and slows component wear across the season.",
+  cto: "Chief Technical Officer — ties every department together. Big multipliers on development speed and innovation for all projects, whatever the area.",
+};
+
+export const SENIORITY_INFO: Record<string, string> = {
+  Junior: "Junior — cheapest salary and lower ratings across the board, but decent innovation growth. Good filler when the budget is tight.",
+  Senior: "Senior — the sweet spot: strong expertise and development speed at mid price. Most teams field seniors in their key departments.",
+  Head: "Head of department — the best ratings money can buy plus a leadership aura that lifts the whole department. Costs roughly double a senior.",
+  CTO: "CTO — one per team. Multiplies development output and innovation for every project, whatever the department. The most expensive hire on the list.",
+};
+
+export const MECHANIC_TIER_INFO: Record<string, string> = {
+  Budget: "Budget pit crew — slow stops (~2.9s) and frequent errors (~6%). Cheap, but every fumbled wheel gun costs track position.",
+  Standard: "Standard pit crew — solid ~2.6-2.7s stops with a moderate error rate (~3%). The sensible midfield choice.",
+  Elite: "Elite pit crew — sub-2.4s stops and rare mistakes (~1%). Red Bull-level choreography; pays for itself in track position.",
+};

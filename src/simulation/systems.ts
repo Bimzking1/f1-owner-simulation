@@ -5,6 +5,7 @@
 // ============================================================================
 
 import type {
+  NewsPriority,
   RaceWeekendResult,
   SimulationState,
   TeamState,
@@ -246,6 +247,18 @@ export function applyMorale(state: SimulationState, weekend: RaceWeekendResult) 
   const diff = DIFFICULTIES.find((d) => d.id === state.difficulty) ?? DIFFICULTIES[1];
   const mult = diff.moraleMultiplier;
 
+  // owner interventions: lingering boosts apply once per weekend, then expire
+  for (const ds of t.drivers) {
+    if (!ds.boosts?.length) continue;
+    for (const b of ds.boosts) {
+      if (b.morale) ds.morale = clamp(ds.morale + Math.round(b.morale * mult), 0, 100);
+      if (b.confidence) ds.confidence = clamp(ds.confidence + Math.round(b.confidence * mult), 0, 100);
+      if (b.frustration) ds.frustration = clamp(ds.frustration + Math.round(b.frustration * mult), 0, 100);
+      b.racesLeft -= 1;
+    }
+    ds.boosts = ds.boosts.filter((b) => b.racesLeft > 0);
+  }
+
   for (const ds of t.drivers) {
     const entry = weekend.playerEntries.find((e) => e.driverId === ds.driverId);
     if (!entry) continue;
@@ -376,9 +389,11 @@ export function evaluateSponsors(state: SimulationState) {
           id: `bonus-${round}-${s.sponsorId}`,
           round,
           tag: "sponsor",
+          priority: "info" satisfies NewsPriority,
           title: `${spec.name} pays the bonus`,
-          body: `Objective met. +$${spec.bonus}M, reputation +${Math.round(2 * specMult)}. New objective coming.`,
+          body: `Objective met (${s.progress}/${s.required}). +$${spec.bonus}M bonus, reputation +${Math.round(2 * specMult)}. A new target will be set on the contract.`,
           bodyEnjoyer: `${spec.name} is thrilled and paid out. A new target appears on the contract.`,
+          options: [{ label: "Review sponsors", action: "goto:sponsors" }],
         });
         s.progress = 0;
         s.deadlineRound = round + (spec.objective === "pointsNextRaces" || spec.objective === "top10NextRaces" ? 5 : 8);
@@ -392,19 +407,25 @@ export function evaluateSponsors(state: SimulationState) {
             id: `exit-${round}-${s.sponsorId}`,
             round,
             tag: "sponsor",
+            priority: "urgent" satisfies NewsPriority,
             title: `${spec.name} pulls out`,
-            body: `Contract terminated. Reputation -${Math.round(6 * specMult)}.`,
+            body: `CONTRACT TERMINATED at round ${round} — objective missed (${s.progress}/${s.required}: ${spec.objectiveText}). Reputation -${Math.round(6 * specMult)}. You lose $${spec.racePayment}M per race income.`,
             bodyEnjoyer: `${spec.name} walked. Your reputation took a hit.`,
+            options: [{ label: "Find a new sponsor", action: "goto:sponsors" }],
           });
         } else {
+          const roundsLeft = Math.max(0, s.deadlineRound - round);
           state.news.unshift({
             id: `warn-${round}-${s.sponsorId}`,
             round,
             tag: "sponsor",
+            priority: "warning" satisfies NewsPriority,
             title: `${spec.name} is unimpressed`,
-            body: `Objective missed (${s.progress}/${s.required}). Patience ${s.patience}.`,
+            body: `Objective missed at evaluation: ${s.progress}/${s.required} — "${spec.objectiveText}". Patience left: ${s.patience}. If it hits 0 they terminate the deal (−$${spec.racePayment}M/race income).`,
             bodyEnjoyer: `They wanted ${spec.objectiveTextEnjoyer}. Patience left: ${s.patience}.`,
+            options: [{ label: "Review sponsors", action: "goto:sponsors" }],
           });
+          void roundsLeft;
         }
         s.progress = 0;
         s.deadlineRound = 0;
@@ -520,10 +541,11 @@ export function advanceDevelopment(state: SimulationState) {
       id: `dev-${round}-${p.id}`,
       round,
       tag: "info",
+      priority: (under ? "warning" : "info") satisfies NewsPriority,
       title: `${p.name} complete${under ? " — underperformed" : ""}`,
       body: under
-        ? `Poor correlation: only about +${gain} delivered.`
-        : `On the car and working: +${gain}.`,
+        ? `Poor correlation in the wind tunnel/sim: the ${p.name} delivered only +${gain} of the expected +${p.effect}. The rest of the budget didn't translate.`
+        : `${p.name} is on the car and working: +${gain} to ${p.target === "pitCrew" ? "pit crew" : p.target === "driverTraining" ? "driver form" : p.target}.`,
       bodyEnjoyer: under
         ? `The upgrade arrived but it's not quite right. Partial gains only.`
         : `The upgrade is on the car and it's real.`,
@@ -552,11 +574,12 @@ export function generatePaddockNews(state: SimulationState, rng: Rng) {
       id: `supplier-${round}`,
       round,
       tag: "supplier",
+      priority: "warning" satisfies NewsPriority,
       title: "Engine supplier offers an upgrade",
-      body: `Energy recovery upgrade available for $${cost}M: +3 power, +2 reliability.`,
+      body: `ACTION AVAILABLE: ${engineById(t.engineId)?.supplier ?? "Your engine maker"} offers an energy-recovery upgrade for $${cost}M — +3 power, +2 reliability for the rest of the season. Offer expires when you respond.`,
       bodyEnjoyer: `Your engine maker has a faster, sturdier spec ready — $${cost}M.`,
       options: [
-        { label: "Purchase", action: "engineUpgrade" },
+        { label: `Purchase ($${cost}M)`, action: "engineUpgrade" },
         { label: "Decline", action: "dismiss" },
       ],
     });
@@ -565,9 +588,11 @@ export function generatePaddockNews(state: SimulationState, rng: Rng) {
       id: `rival-${round}`,
       round,
       tag: "rival",
+      priority: "warning" satisfies NewsPriority,
       title: "Rival development warning",
-      body: "Several midfield teams are filing new floor revisions this week.",
+      body: `Several midfield teams are filing new floor revisions this week. If your development pace stalls they will close the gap — consider starting an upgrade at the next development window (Garage tab).`,
       bodyEnjoyer: "Everyone in the midfield is working on a big upgrade.",
+      options: [{ label: "Open garage", action: "goto:garage" }],
     });
   } else if (roll < 0.62) {
     const other = [
@@ -579,10 +604,144 @@ export function generatePaddockNews(state: SimulationState, rng: Rng) {
       id: `paddock-${round}`,
       round,
       tag: "staff",
+      priority: "info" satisfies NewsPriority,
       title: "Paddock whisper",
-      body: other,
+      body: `${other} Nothing official yet — keep an eye on the Market tab.`,
       bodyEnjoyer: "The paddock is gossiping. Nothing official yet.",
+      options: [{ label: "Open market", action: "goto:market" }],
     });
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Driver → owner conversations (mid-championship interactions)
+
+interface ChatMood {
+  quote: string;
+  priority: NewsPriority;
+}
+
+function chatLine(mood: string, shortName: string, morale: number, frustration: number, rng: Rng): ChatMood {
+  const pick = <T,>(arr: T[]): T => arr[Math.floor(rng() * arr.length)];
+  if (mood === "complain") {
+    return {
+      priority: "warning",
+      quote: pick([
+        `"I can't do this alone. The car is miles off and nobody in the garage seems bothered." — ${shortName} is frustrated (frustration ${frustration}).`,
+        `"We keep losing out in the stops. Either the crew steps up or I stop risking my neck every lap." — ${shortName} (frustration ${frustration}).`,
+        `"My strategy calls have been a joke lately. I need answers, not apologies." — ${shortName} wants change (frustration ${frustration}).`,
+      ]),
+    };
+  }
+  if (mood === "praise") {
+    return {
+      priority: "info",
+      quote: pick([
+        `"Best car I've driven here. Whatever you're doing upstairs — keep going." — ${shortName} is happy (morale ${morale}).`,
+        `"The team believes in itself again. You can feel it in the garage." — ${shortName} (morale ${morale}).`,
+        `"Pit wall's been sharp lately. That's on leadership." — ${shortName}, impressed (morale ${morale}).`,
+      ]),
+    };
+  }
+  if (mood === "joke") {
+    return {
+      priority: "info",
+      quote: pick([
+        `"If we finish P4 again I'm charging you for my chiropractor." — ${shortName}, joking (morale ${morale}).`,
+        `"My engineer promised me a sandwich if I beat the teammate. Hold him to it." — ${shortName} (morale ${morale}).`,
+        `"The new floor is so slippery I nearly signed it 'the steward'." — ${shortName}, laughing (morale ${morale}).`,
+      ]),
+    };
+  }
+  return {
+    priority: "info",
+    quote: pick([
+      `"Honest feedback: qualifying pace is there, race pace isn't. We need to look at tire management." — ${shortName}.`,
+      `"I think one more development push and we're regularly in the points." — ${shortName} (morale ${morale}).`,
+      `"Communication between me and the pit wall could be better on strategy calls." — ${shortName} (morale ${morale}).`,
+    ]),
+  };
+}
+
+/** After some weekends a driver asks the owner for a word — respond in Team Management. */
+export function generateDriverChat(state: SimulationState, rng: Rng) {
+  const t = state.team;
+  if (!t || t.drivers.length === 0) return;
+  if (state.completedRounds === 0 || rng() > 0.42) return;
+  const round = state.completedRounds + 1;
+
+  // unhappy drivers speak up more often
+  const pool: typeof t.drivers = [];
+  for (const ds of t.drivers) {
+    const weight = ds.frustration >= 55 ? 3 : ds.morale <= 40 ? 2 : 1;
+    for (let i = 0; i < weight; i++) pool.push(ds);
+  }
+  const ds = pool[Math.floor(rng() * pool.length)];
+  const d = driverById(ds.driverId, state.season);
+  if (!d) return;
+
+  let mood = "feedback";
+  if (ds.frustration >= 55) mood = "complain";
+  else if (ds.morale >= 70 && ds.confidence >= 60) mood = rng() < 0.5 ? "praise" : "joke";
+  const { quote, priority } = chatLine(mood, d.shortName, ds.morale, ds.frustration, rng);
+
+  state.news.unshift({
+    id: `chat-${round}-${ds.driverId}`,
+    round,
+    tag: "driver",
+    kind: "chat",
+    priority,
+    title: `${d.shortName} wants a word`,
+    body: quote,
+    bodyEnjoyer: quote,
+    options: [
+      { label: "Back him publicly", action: "chat-support", payload: ds.driverId },
+      { label: "Promise upgrades", action: "chat-promise", payload: ds.driverId },
+      { label: "Tough love", action: "chat-tough", payload: ds.driverId },
+    ],
+  });
+}
+
+export function applyChatResponse(state: SimulationState, driverId: string, response: string): string | null {
+  const t = state.team;
+  if (!t) return null;
+  const ds = t.drivers.find((x) => x.driverId === driverId);
+  if (!ds) return null;
+  switch (response) {
+    case "chat-support": {
+      ds.morale = clamp(ds.morale + 6, 0, 100);
+      ds.confidence = clamp(ds.confidence + 3, 0, 100);
+      t.trust = clamp((t.trust ?? 50) + 1, 0, 100);
+      ds.boosts ??= [];
+      const ex = ds.boosts.find((b) => b.label === "Public backing");
+      if (ex) ex.racesLeft = Math.max(ex.racesLeft, 2);
+      else ds.boosts.push({ label: "Public backing", morale: 2, racesLeft: 2 });
+      return "Public backing delivered.";
+    }
+    case "chat-promise": {
+      ds.morale = clamp(ds.morale + 4, 0, 100);
+      ds.confidence = clamp(ds.confidence + 2, 0, 100);
+      ds.frustration = clamp(ds.frustration + 2, 0, 100); // promises add pressure
+      t.trust = clamp((t.trust ?? 50) - 1, 0, 100);
+      ds.boosts ??= [];
+      const ex = ds.boosts.find((b) => b.label === "Upgrade promise");
+      if (ex) ex.racesLeft = Math.max(ex.racesLeft, 3);
+      else ds.boosts.push({ label: "Upgrade promise", confidence: 2, racesLeft: 3 });
+      return "Upgrade promise made — expectations rise.";
+    }
+    case "chat-tough": {
+      ds.frustration = clamp(ds.frustration - 8, 0, 100);
+      ds.morale = clamp(ds.morale - 3, 0, 100);
+      ds.confidence = clamp(ds.confidence + 2, 0, 100);
+      t.trust = clamp((t.trust ?? 50) + 1, 0, 100);
+      ds.boosts ??= [];
+      const ex = ds.boosts.find((b) => b.label === "Tough love");
+      if (ex) ex.racesLeft = Math.max(ex.racesLeft, 2);
+      else ds.boosts.push({ label: "Tough love", frustration: -2, racesLeft: 2 });
+      return "Tough love. Frustration drops, mood dips.";
+    }
+    default:
+      return null;
   }
 }
 
@@ -611,9 +770,11 @@ export function bankruptcyCheck(state: SimulationState): SimulationState {
       id: `grace-${round}`,
       round,
       tag: "breaking",
+      priority: "urgent" satisfies NewsPriority,
       title: "BANK GUARANTEE ACTIVATED",
-      body: "The bank stepped in once: +$25M, reputation -20. There will be no second rescue.",
+      body: `URGENT: cash fell below −$8M after round ${round}. The bank stepped in once: +$25M, reputation -20. There will be no second rescue — cut costs or the team collapses.`,
       bodyEnjoyer: "Your bankers bailed you out with $25M. They won't do it again.",
+      options: [{ label: "Open finance", action: "goto:finance" }],
     });
   } else {
     state.phase = "bankrupt";
@@ -621,8 +782,9 @@ export function bankruptcyCheck(state: SimulationState): SimulationState {
       id: `collapse-${round}`,
       round,
       tag: "breaking",
+      priority: "urgent" satisfies NewsPriority,
       title: "TEAM COLLAPSE",
-      body: "You could no longer finance the operation. Season terminated.",
+      body: `URGENT: you could no longer finance the operation at round ${round}. Creditors move in — season terminated.`,
       bodyEnjoyer: "The money ran out. The season is over.",
     });
   }

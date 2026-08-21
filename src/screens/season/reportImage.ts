@@ -5,7 +5,7 @@
 
 import type { SimulationState } from "@/simulation/types";
 import { constructorById, driverById } from "@/data";
-import { difficultyOf } from "@/state";
+import { difficultyOf, ownerTitle } from "@/state";
 
 type Ratio = "portrait" | "landscape";
 
@@ -118,7 +118,7 @@ function aroundPlayer(rows: StandRow[], above: number, below: number): StandRow[
   return rows.slice(lo, hi + 1);
 }
 
-export function exportReportImage(state: SimulationState, ratio: Ratio) {
+export function exportReportImage(state: SimulationState, ratio: Ratio, quotes?: { shortName: string; text: string }[]) {
   const t = state.team;
   if (!t) return;
   const ctor = constructorById(t.constructorId, state.season);
@@ -130,16 +130,71 @@ export function exportReportImage(state: SimulationState, ratio: Ratio) {
   canvas.height = h;
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
-  drawReport(ctx, w, h, state, accent, ratio);
-  canvas.toBlob((blob) => {
-    if (!blob) return;
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `f1-owner-report-${ratio === "portrait" ? "9x16" : "16x9"}.png`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }, "image/png");
+
+  const render = (ownerImg?: HTMLImageElement) => {
+    drawReport(ctx, w, h, state, accent, ratio, quotes, ownerImg);
+    canvas.toBlob((blob) => {
+      if (!blob) return;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `f1-owner-report-${ratio === "portrait" ? "9x16" : "16x9"}.png`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }, "image/png");
+  };
+
+  const src = t.owner?.image;
+  if (src) {
+    const img = new Image();
+    img.onload = () => render(img);
+    img.onerror = () => render();
+    img.src = src;
+  } else {
+    render();
+  }
+}
+
+/** Circular-cropped owner portrait on the canvas. */
+function drawAvatar(ctx: CanvasRenderingContext2D, img: HTMLImageElement, cx: number, cy: number, r: number) {
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.closePath();
+  ctx.clip();
+  const side = Math.min(img.width, img.height);
+  ctx.drawImage(img, (img.width - side) / 2, (img.height - side) / 2, side, side, cx - r, cy - r, r * 2, r * 2);
+  ctx.restore();
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.strokeStyle = C.line;
+  ctx.lineWidth = 3;
+  ctx.stroke();
+}
+
+/** Word-wrap text to a pixel width using the body font. */
+function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number, size: number): string[] {
+  ctx.font = `400 ${size}px ${BODY}`;
+  const words = text.split(/\s+/);
+  const lines: string[] = [];
+  let cur = "";
+  for (const word of words) {
+    const test = cur ? `${cur} ${word}` : word;
+    if (ctx.measureText(test).width > maxWidth && cur) {
+      lines.push(cur);
+      cur = word;
+    } else {
+      cur = test;
+    }
+  }
+  if (cur) lines.push(cur);
+  return lines;
+}
+
+/** Trim wrapped lines to `max`, appending an ellipsis to the last kept line. */
+function clampLines(lines: string[], max: number): string[] {
+  if (lines.length <= max) return lines;
+  return lines.slice(0, max).map((l, li, arr) => (li === arr.length - 1 ? `${l}…` : l));
 }
 
 function drawReport(
@@ -149,9 +204,13 @@ function drawReport(
   state: SimulationState,
   accent: string,
   ratio: Ratio,
+  quotes?: { shortName: string; text: string }[],
+  ownerImg?: HTMLImageElement,
 ) {
   const t = state.team!;
   const diff = difficultyOf(state);
+  const owner = t.owner ?? null;
+  const ownerLabel = owner ? ownerTitle(state) : null;
   const pos = state.standingsConstructors.findIndex((c) => c.teamId === t.constructorId) + 1;
   const income = t.history.reduce((a, x) => a + Math.max(0, x.amount), 0);
   const spend = t.history.reduce((a, x) => a + Math.min(0, x.amount), 0);
@@ -178,8 +237,8 @@ function drawReport(
   ctx.fillStyle = accent;
   ctx.fillRect(0, 0, w, ratio === "portrait" ? 14 : 16);
 
-  if (ratio === "portrait") return drawPortrait(ctx, state, accent, pos, income, spend, net, prize, wccRows, wdcRows, teamName, myStandings, diff.label);
-  return drawLandscape(ctx, state, accent, pos, income, spend, net, prize, wccRows, wdcRows, teamName, myStandings, diff.label);
+  if (ratio === "portrait") return drawPortrait(ctx, state, accent, pos, income, spend, net, prize, wccRows, wdcRows, teamName, myStandings, diff.label, quotes, ownerImg, ownerLabel);
+  return drawLandscape(ctx, state, accent, pos, income, spend, net, prize, wccRows, wdcRows, teamName, myStandings, diff.label, quotes, ownerImg, ownerLabel);
 }
 
 function ctor(state: SimulationState) {
@@ -205,6 +264,9 @@ function drawPortrait(
   teamName: string,
   myStandings: { s: { driverId: string; points: number; dnfs: number }; i: number }[],
   diffLabel: string,
+  quotes?: { shortName: string; text: string }[],
+  ownerImg?: HTMLImageElement,
+  ownerLabel?: string | null,
 ) {
   const W = 1080;
   const H = 1920;
@@ -223,7 +285,15 @@ function drawPortrait(
     fillText(ctx, ".", pad + pw - 8, 224, 128, accent, { weight: 700 });
   }
   fillText(ctx, teamName.toUpperCase(), pad, 276, 46, C.ink, { weight: 700 });
-  fillText(ctx, `SEASON ${state.season} · ${diffLabel.toUpperCase()} · SEED ${state.seed}`, pad, 316, 22, C.faint, { font: MONO, weight: 500 });
+  fillText(
+    ctx,
+    `SEASON ${state.season} · ${diffLabel.toUpperCase()} · SEED ${state.seed}${ownerLabel ? ` · PRINCIPAL ${ownerLabel.toUpperCase()}` : ""}`,
+    pad,
+    316,
+    22,
+    C.faint,
+    { font: MONO, weight: 500 },
+  );
 
   const stats: [string, string, string][] = [
     ["Points", `${t.points}`, C.ink],
@@ -255,29 +325,67 @@ function drawPortrait(
   fillText(ctx, teamName, pad + cardW + 30, rewardY + 76, 26, C.ink, { weight: 700 });
   fillText(ctx, `NET ${money(net)}`, pad + cardW + 30 + l2w + 28, rewardY + 76, 26, net >= 0 ? C.green : C.red, { weight: 700 });
 
-  const tableTop = rewardY + 108 + 50;
-  fillText(ctx, "CONSTRUCTORS CHAMPIONSHIP", pad, tableTop, 24, C.muted, { weight: 700 });
+  // flowing layout: every section advances a cursor and verdicts only draw if they fit
+  const footerReserve = ownerLabel ? 150 : 70;
+  let y = rewardY + 108 + 50;
+
+  fillText(ctx, "CONSTRUCTORS CHAMPIONSHIP", pad, y, 24, C.muted, { weight: 700 });
+  y += 46;
   const wccShown = aroundPlayer(wccRows, 2, 2);
-  standingsTable(ctx, pad, tableTop + 46, W - pad * 2, wccShown, 58, accent);
+  standingsTable(ctx, pad, y, W - pad * 2, wccShown, 58, accent);
+  y += wccShown.length * 58 + 58;
 
-  const wdcTop = tableTop + 46 + wccShown.length * 58 + 58;
-  fillText(ctx, "DRIVERS CHAMPIONSHIP", pad, wdcTop, 24, C.muted, { weight: 700 });
+  fillText(ctx, "DRIVERS CHAMPIONSHIP", pad, y, 24, C.muted, { weight: 700 });
+  y += 46;
   const wdcShown = aroundPlayer(wdcRows, 2, 2);
-  standingsTable(ctx, pad, wdcTop + 46, W - pad * 2, wdcShown, 56, accent);
+  standingsTable(ctx, pad, y, W - pad * 2, wdcShown, 56, accent);
+  y += wdcShown.length * 56 + 56;
 
-  const driverTop = wdcTop + 46 + wdcShown.length * 56 + 56;
-  fillText(ctx, "YOUR DRIVERS", pad, driverTop, 24, C.muted, { weight: 700 });
+  fillText(ctx, "YOUR DRIVERS", pad, y, 24, C.muted, { weight: 700 });
   myStandings.forEach(({ s, i }, idx) => {
     const d = driverById(s.driverId, state.season);
     const dx = pad + idx * ((W - pad * 2 - 16) / 2 + 8);
     const dw = (W - pad * 2 - 16) / 2;
-    roundRect(ctx, dx, driverTop + 44, dw, 84, 10);
+    roundRect(ctx, dx, y + 44, dw, 84, 10);
     ctx.fillStyle = C.panel;
     ctx.fill();
-    fillText(ctx, `P${i + 1}`, dx + 18, driverTop + 102, 26, i === 0 ? C.green : C.muted, { font: MONO, weight: 700 });
-    fillText(ctx, d?.name ?? s.driverId, dx + 70, driverTop + 95, 22, C.ink, { weight: 700 });
-    fillText(ctx, `${s.points} pts · ${s.dnfs} DNF`, dx + 70, driverTop + 116, 16, C.faint, { font: BODY, weight: 500 });
+    fillText(ctx, `P${i + 1}`, dx + 18, y + 102, 26, i === 0 ? C.green : C.muted, { font: MONO, weight: 700 });
+    fillText(ctx, d?.name ?? s.driverId, dx + 70, y + 95, 22, C.ink, { weight: 700 });
+    fillText(ctx, `${s.points} pts · ${s.dnfs} DNF`, dx + 70, y + 116, 16, C.faint, { font: BODY, weight: 500 });
   });
+  y += 44 + 84 + 34;
+
+  // paddock verdicts — drivers + staff; boxes are sized to their text and
+  // rows that would run past the footer are skipped instead of overcutting
+  if (quotes && quotes.length > 0 && y < H - footerReserve - 60) {
+    fillText(ctx, "PADDOCK VERDICTS", pad, y, 20, C.purple, { weight: 700 });
+    y += 34;
+    const bw = (W - pad * 2 - 16) / 2;
+    for (let i = 0; i < quotes.length; i += 2) {
+      const pair = quotes.slice(i, i + 2);
+      const linesArr = pair.map((q) => clampLines(wrapText(ctx, `“${q.text}”`, bw - 32, 14), 4));
+      const maxLines = Math.max(...linesArr.map((l) => l.length));
+      const bh = 52 + maxLines * 19;
+      if (y + bh > H - footerReserve) break;
+      pair.forEach((q, idx) => {
+        const bx = pad + idx * (bw + 16);
+        roundRect(ctx, bx, y, bw, bh, 10);
+        ctx.fillStyle = C.panel2;
+        ctx.fill();
+        fillText(ctx, q.shortName.toUpperCase(), bx + 16, y + 26, 15, C.yellow, { font: BODY, weight: 700 });
+        linesArr[idx].forEach((ln, li) => fillText(ctx, ln, bx + 16, y + 48 + li * 19, 14, C.ink, { font: BODY, weight: 400 }));
+      });
+      y += bh + 14;
+    }
+  }
+
+  // owner sign-off — portrait + name at the bottom, only when a profile exists
+  if (ownerLabel) {
+    const by = H - 118;
+    if (ownerImg) drawAvatar(ctx, ownerImg, pad + 34, by + 40, 34);
+    fillText(ctx, "TEAM PRINCIPAL", pad + (ownerImg ? 84 : 16), by + 28, 15, C.faint, { font: BODY, weight: 600 });
+    fillText(ctx, ownerLabel.toUpperCase(), pad + (ownerImg ? 84 : 16), by + 60, 30, C.ink, { weight: 700 });
+  }
 
   fillText(ctx, "F1 OWNER — SEASON REPORT", W / 2, H - 36, 20, C.faint, { weight: 600, font: BODY, align: "center" });
   ctx.textAlign = "left";
@@ -297,6 +405,9 @@ function drawLandscape(
   teamName: string,
   myStandings: { s: { driverId: string; points: number; dnfs: number }; i: number }[],
   diffLabel: string,
+  quotes?: { shortName: string; text: string }[],
+  ownerImg?: HTMLImageElement,
+  ownerLabel?: string | null,
 ) {
   const W = 1920;
   const H = 1080;
@@ -338,6 +449,26 @@ function drawLandscape(
   fillText(ctx, `NET FLOW ${money(net)}`, pad + cardW + 32, 740, 26, net >= 0 ? C.green : C.red, { weight: 700 });
   fillText(ctx, `INCOME ${money(income)}  ·  SPEND ${money(spend)}`, pad + cardW + 32, 692, 17, C.faint, { font: BODY, weight: 600 });
 
+  // paddock verdicts — bottom-left free zone; stop before the footer instead of overcutting
+  if (quotes && quotes.length > 0) {
+    let qy = 806;
+    fillText(ctx, "PADDOCK VERDICTS", pad, qy, 20, C.purple, { weight: 700 });
+    qy += 32;
+    const limitY = H - 60;
+    for (const q of quotes.slice(0, 3)) {
+      const lines = clampLines(wrapText(ctx, `“${q.text}”`, 680, 15), 3);
+      const need = 22 + lines.length * 21 + 12;
+      if (qy + need > limitY) break;
+      fillText(ctx, q.shortName.toUpperCase(), pad, qy, 15, C.yellow, { font: BODY, weight: 700 });
+      qy += 22;
+      for (const ln of lines) {
+        fillText(ctx, ln, pad, qy, 15, C.muted, { font: BODY, weight: 400 });
+        qy += 21;
+      }
+      qy += 12;
+    }
+  }
+
   const tablesX = 820;
   const tablesW = W - tablesX - pad;
   const colW = (tablesW - 24) / 2;
@@ -346,6 +477,16 @@ function drawLandscape(
   fillText(ctx, "DRIVERS", tablesX + colW + 24, 118, 18, C.faint, { font: BODY, weight: 600 });
   standingsTable(ctx, tablesX, 136, colW, wccRows.slice(0, 10), 44, accent);
   standingsTable(ctx, tablesX + colW + 24, 136, colW, wdcRows.slice(0, 10), 44, accent);
+
+  // owner sign-off — bottom-right, only when a profile exists
+  if (ownerLabel) {
+    const label = `${ownerLabel.toUpperCase()} · TEAM PRINCIPAL`;
+    ctx.font = `600 18px ${BODY}`;
+    const lw = ctx.measureText(label).width;
+    if (ownerImg) drawAvatar(ctx, ownerImg, W - pad - lw - 34, H - 46, 24);
+    fillText(ctx, label, W - pad, H - 40, 18, C.muted, { font: BODY, weight: 600, align: "right" });
+    ctx.textAlign = "left";
+  }
 
   fillText(ctx, `F1 OWNER — SEASON REPORT · SEED ${state.seed}`, W / 2, H - 34, 20, C.faint, { weight: 600, font: BODY, align: "center" });
   ctx.textAlign = "left";
