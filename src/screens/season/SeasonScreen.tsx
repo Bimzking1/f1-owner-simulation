@@ -77,20 +77,29 @@ export default function SeasonScreen({ state, onRunRound, onNewsAction, act, onR
         </div>
         <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:flex-nowrap">
           {t.owner && (
-            <span className="flex items-center gap-1.5 rounded-sm border border-hairline bg-raised/40 px-1.5 py-1" title={t.owner.name}>
-              {t.owner.image && <Img src={t.owner.image} alt={t.owner.name} className="h-6 w-6 rounded-full object-cover" />}
-              <span className="text-xs font-semibold">{ownerTitle(state)}</span>
+            <span className="flex h-14 items-center gap-2 rounded-md border border-hairline bg-raised/60 px-3" title={t.owner.name}>
+              {t.owner.image ? (
+                <Img src={t.owner.image} alt={t.owner.name} className="h-8 w-8 rounded-full object-cover" />
+              ) : (
+                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-signal/15 font-display text-sm font-bold text-signal">
+                  {t.owner.name.charAt(0).toUpperCase()}
+                </span>
+              )}
+              <span className="flex flex-col leading-tight">
+                <span className="text-[10px] font-semibold uppercase tracking-widest text-ink-faint">Principal</span>
+                <span className="font-display text-sm font-bold">{ownerTitle(state)}</span>
+              </span>
             </span>
           )}
           <Stat label="Cash" value={<Money value={t.cash} />} tone={t.cash < 0 ? "caution" : undefined} />
           <Stat label="Reputation" value={t.reputation} />
           <Stat label="WCC Pts" value={t.points} />
           {!seasonDone && (
-            <Button onClick={onRunRound} className="hidden shrink-0 md:inline-flex">
+            <Button onClick={onRunRound} className="hidden h-14 shrink-0 md:inline-flex">
               Run R{state.round + 1} · {next.grandPrix} →
             </Button>
           )}
-          <Button variant="ghost" small onClick={() => setConfirmMenu(true)} className="ml-auto md:ml-0">
+          <Button variant="ghost" small onClick={() => setConfirmMenu(true)} className="ml-auto h-14 md:ml-0">
             Menu
           </Button>
           {/* mobile: the long run label gets its own full-width row below the stats */}

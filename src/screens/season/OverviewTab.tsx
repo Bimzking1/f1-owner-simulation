@@ -1,7 +1,9 @@
 import type { NewsItem, SimulationState } from "@/simulation/types";
 import { driverById, constructorById, sponsorById } from "@/data";
 import { boostDesc } from "@/actions";
+import { ownerTitle, trustOf } from "@/state";
 import { Bar, Button, Card, Img, Meter, Ovr, Tag } from "@/ui/kit";
+import { ratingTone } from "@/ui/ratings";
 import { driverImage } from "@/data/assets";
 import { MiniBar, StandingsCard } from "./parts";
 
@@ -152,6 +154,8 @@ export function OverviewTab({ state, onNewsAction, onRunRound, onNavigate }: Pro
       </div>
 
       <div className="space-y-4">
+        <OwnerCard state={state} />
+
         <Card title="Paddock feed" pad={false}>
           <div className="max-h-[46rem] overflow-auto">
             {groups.length === 0 && <div className="p-4 text-xs text-ink-faint">No news yet.</div>}
@@ -178,6 +182,42 @@ export function OverviewTab({ state, onNewsAction, onRunRound, onNavigate }: Pro
         <SponsorProgressWidget state={state} onNavigate={onNavigate} />
       </div>
     </div>
+  );
+}
+
+function OwnerCard({ state }: { state: SimulationState }) {
+  const o = state.team!.owner;
+  const trust = trustOf(state);
+  const label =
+    trust <= 25 ? "Distrusted" : trust <= 40 ? "Wary" : trust <= 55 ? "Respected" : trust <= 70 ? "Trusted" : "Ironclad";
+  return (
+    <Card title="Team principal">
+      <div className="flex items-center gap-3">
+        {o?.image ? (
+          <Img src={o.image} alt={o.name} className="h-14 w-14 shrink-0 rounded-full object-cover" />
+        ) : (
+          <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-signal/15 font-display text-xl font-bold text-signal">
+            {(o?.name ?? "O").charAt(0).toUpperCase()}
+          </span>
+        )}
+        <div className="min-w-0 flex-1">
+          <div className="truncate font-display text-lg font-bold leading-tight">{o?.name ?? "The Owner"}</div>
+          <div className="text-[11px] text-ink-faint">Called “{ownerTitle(state)}” around the paddock</div>
+        </div>
+      </div>
+      <div className="mt-3">
+        <Bar
+          label="Trust"
+          value={trust}
+          tone={ratingTone(trust)}
+          right={<span className="text-xs font-semibold">{label}</span>}
+        />
+        <p className="mt-1 text-[10px] leading-relaxed text-ink-faint">
+          Every call you make moves it — bonuses, backing and team days build trust; fines, rants, broken promises and
+          mid-season sackings cost it.
+        </p>
+      </div>
+    </Card>
   );
 }
 

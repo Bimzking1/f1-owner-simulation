@@ -407,9 +407,10 @@ export interface FinancialTransaction {
 
 /** The player's in-game identity — used for callouts ("Ms. Clark") and the report. */
 export interface OwnerProfile {
-  honorific: "Mr" | "Ms";
   /** Full display name; required. */
   name: string;
+  /** How the paddock addresses the owner, e.g. "Ms. Clark", "Sir", "Boss". */
+  callout: string;
   /** Optional data-URL portrait, only set when the user uploads one. */
   image?: string;
 }
@@ -429,6 +430,8 @@ export interface TeamState {
   sponsorIds: string[];
   cash: number;
   reputation: number;
+  /** Paddock trust in the owner, 0-100 — moves with every decision (spec §24). */
+  trust?: number;
   startCash: number;
   car: {
     aero: number;

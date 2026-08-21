@@ -711,6 +711,7 @@ export function applyChatResponse(state: SimulationState, driverId: string, resp
     case "chat-support": {
       ds.morale = clamp(ds.morale + 6, 0, 100);
       ds.confidence = clamp(ds.confidence + 3, 0, 100);
+      t.trust = clamp((t.trust ?? 50) + 1, 0, 100);
       ds.boosts ??= [];
       const ex = ds.boosts.find((b) => b.label === "Public backing");
       if (ex) ex.racesLeft = Math.max(ex.racesLeft, 2);
@@ -721,6 +722,7 @@ export function applyChatResponse(state: SimulationState, driverId: string, resp
       ds.morale = clamp(ds.morale + 4, 0, 100);
       ds.confidence = clamp(ds.confidence + 2, 0, 100);
       ds.frustration = clamp(ds.frustration + 2, 0, 100); // promises add pressure
+      t.trust = clamp((t.trust ?? 50) - 1, 0, 100);
       ds.boosts ??= [];
       const ex = ds.boosts.find((b) => b.label === "Upgrade promise");
       if (ex) ex.racesLeft = Math.max(ex.racesLeft, 3);
@@ -731,6 +733,7 @@ export function applyChatResponse(state: SimulationState, driverId: string, resp
       ds.frustration = clamp(ds.frustration - 8, 0, 100);
       ds.morale = clamp(ds.morale - 3, 0, 100);
       ds.confidence = clamp(ds.confidence + 2, 0, 100);
+      t.trust = clamp((t.trust ?? 50) + 1, 0, 100);
       ds.boosts ??= [];
       const ex = ds.boosts.find((b) => b.label === "Tough love");
       if (ex) ex.racesLeft = Math.max(ex.racesLeft, 2);

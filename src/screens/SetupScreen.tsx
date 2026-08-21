@@ -4,6 +4,7 @@ import type {
   EngineSpec,
   GameLengthId,
   GearboxSpec,
+  OwnerProfile,
   Philosophy,
   SeasonId,
   TeamOrders,
@@ -40,6 +41,7 @@ export interface SetupConfig {
   season: SeasonId;
   difficulty: DifficultyId;
   gameLength: GameLengthId;
+  owner: OwnerProfile;
 }
 
 interface Props {
@@ -68,33 +70,6 @@ export default function SetupScreen({ cfg, onStart, onBack }: Props) {
   const [philosophy, setPhilosophy] = useState<Philosophy>("balanced");
   const [orders, setOrders] = useState<TeamOrders>("equal");
   const [sponsorIds, setSponsorIds] = useState<string[]>([]);
-  const [ownerHonorific, setOwnerHonorific] = useState<"Mr" | "Ms">("Mr");
-  const [ownerName, setOwnerName] = useState("");
-  const [ownerImage, setOwnerImage] = useState<string | undefined>();
-
-  /** Center-crop the chosen picture to a small square data URL for the save. */
-  const onOwnerImage = (file: File | undefined) => {
-    if (!file) {
-      setOwnerImage(undefined);
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = () => {
-      const img = new Image();
-      img.onload = () => {
-        const c = document.createElement("canvas");
-        c.width = 128;
-        c.height = 128;
-        const cx = c.getContext("2d");
-        if (!cx) return;
-        const side = Math.min(img.width, img.height);
-        cx.drawImage(img, (img.width - side) / 2, (img.height - side) / 2, side, side, 0, 0, 128, 128);
-        setOwnerImage(c.toDataURL("image/jpeg", 0.85));
-      };
-      img.src = String(reader.result);
-    };
-    reader.readAsDataURL(file);
-  };
 
   const ctor = teams.find((c) => c.id === constructorId);
   const startCash = ctor ? Math.round(ctor.startCash * diff.cashMultiplier * 100) / 100 : 0;
@@ -144,7 +119,7 @@ export default function SetupScreen({ cfg, onStart, onBack }: Props) {
     (step === "Technical" && !!engineId && !!gearboxId && !!techId) ||
     (step === "Philosophy" && true) ||
     (step === "Sponsors" && true) ||
-    (step === "Review" && ownerName.trim().length > 0);
+    step === "Review";
 
   function next() {
     if (!canContinue || overBudget) return;
@@ -161,11 +136,7 @@ export default function SetupScreen({ cfg, onStart, onBack }: Props) {
     const c = teams.find((x) => x.id === constructorId)!;
     return {
       constructorId,
-      owner: {
-        honorific: ownerHonorific,
-        name: ownerName.trim(),
-        ...(ownerImage ? { image: ownerImage } : {}),
-      },
+      owner: cfg.owner,
       philosophy,
       teamOrders: orders,
       driver1Id,
@@ -575,56 +546,22 @@ export default function SetupScreen({ cfg, onStart, onBack }: Props) {
 
       {/* REVIEW */}
       {step === "Review" && (
-        <div className="grid gap-4 lg:grid-cols-2">
-          <Card title="Owner">
-            <div className="flex items-start gap-3">
-              {ownerImage ? (
-                <Img src={ownerImage} alt="Owner portrait" className="h-16 w-16 shrink-0 rounded-full object-cover" />
-              ) : (
-                <label className="flex h-16 w-16 shrink-0 cursor-pointer flex-col items-center justify-center rounded-full border border-dashed border-hairline text-[9px] uppercase tracking-widest text-ink-faint hover:border-telemetry hover:text-telemetry">
-                  Photo
-                  <input type="file" accept="image/*" className="hidden" onChange={(e) => onOwnerImage(e.target.files?.[0])} />
-                </label>
-              )}
-              <div className="min-w-0 flex-1 space-y-2">
-                <div className="flex items-center gap-1">
-                  {(["Mr", "Ms"] as const).map((h) => (
-                    <button
-                      key={h}
-                      type="button"
-                      onClick={() => setOwnerHonorific(h)}
-                      className={`rounded-sm border px-2 py-1.5 text-xs font-bold transition ${
-                        ownerHonorific === h
-                          ? "border-signal/40 bg-signal/15 text-signal"
-                          : "border-transparent bg-raised/40 text-ink-soft hover:bg-raised hover:text-ink"
-                      }`}
-                    >
-                      {h}.
-                    </button>
-                  ))}
-                  <input
-                    value={ownerName}
-                    onChange={(e) => setOwnerName(e.target.value)}
-                    placeholder="Your full name (required)"
-                    maxLength={40}
-                    className="min-w-0 flex-1 rounded-sm border border-hairline bg-raised/40 px-2 py-1.5 text-sm outline-none placeholder:text-ink-faint focus:border-telemetry"
-                  />
-                </div>
-                <p className="text-[11px] leading-relaxed text-ink-faint">
-                  The paddock will address you as{" "}
-                  <span className="font-semibold text-ink-soft">
-                    “{ownerName.trim() ? `${ownerHonorific} ${ownerName.trim().split(/\s+/).pop()}` : "Boss"}”
-                  </span>
-                  .{ownerImage ? "" : " Add an optional photo — it appears in the navbar and on your season report."}
-                </p>
-                {ownerImage && (
-                  <button type="button" onClick={() => setOwnerImage(undefined)} className="text-[11px] uppercase tracking-widest text-signal hover:underline">
-                    Remove photo
-                  </button>
-                )}
-              </div>
+        <>
+          <div className="flex items-center gap-3 rounded-md border border-hairline bg-raised/30 p-3">
+            {cfg.owner.image ? (
+              <Img src={cfg.owner.image} alt={cfg.owner.name} className="h-14 w-14 shrink-0 rounded-full object-cover" />
+            ) : (
+              <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-signal/15 font-display text-xl font-bold text-signal">
+                {(cfg.owner.name || "O").charAt(0).toUpperCase()}
+              </span>
+            )}
+            <div className="min-w-0">
+              <div className="text-[10px] font-semibold uppercase tracking-widest text-ink-faint">Team principal</div>
+              <div className="truncate font-display text-lg font-bold leading-tight">{cfg.owner.name}</div>
+              <div className="text-[11px] text-ink-faint">The paddock calls you “{cfg.owner.callout}”</div>
             </div>
-          </Card>
+          </div>
+          <div className="grid gap-4 lg:grid-cols-2">
           <Card title="Team">
             {ctor && (
               <div className="mb-3">
@@ -657,6 +594,7 @@ export default function SetupScreen({ cfg, onStart, onBack }: Props) {
               </div>
             )}
             <div className="space-y-1 text-sm">
+              <Row k="Principal" v={cfg.owner.callout} />
               <Row k="Constructor" v={ctor?.name ?? "—"} />
               <Row
                 k="Seat 1"
@@ -746,7 +684,8 @@ export default function SetupScreen({ cfg, onStart, onBack }: Props) {
               )}
             </div>
           </Card>
-        </div>
+          </div>
+        </>
       )}
 
       <div className="fixed inset-x-3 bottom-3 z-40 flex items-center justify-between gap-3">

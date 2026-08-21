@@ -18,6 +18,15 @@ import { difficultyOf } from "./state";
 
 export type ActionResult = { ok: boolean; message: string };
 
+/** Move paddock trust after a decision; returns the delta for messaging. */
+function addTrust(t: SimulationState["team"], delta: number): number {
+  if (!t) return 0;
+  t.trust = Math.max(0, Math.min(100, (t.trust ?? 50) + delta));
+  return delta;
+}
+
+const trustNote = (delta: number) => (delta !== 0 ? ` Trust ${delta > 0 ? "+" : ""}${delta}.` : "");
+
 function msg(result: ActionResult, ok: boolean, message: string): ActionResult {
   result.ok = ok;
   result.message = message;
@@ -57,7 +66,7 @@ export function fireEngineer(state: SimulationState, engineerId: string): Action
     category: "staff",
     detail: `${eng.name} released.\nOne-time severance = 50% of the $${eng.cost}M seasonal salary = $${cost}M.`,
   });
-  return msg(result, true, `${eng.name} released (severance $${cost}M).`);
+  return msg(result, true, `${eng.name} released (severance $${cost}M).${trustNote(addTrust(t, -1))}`);
 }
 
 export function hireMechanic(state: SimulationState, mechanicId: string): ActionResult {
@@ -93,7 +102,7 @@ export function fireMechanic(state: SimulationState, mechanicId: string): Action
     category: "staff",
     detail: `${mech.name} released.\nOne-time severance = 50% of the $${mech.cost}M seasonal salary = $${cost}M.`,
   });
-  return msg(result, true, `${mech.name} released (severance $${cost}M).`);
+  return msg(result, true, `${mech.name} released (severance $${cost}M).${trustNote(addTrust(t, -1))}`);
 }
 
 export interface SwapQuote {
@@ -172,7 +181,7 @@ export function swapDriver(state: SimulationState, slot: 1 | 2, driverId: string
     fee: total,
     round: state.completedRounds + 1,
   };
-  return msg(result, true, `${target.name} signed ($${total}M).`);
+  return msg(result, true, `${target.name} signed ($${total}M).${trustNote(addTrust(t, -2))}`);
 }
 
 /** Refund the last driver swap before any race has been run (undo). */
@@ -227,7 +236,7 @@ export function signSponsor(state: SimulationState, sponsorId: string): ActionRe
     category: "sponsor",
     detail: `${spec.name} signed.\nNo up-front fee — pays $${spec.racePayment}M per race weekend.\nBonus: +$${Math.round(spec.bonus * 100) / 100}M if the objective is met.`,
   });
-  return msg(result, true, `${spec.name} signed. No up-front fee — pays per race.`);
+  return msg(result, true, `${spec.name} signed. No up-front fee — pays per race.${trustNote(addTrust(t, 1))}`);
 }
 
 function scheduleObjective(state: SimulationState, sponsorId: string, round: number) {
@@ -360,6 +369,14 @@ export const MGMT_INFO: Record<MgmtAction, { label: string; cost: number; cooldo
   rant: { label: "Private rant", cost: 0, cooldown: 4, desc: "Let them have it behind closed doors. Crushes frustration but damages morale and confidence." },
 };
 
+/** How each owner decision moves paddock trust. */
+const TRUST_DELTA: Record<MgmtAction, number> = {
+  speech: 1,
+  bonus: 2,
+  fine: -3,
+  rant: -4,
+};
+
 /** Rounds remaining before the action is available again (0 = ready). */
 export function mgmtCooldown(state: SimulationState, driverId: string, action: MgmtAction): number {
   const t = state.team!;
@@ -438,7 +455,7 @@ export function manageDriver(state: SimulationState, driverId: string, action: M
     if (existing) existing.racesLeft = Math.max(existing.racesLeft, tail.racesLeft);
     else ds.boosts.push(tail);
   }
-  return msg(result, true, `${info.label}: ${effect}.${tail ? ` Lingering: ${boostDesc(tail)}.` : ""}`);
+  return msg(result, true, `${info.label}: ${effect}.${tail ? ` Lingering: ${boostDesc(tail)}.` : ""}${trustNote(addTrust(t, TRUST_DELTA[action]))}`);
 }
 
 /** Human-readable summary of a lingering boost, e.g. "morale +2 per weekend ×3". */
@@ -534,7 +551,8 @@ export function manageTeam(state: SimulationState, action: TeamAction): ActionRe
     ds.boosts.push({ ...tails[action] });
   }
   if (action === "teambuilding") t.pitCrew = clamp(t.pitCrew + 1, 0, 100);
-  return msg(result, true, `${info.label}: ${effect}. Lingering: ${boostDesc(tails[action])} each.`);
+  const teamTrust: Record<TeamAction, number> = { teambuilding: 2, trainingcamp: 2, psych: 1 };
+  return msg(result, true, `${info.label}: ${effect}. Lingering: ${boostDesc(tails[action])} each.${trustNote(addTrust(t, teamTrust[action]))}`);
 }
 
 function doReplace(state: SimulationState, component: "engine" | "gearbox"): ActionResult {

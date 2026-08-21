@@ -372,12 +372,10 @@ const CHAT_ACKS: Record<string, string> = {
   "chat-tough": "...message received",
 };
 
-/** "Ms. Clark" — how characters address the owner. */
+/** "Ms. Clark" / "Sir" / "Boss" — how characters address the owner. */
 function ownerTitleOf(state: SimulationState): string {
   const o = state.team?.owner;
-  if (!o?.name) return "Boss";
-  const parts = o.name.trim().split(/\s+/);
-  return `${o.honorific} ${parts[parts.length - 1]}`;
+  return o?.callout?.trim() || o?.name?.trim() || "Boss";
 }
 
 export function resolveNewsAction(state: SimulationState, newsId: string, action: string) {
@@ -398,6 +396,7 @@ export function resolveNewsAction(state: SimulationState, newsId: string, action
     const driverId = item.options?.find((o) => o.action === action)?.payload;
     const ds = t.drivers.find((x) => x.driverId === driverId);
     const before = ds ? { morale: ds.morale, confidence: ds.confidence, frustration: ds.frustration } : null;
+    const trustBefore = t.trust ?? 50;
     if (driverId) applyChatResponse(state, driverId, action);
     item.resolved = true;
     item.options = [];
@@ -406,9 +405,10 @@ export function resolveNewsAction(state: SimulationState, newsId: string, action
         const d = ds[k] - before[k];
         return `${k} ${d > 0 ? "+" : ""}${d}`;
       };
+      const trustDelta = (t.trust ?? 50) - trustBefore;
       const label = CHAT_LABELS[action] ?? "You responded";
       const ack = CHAT_ACKS[action];
-      item.body += `\n\n${label} — ${delta("morale")} · ${delta("confidence")} · ${delta("frustration")}.\nNow: morale ${ds.morale} · confidence ${ds.confidence} · frustration ${ds.frustration}.${ack ? `\n"${ack}, ${ownerTitleOf(state)}."` : ""}`;
+      item.body += `\n\n${label} — ${delta("morale")} · ${delta("confidence")} · ${delta("frustration")}.\nPaddock trust ${trustDelta > 0 ? "+" : ""}${trustDelta} (${t.trust ?? 50}/100).\nNow: morale ${ds.morale} · confidence ${ds.confidence} · frustration ${ds.frustration}.${ack ? `\n"${ack}, ${ownerTitleOf(state)}."` : ""}`;
     }
     return;
   }

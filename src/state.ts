@@ -143,10 +143,13 @@ export function constructorName(team: TeamState): string {
   return constructorById(team.constructorId)?.name ?? team.constructorId;
 }
 
-/** "Ms. Clark" — honorific + surname, used when characters address the owner. */
+/** "Ms. Clark" / "Sir" / "Boss" — how characters address the owner. */
 export function ownerTitle(state: SimulationState): string {
   const o = state.team?.owner;
-  if (!o?.name) return "Boss";
-  const parts = o.name.trim().split(/\s+/);
-  return `${o.honorific} ${parts[parts.length - 1]}`;
+  return o?.callout?.trim() || o?.name?.trim() || "Boss";
+}
+
+/** Paddock trust in the owner (0-100); defaults to 50 for older saves. */
+export function trustOf(state: SimulationState): number {
+  return state.team?.trust ?? 50;
 }
