@@ -55,6 +55,8 @@ export function MarketTab({ state, act }: Props) {
   const t = state.team!;
   const [pending, setPending] = useState<{ slot: 1 | 2; driverId: string } | null>(null);
   const [staffPick, setStaffPick] = useState<{ kind: "engineer" | "mechanic"; id: string; action: "hire" | "fire" } | null>(null);
+  const [testPick, setTestPick] = useState<TestType | null>(null);
+  const [ordersPick, setOrdersPick] = useState<"equal" | "priority1" | "priority2" | null>(null);
   const seasonDrivers = Object.values(driversByTeam(state.season))
     .flat()
     .map(driverById)
@@ -194,19 +196,14 @@ export function MarketTab({ state, act }: Props) {
       </div>
 
       <div className="space-y-4">
-        <Card title="Testing">
+        <Card title="Testing" right={<span className="text-[10px] uppercase tracking-wider text-ink-faint">confirm before spend</span>}>
           <div className="space-y-2">
             {(["performance", "reliability", "tire", "driver"] as TestType[]).map((type) => (
               <button
                 key={type}
                 type="button"
                 disabled={t.cash < costs[type]}
-                onClick={() =>
-                  act((s) => {
-                    runTest(s, type);
-                    return `${type} test done.`;
-                  })
-                }
+                onClick={() => setTestPick(type)}
                 className="flex w-full items-center justify-between rounded-sm border border-hairline px-2 py-1.5 text-sm hover:border-telemetry disabled:opacity-40"
               >
                 <span className="capitalize">{type} test</span>
@@ -226,32 +223,173 @@ export function MarketTab({ state, act }: Props) {
           )}
         </Card>
 
-        <Card title="Team orders">
+        <Card title="Team orders" right={<Tag tone={t.teamOrders === "equal" ? "ink" : "signal"}>{t.teamOrders === "equal" ? "Equal" : t.teamOrders === "priority1" ? "1 leads" : "2 leads"}</Tag>}>
           <div className="flex flex-wrap gap-2">
             {(["equal", "priority1", "priority2"] as const).map((o) => (
               <button
                 key={o}
                 type="button"
-                onClick={() =>
-                  act((s) => {
-                    s.team!.teamOrders = o;
-                    return `Orders: ${o}.`;
-                  })
-                }
+                onClick={() => setOrdersPick(o)}
                 className={`rounded-sm border px-2 py-1 text-xs uppercase tracking-wider ${
-                  t.teamOrders === o ? "border-signal bg-signal/15 text-signal" : "border-hairline text-ink-soft"
+                  t.teamOrders === o ? "border-signal bg-signal/15 text-signal" : "border-hairline text-ink-soft hover:border-telemetry"
                 }`}
               >
                 {o === "equal" ? "Equal" : o === "priority1" ? "1 leads" : "2 leads"}
               </button>
             ))}
           </div>
-          <p className="mt-2 text-[11px] text-ink-faint">Affects driver confidence swings between teammates.</p>
+          <p className="mt-2 text-[11px] leading-relaxed text-ink-faint">
+            {ordersLeaderText(state)}
+          </p>
         </Card>
       </div>
 
       {staffPick && <StaffConfirmModal staffPick={staffPick} state={state} act={act} onClose={() => setStaffPick(null)} />}
+      {testPick && (
+        <TestConfirmModal
+          state={state}
+          type={testPick}
+          onClose={() => setTestPick(null)}
+          onConfirm={() => {
+            act((s) => {
+              const r = runTest(s, testPick);
+              return `${r.label}: ${r.value}/100 (${r.confidence}% confidence).`;
+            });
+            setTestPick(null);
+          }}
+        />
+      )}
+      {ordersPick && (
+        <OrdersConfirmModal
+          state={state}
+          mode={ordersPick}
+          onClose={() => setOrdersPick(null)}
+          onConfirm={() => {
+            act((s) => {
+              s.team!.teamOrders = ordersPick;
+              return `Team orders set: ${ORDERS_INFO[ordersPick].label}.`;
+            });
+            setOrdersPick(null);
+          }}
+        />
+      )}
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+
+const TEST_INFO: Record<TestType, string> = {
+  performance: "Aero rake runs and power bench tests. Estimates the car's current performance level (aero/chassis/power blend) before you commit development money.",
+  reliability: "Endurance rig testing. Estimates component reliability and highlights the DNF-risk areas of the car.",
+  tire: "Tire wear simulation across compounds. Estimates how kindly the car treats its tires over long stints.",
+  driver: "Simulator session for your race drivers. Reports driver form and gives both a small confidence/morale boost.",
+};
+
+function TestConfirmModal({
+  state,
+  type,
+  onClose,
+  onConfirm,
+}: {
+  state: SimulationState;
+  type: TestType;
+  onClose: () => void;
+  onConfirm: () => void;
+}) {
+  const t = state.team!;
+  const cost = testingBudget()[type];
+  return (
+    <Modal open onClose={onClose} title={`Run ${type} test?`}>
+      <div className="space-y-3 text-sm">
+        <p className="rounded-md border-l-2 border-telemetry/50 bg-raised/40 p-3 text-xs leading-relaxed text-ink-soft">{TEST_INFO[type]}</p>
+        <div className="grid gap-1 rounded-md border border-hairline bg-raised/40 p-3 text-xs">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-ink-faint">Cost</span>
+            <span className="tabular">−<Money value={cost} /></span>
+          </div>
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-ink-faint">Cash</span>
+            <span className="tabular">${t.cash.toFixed(1)}M → ${(t.cash - cost).toFixed(1)}M</span>
+          </div>
+        </div>
+        <div className="flex justify-end gap-2 pt-1">
+          <Button small variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button small onClick={onConfirm}>Yes, run test</Button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+const ORDERS_INFO: Record<"equal" | "priority1" | "priority2", { label: string; desc: string }> = {
+  equal: {
+    label: "Equal",
+    desc: "No team orders — both drivers race each other hard and strategy calls go to whoever is better placed at the time. Confidence swings come purely from results.",
+  },
+  priority1: {
+    label: "1 leads",
+    desc: "Seat 1 is the designated leader: he gets strategic priority (fresh tires, track-position calls). The leader gains confidence when ahead; the supporting driver can lose morale if ordered to hold position.",
+  },
+  priority2: {
+    label: "2 leads",
+    desc: "Seat 2 is the designated leader: he gets strategic priority (fresh tires, track-position calls). The leader gains confidence when ahead; the supporting driver can lose morale if ordered to hold position.",
+  },
+};
+
+function ordersLeaderText(state: SimulationState): string {
+  const t = state.team!;
+  if (state.completedRounds === 0) return "No races run yet — the championship leader shows here once the season starts.";
+  const posOf = (id: string) => state.standingsDrivers.findIndex((s) => s.driverId === id) + 1;
+  const p1 = posOf(t.driver1Id);
+  const p2 = posOf(t.driver2Id);
+  if (!p1 || !p2) return "No races run yet.";
+  const leader = p1 <= p2 ? driverById(t.driver1Id, state.season) : driverById(t.driver2Id, state.season);
+  return `Current leader: ${leader?.shortName ?? "?"} (WDC P${Math.min(p1, p2)}).`;
+}
+
+function OrdersConfirmModal({
+  state,
+  mode,
+  onClose,
+  onConfirm,
+}: {
+  state: SimulationState;
+  mode: "equal" | "priority1" | "priority2";
+  onClose: () => void;
+  onConfirm: () => void;
+}) {
+  const t = state.team!;
+  const info = ORDERS_INFO[mode];
+  const posOf = (id: string) => state.standingsDrivers.findIndex((s) => s.driverId === id) + 1;
+  const rows = ([1, 2] as const).map((slot) => {
+    const id = slot === 1 ? t.driver1Id : t.driver2Id;
+    const d = driverById(id, state.season);
+    const ds = t.drivers.find((x) => x.driverId === id);
+    return { slot, name: d?.shortName ?? id, wdc: posOf(id), pts: ds?.points ?? 0 };
+  });
+  return (
+    <Modal open onClose={onClose} title="Change team orders?">
+      <div className="space-y-3 text-sm">
+        <p className="rounded-md border-l-2 border-signal/50 bg-raised/40 p-3 text-xs leading-relaxed text-ink-soft">{info.desc}</p>
+        <div className="divide-y divide-hairline/60 rounded-md border border-hairline">
+          {rows.map((r) => {
+            const isLeader = mode !== "equal" && mode === (`priority${r.slot}` as const);
+            return (
+              <div key={r.slot} className="flex items-center gap-2 px-3 py-1.5 text-xs">
+                <Tag tone={isLeader ? "signal" : "ink"}>{isLeader ? "Leader" : `Seat ${r.slot}`}</Tag>
+                <span className="min-w-0 flex-1 truncate font-semibold">{r.name}</span>
+                <span className="tabular text-ink-faint">{state.completedRounds > 0 ? `WDC P${r.wdc} · ${r.pts} pts` : "no races yet"}</span>
+              </div>
+            );
+          })}
+        </div>
+        <div className="flex justify-end gap-2 pt-1">
+          <Button small variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button small onClick={onConfirm}>Set “{info.label}”</Button>
+        </div>
+      </div>
+    </Modal>
   );
 }
 

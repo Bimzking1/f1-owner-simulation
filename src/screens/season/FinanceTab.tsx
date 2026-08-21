@@ -29,11 +29,12 @@ export function FinanceTab({ state }: { state: SimulationState }) {
               return (
                 <div key={r} className="grid grid-cols-[1fr_5rem_5rem_5rem] gap-2 py-1 text-sm">
                   <span className="min-w-0 truncate text-ink-soft" title={`Round ${r}${gp ? ` — ${gp}` : ""}`}>
-                    R{r}{gp ? ` — ${gp}` : ""}
+                    <span className="sm:hidden">R{r}</span>
+                    <span className="hidden sm:inline">R{r}{gp ? ` — ${gp}` : ""}</span>
                   </span>
-                  <span className="tabular text-positive">+{d.inc.toFixed(1)}</span>
-                  <span className="tabular text-signal">{d.exp.toFixed(1)}</span>
-                  <span className={`tabular ${d.inc + d.exp < 0 ? "text-signal" : "text-ink"}`}>
+                  <span className="tabular text-right text-positive">+{d.inc.toFixed(1)}</span>
+                  <span className="tabular text-right text-signal">{d.exp.toFixed(1)}</span>
+                  <span className={`tabular text-right ${d.inc + d.exp < 0 ? "text-signal" : "text-ink"}`}>
                     {(d.inc + d.exp) >= 0 ? "+" : ""}{(d.inc + d.exp).toFixed(1)}
                   </span>
                 </div>

@@ -210,14 +210,15 @@ export function InfoTip({
         aria-label={`About ${title}`}
         onClick={(e) => {
           e.stopPropagation();
+          setHover(false);
           setModal(true);
         }}
         className="flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full border border-telemetry/50 bg-telemetry/10 px-1 text-[9px] font-bold leading-none text-telemetry transition hover:bg-telemetry/25"
       >
         i
       </button>
-      {/* desktop hover tooltip */}
-      {hover && (
+      {/* desktop hover tooltip — hidden while the modal is open */}
+      {hover && !modal && (
         <span className="pointer-events-none absolute left-1/2 top-full z-[70] mt-1.5 hidden w-64 -translate-x-1/2 rounded-md border border-hairline bg-void p-3 text-left shadow-2xl md:block">
           <span className="mb-1 block font-display text-xs font-bold uppercase tracking-widest text-telemetry">{title}</span>
           <span className="block text-[11px] leading-relaxed text-ink-soft">{children}</span>

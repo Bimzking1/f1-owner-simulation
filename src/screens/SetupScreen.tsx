@@ -87,7 +87,6 @@ export default function SetupScreen({ cfg, onStart, onBack }: Props) {
     engineerIds.reduce((a, id) => a + (engineerById(id)?.cost ?? 0), 0) +
     mechanicIds.reduce((a, id) => a + (mechanicById(id)?.cost ?? 0), 0);
   const staffWeekly = totalRounds > 0 ? Math.round((staffCost / totalRounds) * 100) / 100 : 0;
-  const sponsorRaceIncome = sponsorIds.reduce((a, id) => a + (sponsorById(id)?.racePayment ?? 0), 0);
   const remaining = Math.round((startCash - equipmentCost) * 100) / 100;
 
   const d1 = driverById(driver1Id, cfg.season);
@@ -374,7 +373,7 @@ export default function SetupScreen({ cfg, onStart, onBack }: Props) {
                     name={e.name}
                     cost={e.cost}
                     badge={<SeniorityBadge tone={sen.tone} label={sen.label} />}
-                    meta={<Tag tone="telemetry">{engineerRole(e)}</Tag>}
+                    meta={<Tag tone="ink">{engineerRole(e)}</Tag>}
                     ratings={
                       <>
                         <Rating label="Expertise" value={e.expertise} />
@@ -416,7 +415,7 @@ export default function SetupScreen({ cfg, onStart, onBack }: Props) {
                     name={m.name}
                     cost={m.cost}
                     badge={<SeniorityBadge tone={tier.tone} label={tier.label} />}
-                    meta={<Tag tone="telemetry">Pit crew</Tag>}
+                    meta={<Tag tone="ink">Pit crew</Tag>}
                     ratings={
                       <>
                         <Rating label="Pit" value={`${m.pitStop.toFixed(2)}s`} rank={100 - Math.round((m.pitStop - 2) * 40)} />
@@ -606,30 +605,61 @@ export default function SetupScreen({ cfg, onStart, onBack }: Props) {
               <Row k="Equipment (one-time)" v={`-${money(equipmentCost)}`} />
               <Row k="Driver wages" v={d1 && d2 ? `${money(d1.salary + d2.salary)}/weekend` : "—"} />
               <Row k="Staff wages" v={`${money(staffWeekly)}/weekend`} />
-              <div className="flex items-center justify-between gap-3">
-                <span className="shrink-0 text-ink-faint">Sponsors</span>
-                {sponsorIds.length > 0 ? (
-                  <span className="flex min-w-0 flex-wrap items-center justify-end gap-1.5">
-                    {sponsorIds.map((id) => {
-                      const sp = sponsorById(id);
-                      if (!sp) return null;
-                      return (
-                        <span key={id} title={sp.name} className="inline-flex">
-                          <Img src={sp.image} alt={sp.name} className="h-4 w-8 rounded-sm object-contain" />
-                        </span>
-                      );
-                    })}
-                    <span className="ml-1">{money(sponsorRaceIncome)}/race income</span>
-                  </span>
-                ) : (
-                  <span className="text-ink-faint">none</span>
-                )}
-              </div>
               <Row k="Cash at season start" v={money(remaining)} bold />
             </div>
             <div className="mt-4 text-xs text-ink-faint">
               Difficulty {diff.label} · {cfg.season === 2013 ? "2013, 19 races" : "2025, 24 races + sprints"} · detail level{" "}
               {cfg.gameLength} · driver & staff wages paid per weekend; parts (engine, gearbox, tech) bought up front
+            </div>
+            <div className="mt-3 border-t border-hairline pt-3">
+              <div className="mb-2 flex items-center justify-between">
+                <span className="font-display text-sm font-bold uppercase tracking-wider">Sponsors</span>
+                <span className="text-[11px] text-ink-faint">{sponsorIds.length}/5 slots</span>
+              </div>
+              {sponsorIds.length === 0 ? (
+                <p className="text-xs text-ink-faint">No sponsors signed yet.</p>
+              ) : (
+                <div className="space-y-2">
+                  {sponsorIds.map((id) => {
+                    const sp = sponsorById(id);
+                    if (!sp) return null;
+                    const seasonTotal = Math.round((sp.racePayment * totalRounds + sp.bonus) * 100) / 100;
+                    return (
+                      <div key={id} className="flex items-center gap-3 rounded-md border border-hairline bg-raised/30 p-2">
+                        <Img src={sp.image} alt={sp.name} className="h-10 w-20 shrink-0 rounded-sm bg-white object-contain p-1" />
+                        <div className="min-w-0 flex-1 text-xs">
+                          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                            <span className="font-display text-sm font-bold">{sp.name}</span>
+                            <Tag tone={sp.tier === "title" ? "elite" : sp.tier === "major" ? "telemetry" : "ink"}>{sp.tier}</Tag>
+                          </div>
+                          <div className="mt-0.5 text-ink-soft">
+                            Pays {money(sp.racePayment)}/race · bonus +{money(sp.bonus)} if objective met
+                          </div>
+                          <div className="mt-0.5 text-[11px] leading-snug text-ink-faint">Requirement: {sp.objectiveTextEnjoyer}</div>
+                          <div className="mt-0.5 text-[11px] text-ink-faint">
+                            Length: full season ({totalRounds} races) · terminable anytime
+                          </div>
+                        </div>
+                        <div className="shrink-0 text-right">
+                          <div className="text-[10px] uppercase tracking-widest text-ink-faint">Per season</div>
+                          <div className="tabular text-sm font-bold text-positive">{money(seasonTotal)}</div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  <div className="flex items-center justify-between border-t border-hairline pt-2 text-sm">
+                    <span className="text-ink-faint">Total sponsor income per season</span>
+                    <span className="tabular font-bold text-positive">
+                      {money(
+                        sponsorIds.reduce((a, id) => {
+                          const sp = sponsorById(id);
+                          return a + (sp ? sp.racePayment * totalRounds + sp.bonus : 0);
+                        }, 0),
+                      )}
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
           </Card>
         </div>
@@ -761,7 +791,7 @@ function StaffCard({
         }
       }}
       {...hold}
-      className={`flex items-center gap-3 rounded-md border p-2 text-left transition ${
+      className={`rounded-md border p-2 text-left transition ${
         hired
           ? "border-positive/50 bg-positive/10"
           : disabled
@@ -769,20 +799,20 @@ function StaffCard({
             : "cursor-pointer border-hairline bg-surface hover:border-ink-faint"
       }`}
     >
-      <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+      <div className="flex items-start justify-between gap-2">
+        <span className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1">
           <span className="font-display font-bold">{name}</span>
-          {badge}
           <InfoTip title={name} open={open} onOpenChange={setOpen}>
             {tip}
           </InfoTip>
-        </div>
-        <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-ink-soft">
-          {meta}
-          {ratings}
-        </div>
+        </span>
+        <Money value={cost} className="shrink-0 text-sm font-bold" />
       </div>
-      <Money value={cost} className="shrink-0 text-sm font-bold" />
+      <div className="mt-1 flex flex-wrap items-center gap-1.5">
+        {badge}
+        {meta}
+      </div>
+      <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-ink-soft">{ratings}</div>
     </div>
   );
 }

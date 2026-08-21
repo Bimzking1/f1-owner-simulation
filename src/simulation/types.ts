@@ -85,6 +85,17 @@ export interface DriverState {
   form: number; // -10..+10 seasonal form offset
   dnfs: number;
   points: number;
+  /** Owner interventions with lingering per-weekend effects (spec §24). */
+  boosts?: DriverBoost[];
+}
+
+/** A temporary morale effect applied once per weekend for `racesLeft` weekends. */
+export interface DriverBoost {
+  label: string;
+  morale?: number;
+  confidence?: number;
+  frustration?: number;
+  racesLeft: number;
 }
 
 // ---------------------------------------------------------------------------

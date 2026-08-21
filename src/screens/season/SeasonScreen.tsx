@@ -75,16 +75,24 @@ export default function SeasonScreen({ state, onRunRound, onNewsAction, act, onR
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:flex-nowrap">
           <Stat label="Cash" value={<Money value={t.cash} />} tone={t.cash < 0 ? "caution" : undefined} />
           <Stat label="Reputation" value={t.reputation} />
           <Stat label="WCC Pts" value={t.points} />
           {!seasonDone && (
-            <Button onClick={onRunRound} className="shrink-0">
+            <Button onClick={onRunRound} className="hidden shrink-0 md:inline-flex">
               Run R{state.round + 1} · {next.grandPrix} →
             </Button>
           )}
-          <Button variant="ghost" small onClick={() => setConfirmMenu(true)}>Menu</Button>
+          <Button variant="ghost" small onClick={() => setConfirmMenu(true)} className="ml-auto md:ml-0">
+            Menu
+          </Button>
+          {/* mobile: the long run label gets its own full-width row below the stats */}
+          {!seasonDone && (
+            <Button onClick={onRunRound} className="w-full md:hidden">
+              Run R{state.round + 1} · {next.grandPrix} →
+            </Button>
+          )}
         </div>
       </header>
 

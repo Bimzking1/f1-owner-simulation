@@ -247,6 +247,18 @@ export function applyMorale(state: SimulationState, weekend: RaceWeekendResult) 
   const diff = DIFFICULTIES.find((d) => d.id === state.difficulty) ?? DIFFICULTIES[1];
   const mult = diff.moraleMultiplier;
 
+  // owner interventions: lingering boosts apply once per weekend, then expire
+  for (const ds of t.drivers) {
+    if (!ds.boosts?.length) continue;
+    for (const b of ds.boosts) {
+      if (b.morale) ds.morale = clamp(ds.morale + Math.round(b.morale * mult), 0, 100);
+      if (b.confidence) ds.confidence = clamp(ds.confidence + Math.round(b.confidence * mult), 0, 100);
+      if (b.frustration) ds.frustration = clamp(ds.frustration + Math.round(b.frustration * mult), 0, 100);
+      b.racesLeft -= 1;
+    }
+    ds.boosts = ds.boosts.filter((b) => b.racesLeft > 0);
+  }
+
   for (const ds of t.drivers) {
     const entry = weekend.playerEntries.find((e) => e.driverId === ds.driverId);
     if (!entry) continue;

@@ -1,5 +1,6 @@
 import type { NewsItem, SimulationState } from "@/simulation/types";
 import { driverById, constructorById, sponsorById } from "@/data";
+import { boostDesc } from "@/actions";
 import { Bar, Button, Card, Img, Meter, Ovr, Tag } from "@/ui/kit";
 import { driverImage } from "@/data/assets";
 import { MiniBar, StandingsCard } from "./parts";
@@ -41,7 +42,7 @@ export function OverviewTab({ state, onNewsAction, onRunRound, onNavigate }: Pro
           </Card>
         )}
         {next && (
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md border border-hairline bg-surface/70 px-4 py-2 text-sm">
+          <div className="flex flex-col gap-1.5 rounded-md border border-hairline bg-surface/70 px-4 py-2 text-sm sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-3 sm:gap-y-1">
             <span className="font-display text-base font-bold">{next.name}</span>
             <span className="text-xs text-ink-faint">
               {next.country} · {next.laps} laps · {next.lengthKm.toFixed(3)} km
@@ -50,7 +51,7 @@ export function OverviewTab({ state, onNewsAction, onRunRound, onNavigate }: Pro
             <button
               type="button"
               onClick={() => onNavigate("Race")}
-              className="ml-auto text-[11px] uppercase tracking-widest text-telemetry hover:text-ink"
+              className="text-left text-[11px] uppercase tracking-widest text-telemetry hover:text-ink sm:ml-auto sm:text-right"
             >
               Details & map on the Race tab →
             </button>
@@ -115,6 +116,23 @@ export function OverviewTab({ state, onNewsAction, onRunRound, onNavigate }: Pro
                       <MiniBar label="Conf" value={ds.confidence} />
                       <MiniBar label="Morale" value={ds.morale} />
                     </div>
+                    {!!ds.boosts?.length && (
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {ds.boosts.map((b, i) => (
+                          <span
+                            key={`${b.label}-${i}`}
+                            title={boostDesc(b)}
+                            className={`rounded-sm border px-1 py-px text-[9px] ${
+                              (b.morale ?? 0) + (b.confidence ?? 0) + (b.frustration ?? 0) >= 0
+                                ? "border-positive/40 bg-positive/10 text-positive"
+                                : "border-signal/40 bg-signal/10 text-signal"
+                            }`}
+                          >
+                            {b.label} ×{b.racesLeft}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               );

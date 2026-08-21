@@ -3,7 +3,7 @@
 // Each takes a SimulationState and returns a user-facing message.
 // ============================================================================
 
-import type { Driver, DriverState, SimulationState, TestReport, TestType } from "@/simulation/types";
+import type { Driver, DriverBoost, DriverState, SimulationState, TestReport, TestType } from "@/simulation/types";
 import type { DevOption } from "@/simulation/systems";
 import {
   generateDevOptions,
@@ -404,30 +404,51 @@ export function manageDriver(state: SimulationState, driverId: string, action: M
   }
 
   let effect = "";
+  let tail: DriverBoost | null = null;
   switch (action) {
     case "speech":
       ds.morale = clamp(ds.morale + 5, 0, 100);
       ds.confidence = clamp(ds.confidence + 2, 0, 100);
+      tail = { label: "Speech", morale: 2, racesLeft: 2 };
       effect = "morale +5, confidence +2";
       break;
     case "bonus":
       ds.morale = clamp(ds.morale + 10, 0, 100);
       ds.confidence = clamp(ds.confidence + 5, 0, 100);
+      tail = { label: "Bonus", morale: 3, confidence: 2, racesLeft: 4 };
       effect = "morale +10, confidence +5";
       break;
     case "fine":
       ds.frustration = clamp(ds.frustration - 10, 0, 100);
       ds.morale = clamp(ds.morale - 5, 0, 100);
+      tail = { label: "Fine", morale: -2, racesLeft: 3 };
       effect = "frustration −10, morale −5";
       break;
     case "rant":
       ds.frustration = clamp(ds.frustration - 6, 0, 100);
       ds.morale = clamp(ds.morale - 8, 0, 100);
       ds.confidence = clamp(ds.confidence - 2, 0, 100);
+      tail = { label: "Rant", morale: -2, racesLeft: 3 };
       effect = "frustration −6, morale −8, confidence −2";
       break;
   }
-  return msg(result, true, `${info.label}: ${effect}.`);
+  if (tail) {
+    ds.boosts ??= [];
+    const existing = ds.boosts.find((b) => b.label === tail.label);
+    if (existing) existing.racesLeft = Math.max(existing.racesLeft, tail.racesLeft);
+    else ds.boosts.push(tail);
+  }
+  return msg(result, true, `${info.label}: ${effect}.${tail ? ` Lingering: ${boostDesc(tail)}.` : ""}`);
+}
+
+/** Human-readable summary of a lingering boost, e.g. "morale +2 per weekend ×3". */
+export function boostDesc(b: DriverBoost): string {
+  const parts: string[] = [];
+  const sign = (v: number) => `${v > 0 ? "+" : ""}${v}`;
+  if (b.morale) parts.push(`morale ${sign(b.morale)}`);
+  if (b.confidence) parts.push(`confidence ${sign(b.confidence)}`);
+  if (b.frustration) parts.push(`frustration ${sign(b.frustration)}`);
+  return `${parts.join(", ")} per weekend ×${b.racesLeft}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -486,6 +507,11 @@ export function manageTeam(state: SimulationState, action: TeamAction): ActionRe
   });
 
   let effect = "";
+  const tails: Record<TeamAction, DriverBoost> = {
+    teambuilding: { label: "Team building", morale: 2, racesLeft: 3 },
+    trainingcamp: { label: "Training camp", confidence: 3, racesLeft: 4 },
+    psych: { label: "Psychology", frustration: -3, confidence: 2, racesLeft: 3 },
+  };
   for (const ds of t.drivers) {
     switch (action) {
       case "teambuilding":
@@ -504,9 +530,11 @@ export function manageTeam(state: SimulationState, action: TeamAction): ActionRe
         effect = "confidence +5, frustration −5 (both drivers)";
         break;
     }
+    ds.boosts ??= [];
+    ds.boosts.push({ ...tails[action] });
   }
   if (action === "teambuilding") t.pitCrew = clamp(t.pitCrew + 1, 0, 100);
-  return msg(result, true, `${info.label}: ${effect}.`);
+  return msg(result, true, `${info.label}: ${effect}. Lingering: ${boostDesc(tails[action])} each.`);
 }
 
 function doReplace(state: SimulationState, component: "engine" | "gearbox"): ActionResult {

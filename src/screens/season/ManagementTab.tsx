@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { SimulationState } from "@/simulation/types";
 import { driverById } from "@/data";
-import { manageDriver, manageTeam, mgmtCooldown, teamCooldown, MGMT_INFO, TEAM_INFO, type MgmtAction, type TeamAction } from "@/actions";
+import { boostDesc, manageDriver, manageTeam, mgmtCooldown, teamCooldown, MGMT_INFO, TEAM_INFO, type MgmtAction, type TeamAction } from "@/actions";
 import { Bar, Button, Card, Empty, Img, Tag } from "@/ui/kit";
 import { driverImage } from "@/data/assets";
 import type { Act } from "./parts";
@@ -63,6 +63,23 @@ export function ManagementTab({ state, act, onNewsAction }: Props) {
                           : "Mood is neutral."}
                     </div>
                   </div>
+                  {!!ds.boosts?.length && (
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      {ds.boosts.map((b, i) => (
+                        <span
+                          key={`${b.label}-${i}`}
+                          title={`Applies once per weekend, then expires`}
+                          className={`rounded-sm border px-1.5 py-0.5 text-[10px] ${
+                            (b.morale ?? 0) + (b.confidence ?? 0) + (b.frustration ?? 0) >= 0
+                              ? "border-positive/40 bg-positive/10 text-positive"
+                              : "border-signal/40 bg-signal/10 text-signal"
+                          }`}
+                        >
+                          {b.label}: {boostDesc(b)}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                   <div className="mt-3 flex flex-wrap gap-2">
                     {(Object.keys(MGMT_INFO) as MgmtAction[]).map((a) => {
                       const cd = mgmtCooldown(state, ds.driverId, a);

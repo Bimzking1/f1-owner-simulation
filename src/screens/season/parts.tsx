@@ -79,8 +79,8 @@ export function NextRaceCard({ track, round }: { track: Track; round?: number })
             ))}
           </div>
         </div>
-        <div className="shrink-0">
-          <div className="flex aspect-[4/3] h-36 items-center justify-center overflow-hidden rounded-sm bg-white p-2 md:h-44">
+        <div className="w-full shrink-0 md:w-auto">
+          <div className="flex aspect-[4/3] w-full items-center justify-center overflow-hidden rounded-sm bg-white p-2 md:h-44 md:w-auto">
             <Img
               src={track.image}
               alt={`${track.name} circuit layout`}
