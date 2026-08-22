@@ -1,4 +1,3 @@
-import { useState } from "react";
 import type { NewsItem, SimulationState } from "@/simulation/types";
 import { driverById, constructorById, sponsorById } from "@/data";
 import { boostDesc } from "@/actions";
@@ -18,16 +17,19 @@ interface Props {
 export function OverviewTab({ state, onNewsAction, onRunRound, onNavigate }: Props) {
   const t = state.team!;
   const next = state.calendar[state.round];
-  const [achOpen, setAchOpen] = useState<"races" | "wins" | "podiums" | null>(null);
 
-  // per-driver achievement counts for the expandable stat tiles
+  // per-driver achievement counts (current line-up) shown under the stat tiles
   const myDrivers = state.standingsDrivers.filter((s) => s.teamId === t.constructorId);
   const driverName = (id: string) => driverById(id, state.season)?.shortName ?? id;
-  const achDetail: Record<"races" | "wins" | "podiums", { name: string; count: number }[]> = {
-    races: myDrivers.map((s) => ({ name: driverName(s.driverId), count: Math.max(0, state.completedRounds - s.dnfs) })),
-    wins: myDrivers.map((s) => ({ name: driverName(s.driverId), count: s.wins })),
-    podiums: myDrivers.map((s) => ({ name: driverName(s.driverId), count: s.podiums })),
+  // points/wins/podiums credited to the team but not to either current driver
+  // (scored by drivers who were swapped out mid-season — the team keeps them)
+  const sumOf = (pick: (s: (typeof myDrivers)[number]) => number) => myDrivers.reduce((a, s) => a + pick(s), 0);
+  const exDrivers = {
+    wins: t.wins - sumOf((s) => s.wins),
+    podiums: t.podiums - sumOf((s) => s.podiums),
+    points: t.points - sumOf((s) => s.points),
   };
+  const hasExDrivers = exDrivers.wins !== 0 || exDrivers.podiums !== 0 || exDrivers.points !== 0;
 
   // group the feed into per-GP blocks with separators
   const groups: { round: number; items: NewsItem[] }[] = [];
@@ -147,46 +149,65 @@ export function OverviewTab({ state, onNewsAction, onRunRound, onNavigate }: Pro
               );
             })}
           </div>
-          {/* season achievements — under the driver form bars; click a tile to see who got them */}
+          {/* season achievements — under the driver form bars; breakdown always visible */}
           <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-            {(
-              [
-                ["races", "Races", state.completedRounds],
-                ["wins", "Wins", t.wins],
-                ["podiums", "Podiums", t.podiums],
-              ] as const
-            ).map(([key, label, value]) => (
-              <button
-                key={key}
-                type="button"
-                aria-expanded={achOpen === key}
-                onClick={() => setAchOpen(achOpen === key ? null : key)}
-                className={`rounded-md border px-3 py-1.5 text-left transition ${
-                  achOpen === key ? "border-telemetry/50 bg-telemetry/10" : "border-hairline bg-raised/50 hover:border-ink-faint"
-                }`}
-              >
-                <span className="label-tech block text-[9px] text-ink-faint">{label}</span>
-                <span className="num-data block text-lg leading-tight">
-                  {value}
-                  <span className="ml-1 text-[10px] text-ink-faint">{achOpen === key ? "▾" : "▸"}</span>
-                </span>
-              </button>
-            ))}
+            <div className="rounded-md border border-hairline bg-raised/50 px-3 py-1.5">
+              <div className="label-tech text-[9px] text-ink-faint">Races</div>
+              <div className="num-data text-lg leading-tight">{state.completedRounds}</div>
+            </div>
+            <div className="rounded-md border border-hairline bg-raised/50 px-3 py-1.5">
+              <div className="label-tech text-[9px] text-ink-faint">Wins</div>
+              <div className="num-data text-lg leading-tight">{t.wins}</div>
+            </div>
+            <div className="rounded-md border border-hairline bg-raised/50 px-3 py-1.5">
+              <div className="label-tech text-[9px] text-ink-faint">Podiums</div>
+              <div className="num-data text-lg leading-tight">{t.podiums}</div>
+            </div>
             <div className="rounded-md border border-positive/30 bg-positive/10 px-3 py-1.5">
               <div className="label-tech text-[9px] text-positive">WCC Pts</div>
               <div className="num-data text-lg leading-tight text-positive">{t.points}</div>
             </div>
           </div>
-          {achOpen && (
-            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 rounded-md border border-hairline bg-raised/40 px-3 py-2 text-xs">
-              {achDetail[achOpen].map((d) => (
-                <span key={d.name} className="flex items-center gap-1.5">
-                  <span className="text-ink-soft">{d.name}</span>
-                  <span className="num-data text-[13px] leading-none text-ink">{d.count}</span>
-                </span>
+          {/* who scored them — current drivers, any points kept from swapped-out
+              drivers, and the team total (matches the WCC standings) */}
+          <table className="mt-2 w-full text-left text-xs lg:text-sm">
+            <thead>
+              <tr className="label-tech border-b border-hairline text-[8px] text-ink-faint lg:text-[9px]">
+                <th className="py-1 pr-2 font-medium lg:pr-6">Driver</th>
+                <th className="py-1 pr-2 text-right font-medium lg:px-5">Races</th>
+                <th className="py-1 pr-2 text-right font-medium lg:px-5">Wins</th>
+                <th className="py-1 pr-2 text-right font-medium lg:px-5">Podiums</th>
+                <th className="py-1 text-right font-medium lg:pl-5">Pts</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-hairline/40">
+              {myDrivers.map((s) => (
+                <tr key={s.driverId}>
+                  <td className="py-1 pr-2 text-ink-soft lg:pr-6">{driverName(s.driverId)}</td>
+                  <td className="num-data py-1 pr-2 text-right lg:px-5">{Math.max(0, state.completedRounds - s.dnfs)}</td>
+                  <td className="num-data py-1 pr-2 text-right lg:px-5">{s.wins}</td>
+                  <td className="num-data py-1 pr-2 text-right lg:px-5">{s.podiums}</td>
+                  <td className="num-data py-1 text-right text-ink lg:pl-5">{s.points}</td>
+                </tr>
               ))}
-            </div>
-          )}
+              {hasExDrivers && (
+                <tr title="Scored by a driver you replaced mid-season — the team keeps those points">
+                  <td className="py-1 pr-2 text-ink-faint italic lg:pr-6">Ex-drivers</td>
+                  <td className="num-data py-1 pr-2 text-right text-ink-faint lg:px-5">—</td>
+                  <td className={`num-data py-1 pr-2 text-right lg:px-5 ${exDrivers.wins ? "text-ink" : "text-ink-faint"}`}>{exDrivers.wins}</td>
+                  <td className={`num-data py-1 pr-2 text-right lg:px-5 ${exDrivers.podiums ? "text-ink" : "text-ink-faint"}`}>{exDrivers.podiums}</td>
+                  <td className={`num-data py-1 text-right lg:pl-5 ${exDrivers.points ? "text-ink" : "text-ink-faint"}`}>{exDrivers.points}</td>
+                </tr>
+              )}
+              <tr className="border-t border-hairline">
+                <td className="label-tech py-1 pr-2 text-[9px] lg:pr-6">Team WCC</td>
+                <td className="num-data py-1 pr-2 text-right lg:px-5">{state.completedRounds}</td>
+                <td className="num-data py-1 pr-2 text-right lg:px-5">{t.wins}</td>
+                <td className="num-data py-1 pr-2 text-right lg:px-5">{t.podiums}</td>
+                <td className="num-data py-1 text-right text-positive lg:pl-5">{t.points}</td>
+              </tr>
+            </tbody>
+          </table>
           <div className="mt-3 grid gap-2 sm:grid-cols-2">
             <Bar label="Aero" value={t.car.aero} />
             <Bar label="Chassis" value={t.car.chassis} />
