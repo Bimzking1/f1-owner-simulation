@@ -39,10 +39,10 @@ export function StatValue({ children, className = "" }: { children: ReactNode; c
 }
 
 export function Money({ value, className = "" }: { value: number; className?: string }) {
-  const neg = value < 0;
+  const tone = value < 0 ? "text-signal" : value > 0 ? "text-positive" : "";
   return (
-    <span className={`num-data ${neg ? "text-caution" : ""} ${className}`}>
-      {neg ? "-$" : "$"}
+    <span className={`num-data ${tone} ${className}`}>
+      {value < 0 ? "-$" : "$"}
       {Math.abs(Math.round(value * 100) / 100).toFixed(value % 1 === 0 ? 0 : 1)}M
     </span>
   );
@@ -105,12 +105,13 @@ export function Card({ title, right, children, className = "", pad = true }: { t
   );
 }
 
-export function Button({ children, onClick, variant = "primary", disabled, className = "", small }: { children: ReactNode; onClick?: () => void; variant?: "primary" | "ghost" | "danger" | "positive"; disabled?: boolean; className?: string; small?: boolean }) {
+export function Button({ children, onClick, variant = "primary", disabled, className = "", small }: { children: ReactNode; onClick?: () => void; variant?: "primary" | "ghost" | "danger" | "positive" | "signal"; disabled?: boolean; className?: string; small?: boolean }) {
   const vars: Record<string, string> = {
     primary: "bg-signal text-white hover:bg-signal/80 border border-signal/60",
     ghost: "bg-raised text-ink-soft hover:text-ink hover:bg-raised/80 border border-hairline",
     danger: "bg-transparent text-caution border border-caution/40 hover:bg-caution/10",
     positive: "bg-positive/20 text-positive border border-positive/40 hover:bg-positive/30",
+    signal: "bg-transparent text-signal border border-signal/40 hover:bg-signal/10",
   };
   return (
     <button
@@ -161,7 +162,7 @@ export function Stat({ label, value, sub, tone }: { label: string; value: ReactN
   return (
     <div className="rounded-md border border-hairline bg-raised/60 px-3 py-2">
       <div className="label-tech text-[10px] text-ink-faint">{label}</div>
-      <div className={`num-display mt-0.5 text-xl ${toneCls}`}>{value}</div>
+      <div className={`num-data mt-0.5 text-xl ${toneCls}`}>{value}</div>
       {sub && <div className="mt-0.5 text-[11px] leading-snug text-ink-faint">{sub}</div>}
     </div>
   );

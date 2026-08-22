@@ -110,8 +110,8 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* Hero stats ONLY — big obvious numbers (cash remaining, season year, final
-   classification). Too wide for dense tables; use sparingly. */
+/* Hero stats ONLY — rare, big, standalone numbers (e.g. the principal's
+   reputation). Too wide for tables and dense data; use sparingly. */
 @utility num-display {
   font-family: var(--font-stat);
   font-weight: 700;

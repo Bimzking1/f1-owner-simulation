@@ -138,7 +138,7 @@ export function EndScreens({ state, onReset }: Props) {
           Season {state.season} · seed {state.seed} · final report
         </div>
         <h1 className="mt-1 text-hero uppercase">
-          <span className="num-display">WCC P{pos}</span>
+          <span className="pos-num">WCC P{pos}</span>
           <span className="font-display font-bold text-signal">.</span>
         </h1>
         <p className="mt-2 text-sm text-ink-soft">{headline}</p>

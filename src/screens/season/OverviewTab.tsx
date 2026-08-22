@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { NewsItem, SimulationState } from "@/simulation/types";
 import { driverById, constructorById, sponsorById } from "@/data";
 import { boostDesc } from "@/actions";
@@ -17,6 +18,16 @@ interface Props {
 export function OverviewTab({ state, onNewsAction, onRunRound, onNavigate }: Props) {
   const t = state.team!;
   const next = state.calendar[state.round];
+  const [achOpen, setAchOpen] = useState<"races" | "wins" | "podiums" | null>(null);
+
+  // per-driver achievement counts for the expandable stat tiles
+  const myDrivers = state.standingsDrivers.filter((s) => s.teamId === t.constructorId);
+  const driverName = (id: string) => driverById(id, state.season)?.shortName ?? id;
+  const achDetail: Record<"races" | "wins" | "podiums", { name: string; count: number }[]> = {
+    races: myDrivers.map((s) => ({ name: driverName(s.driverId), count: Math.max(0, state.completedRounds - s.dnfs) })),
+    wins: myDrivers.map((s) => ({ name: driverName(s.driverId), count: s.wins })),
+    podiums: myDrivers.map((s) => ({ name: driverName(s.driverId), count: s.podiums })),
+  };
 
   // group the feed into per-GP blocks with separators
   const groups: { round: number; items: NewsItem[] }[] = [];
@@ -136,25 +147,46 @@ export function OverviewTab({ state, onNewsAction, onRunRound, onNavigate }: Pro
               );
             })}
           </div>
-          {/* season achievements — under the driver form bars */}
+          {/* season achievements — under the driver form bars; click a tile to see who got them */}
           <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-            <div className="rounded-md border border-hairline bg-raised/50 px-3 py-1.5">
-              <div className="label-tech text-[9px] text-ink-faint">Races</div>
-              <div className="num-display text-lg leading-tight">{state.completedRounds}</div>
-            </div>
-            <div className="rounded-md border border-hairline bg-raised/50 px-3 py-1.5">
-              <div className="label-tech text-[9px] text-ink-faint">Wins</div>
-              <div className="num-display text-lg leading-tight">{t.wins}</div>
-            </div>
-            <div className="rounded-md border border-hairline bg-raised/50 px-3 py-1.5">
-              <div className="label-tech text-[9px] text-ink-faint">Podiums</div>
-              <div className="num-display text-lg leading-tight">{t.podiums}</div>
-            </div>
+            {(
+              [
+                ["races", "Races", state.completedRounds],
+                ["wins", "Wins", t.wins],
+                ["podiums", "Podiums", t.podiums],
+              ] as const
+            ).map(([key, label, value]) => (
+              <button
+                key={key}
+                type="button"
+                aria-expanded={achOpen === key}
+                onClick={() => setAchOpen(achOpen === key ? null : key)}
+                className={`rounded-md border px-3 py-1.5 text-left transition ${
+                  achOpen === key ? "border-telemetry/50 bg-telemetry/10" : "border-hairline bg-raised/50 hover:border-ink-faint"
+                }`}
+              >
+                <span className="label-tech block text-[9px] text-ink-faint">{label}</span>
+                <span className="num-data block text-lg leading-tight">
+                  {value}
+                  <span className="ml-1 text-[10px] text-ink-faint">{achOpen === key ? "▾" : "▸"}</span>
+                </span>
+              </button>
+            ))}
             <div className="rounded-md border border-positive/30 bg-positive/10 px-3 py-1.5">
               <div className="label-tech text-[9px] text-positive">WCC Pts</div>
-              <div className="num-display text-lg leading-tight text-positive">{t.points}</div>
+              <div className="num-data text-lg leading-tight text-positive">{t.points}</div>
             </div>
           </div>
+          {achOpen && (
+            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 rounded-md border border-hairline bg-raised/40 px-3 py-2 text-xs">
+              {achDetail[achOpen].map((d) => (
+                <span key={d.name} className="flex items-center gap-1.5">
+                  <span className="text-ink-soft">{d.name}</span>
+                  <span className="num-data text-[13px] leading-none text-ink">{d.count}</span>
+                </span>
+              ))}
+            </div>
+          )}
           <div className="mt-3 grid gap-2 sm:grid-cols-2">
             <Bar label="Aero" value={t.car.aero} />
             <Bar label="Chassis" value={t.car.chassis} />

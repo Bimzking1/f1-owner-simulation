@@ -88,7 +88,7 @@ export function ManagementTab({ state, act, onNewsAction }: Props) {
                         <Button
                           key={a}
                           small
-                          variant={a === "fine" || a === "rant" ? "danger" : a === "bonus" ? "positive" : "primary"}
+                          variant={a === "fine" ? "danger" : a === "rant" ? "signal" : a === "bonus" ? "positive" : "primary"}
                           disabled={cd > 0 || t.cash < info.cost}
                           onClick={() => setConfirm({ kind: "driver", driverId: ds.driverId, action: a })}
                         >

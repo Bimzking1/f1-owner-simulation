@@ -97,7 +97,7 @@ export default function SeasonScreen({ state, onRunRound, onNewsAction, act, onR
           )}
           <div className="flex shrink-0 items-center gap-2 rounded-md border border-hairline bg-raised/60 px-3 py-1.5">
             <span className="label-tech text-[9px] text-ink-faint">Cash</span>
-            <Money value={t.cash} className="num-display text-lg leading-none sm:text-xl" />
+            <Money value={t.cash} className="text-lg leading-none sm:text-xl" />
           </div>
           <Button variant="ghost" small onClick={() => setConfirmMenu(true)} className="shrink-0 self-center px-3 md:self-auto">
             Menu
