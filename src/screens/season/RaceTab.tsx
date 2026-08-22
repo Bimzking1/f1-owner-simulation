@@ -46,17 +46,17 @@ export function RaceTab({ state, onRunRound }: Props) {
           <div className="space-y-3 text-sm">
             <div className="flex items-center justify-between gap-2">
               <span className="text-ink-faint">Engine</span>
-              <span className="tabular">{t.components.engine.condition.toFixed(1)}% · age {t.components.engine.age}</span>
+              <span className="num-data">{t.components.engine.condition.toFixed(1)}% · age {t.components.engine.age}</span>
             </div>
             <Meter value={t.components.engine.condition} tone={ratingTone(t.components.engine.condition)} />
             <div className="flex items-center justify-between gap-2">
               <span className="text-ink-faint">Gearbox</span>
-              <span className="tabular">{t.components.gearbox.condition.toFixed(1)}% · age {t.components.gearbox.age}</span>
+              <span className="num-data">{t.components.gearbox.condition.toFixed(1)}% · age {t.components.gearbox.age}</span>
             </div>
             <Meter value={t.components.gearbox.condition} tone={ratingTone(t.components.gearbox.condition)} />
             <div className="flex items-center justify-between gap-2">
               <span className="text-ink-faint">Pit crew</span>
-              <span className="tabular">{t.pitCrew}</span>
+              <span className="num-data">{t.pitCrew}</span>
             </div>
             <Meter value={t.pitCrew} tone={ratingTone(t.pitCrew)} />
           </div>
@@ -68,7 +68,7 @@ export function RaceTab({ state, onRunRound }: Props) {
                 <div key={u.id}>
                   <div className="flex items-center justify-between text-sm">
                     <span>{u.name}</span>
-                    <span className="tabular text-ink-faint">{u.remainingRaces}/{u.totalRaces} races left</span>
+                    <span className="num-data text-ink-faint">{u.remainingRaces}/{u.totalRaces} races left</span>
                   </div>
                   <Meter value={((u.totalRaces - u.remainingRaces) / u.totalRaces) * 100} tone="elite" />
                 </div>
@@ -126,30 +126,30 @@ function WeekendClassification({ state, weekend }: { state: SimulationState; wee
         {view === "quali" &&
           quali.map((q) => (
             <div key={q.driverId} className={`flex items-center gap-2 py-1 text-sm ${mine(q.driverId) ? "font-semibold text-ink" : "text-ink-soft"}`}>
-              <span className="w-8 tabular text-ink-faint">P{q.gridPosition}</span>
+              <span className="pos-num w-8 text-[15px] leading-none text-ink-faint">P{q.gridPosition}</span>
               <span className="min-w-0 flex-1 truncate">{nameOf(q.driverId)}</span>
-              <span className="w-16 text-right text-[11px] tabular text-ink-faint">→ {racePosOf[q.driverId] ?? "—"}</span>
+              <span className="w-16 text-right pos-num text-[13px] leading-none text-ink-faint">→ {racePosOf[q.driverId] ?? "—"}</span>
             </div>
           ))}
         {view === "race" &&
           race.map((r) => (
             <div key={r.driverId} className={`flex items-center gap-2 py-1 text-sm ${mine(r.driverId) ? "font-semibold text-ink" : "text-ink-soft"}`}>
-              <span className="w-20 tabular text-ink-faint">
+              <span className="pos-num w-20 text-[15px] leading-none text-ink-faint">
                 Q{r.gridPosition}→{r.dnf ? "DNF" : `P${r.position}`}
               </span>
               <span className="min-w-0 flex-1 truncate">{nameOf(r.driverId)}</span>
               <span className="text-[11px] text-ink-faint">
                 {r.fastestLap ? "fastest lap" : r.dnf && r.dnfReason ? r.dnfReason : ""}
               </span>
-              <span className="w-8 text-right tabular text-ink-soft">{r.points > 0 ? r.points : ""}</span>
+              <span className="num-data w-8 text-right text-[15px] leading-none text-ink-soft">{r.points > 0 ? r.points : ""}</span>
             </div>
           ))}
         {view === "sprint" &&
           weekend.sprint!.map((r) => (
             <div key={r.driverId} className={`flex items-center gap-2 py-1 text-sm ${mine(r.driverId) ? "font-semibold text-ink" : "text-ink-soft"}`}>
-              <span className="w-12 tabular text-ink-faint">P{r.position}</span>
+              <span className="pos-num w-12 text-[15px] leading-none text-ink-faint">P{r.position}</span>
               <span className="min-w-0 flex-1 truncate">{nameOf(r.driverId)}</span>
-              <span className="w-8 text-right tabular text-ink-soft">{r.points > 0 ? r.points : ""}</span>
+              <span className="num-data w-8 text-right text-[15px] leading-none text-ink-soft">{r.points > 0 ? r.points : ""}</span>
             </div>
           ))}
       </div>
@@ -178,11 +178,11 @@ function ResultCard({ weekend, season }: { weekend: RaceWeekendResult; season: n
               <div key={p.driverId} className="flex items-center gap-2 rounded-md border border-hairline bg-raised/50 px-2 py-1.5">
                 <Img src={d ? driverImage(d.id, season) : ""} alt={d?.shortName ?? p.driverId} className="h-6 w-6 rounded-sm object-cover" />
                 <span className="min-w-0 flex-1 truncate">{d?.shortName ?? p.driverId}</span>
-                {grid != null && <span className="text-[10px] tabular text-ink-faint">Q{grid}</span>}
+                {grid != null && <span className="pos-num text-[13px] leading-none text-ink-faint">Q{grid}</span>}
                 {p.dnf ? (
                   <Tag tone="signal">DNF</Tag>
                 ) : (
-                  <span className={`tabular font-bold ${best === p.position ? "text-positive" : ""}`}>
+                  <span className={`pos-num text-[15px] leading-none ${best === p.position ? "text-positive" : ""}`}>
                     P{p.position} · {p.points} pts
                   </span>
                 )}
@@ -207,50 +207,50 @@ function ResultCard({ weekend, season }: { weekend: RaceWeekendResult; season: n
         )}
       </div>
       <div className="mt-3 mb-3 grid grid-cols-2 gap-2 text-xs lg:grid-cols-4">
-        <div className="rounded-md border border-hairline bg-raised/40 p-2">
-          <div className="text-[10px] font-semibold uppercase tracking-widest text-ink-faint">Fastest lap</div>
-          {hl.fastest ? (
-            <>
-              <div className="mt-0.5 font-display font-bold">{hl.fastest.name}</div>
-              <div className="tabular text-telemetry">{fmtLap(hl.fastest.time)}</div>
-            </>
-          ) : (
-            <div className="mt-0.5 text-ink-faint">—</div>
-          )}
-        </div>
-        <div className="rounded-md border border-elite/30 bg-elite/10 p-2">
-          <div className="text-[10px] font-semibold uppercase tracking-widest text-elite">Driver of the day</div>
-          {hl.dotd ? (
-            <>
-              <div className="mt-0.5 font-display font-bold">{hl.dotd.name}</div>
-              <div className="text-[10px] text-ink-faint">{hl.dotd.note}</div>
-            </>
-          ) : (
-            <div className="mt-0.5 text-ink-faint">—</div>
-          )}
-        </div>
-        <div className="rounded-md border border-hairline bg-raised/40 p-2">
-          <div className="text-[10px] font-semibold uppercase tracking-widest text-ink-faint">Most gained</div>
-          {hl.gained && hl.gained.delta > 0 ? (
-            <>
-              <div className="mt-0.5 font-display font-bold">{hl.gained.name}</div>
-              <div className="text-[10px] tabular text-positive">+{hl.gained.delta} positions</div>
-            </>
-          ) : (
-            <div className="mt-0.5 text-ink-faint">none</div>
-          )}
-        </div>
-        <div className="rounded-md border border-hairline bg-raised/40 p-2">
-          <div className="text-[10px] font-semibold uppercase tracking-widest text-ink-faint">Most lost</div>
-          {hl.lost && hl.lost.delta < 0 ? (
-            <>
-              <div className="mt-0.5 font-display font-bold">{hl.lost.name}</div>
-              <div className="text-[10px] tabular text-signal">{hl.lost.delta} positions</div>
-            </>
-          ) : (
-            <div className="mt-0.5 text-ink-faint">none</div>
-          )}
-        </div>
+          <div className="rounded-md border border-hairline bg-raised/40 p-2">
+            <div className="label-tech text-[10px] text-ink-faint">Fastest lap</div>
+            {hl.fastest ? (
+              <>
+                <div className="mt-0.5 font-display text-base font-bold uppercase leading-tight">{hl.fastest.name}</div>
+                <div className="num-data mt-0.5 text-lg text-telemetry">{fmtLap(hl.fastest.time)}</div>
+              </>
+            ) : (
+              <div className="mt-0.5 text-ink-faint">—</div>
+            )}
+          </div>
+          <div className="rounded-md border border-elite/30 bg-elite/10 p-2">
+            <div className="label-tech text-[10px] text-elite">Driver of the day</div>
+            {hl.dotd ? (
+              <>
+                <div className="mt-0.5 font-display text-base font-bold uppercase leading-tight">{hl.dotd.name}</div>
+                <div className="text-[10px] text-ink-faint">{hl.dotd.note}</div>
+              </>
+            ) : (
+              <div className="mt-0.5 text-ink-faint">—</div>
+            )}
+          </div>
+          <div className="rounded-md border border-hairline bg-raised/40 p-2">
+            <div className="label-tech text-[10px] text-ink-faint">Most gained</div>
+            {hl.gained && hl.gained.delta > 0 ? (
+              <>
+                <div className="mt-0.5 font-display text-base font-bold uppercase leading-tight">{hl.gained.name}</div>
+                <div className="num-data mt-0.5 text-sm text-positive">+{hl.gained.delta} positions</div>
+              </>
+            ) : (
+              <div className="mt-0.5 text-ink-faint">none</div>
+            )}
+          </div>
+          <div className="rounded-md border border-hairline bg-raised/40 p-2">
+            <div className="label-tech text-[10px] text-ink-faint">Most lost</div>
+            {hl.lost && hl.lost.delta < 0 ? (
+              <>
+                <div className="mt-0.5 font-display text-base font-bold uppercase leading-tight">{hl.lost.name}</div>
+                <div className="num-data mt-0.5 text-sm text-signal">{hl.lost.delta} positions</div>
+              </>
+            ) : (
+              <div className="mt-0.5 text-ink-faint">none</div>
+            )}
+          </div>
       </div>
       <div className="mt-3 flex flex-wrap gap-3 text-[11px] text-ink-faint">
         <span>Weather: {weekend.weather}</span>
@@ -350,12 +350,12 @@ function RaceResultReplay({ weekend, season, onClose }: { weekend: RaceWeekendRe
                 const d = driverById(r.driverId, season);
                 return (
                   <div key={r.driverId} className="flex items-center gap-2 px-3 py-1.5 text-sm">
-                    <span className={`w-12 tabular ${r.dnf ? "text-signal" : "text-ink-faint"}`}>
+                    <span className={`pos-num w-12 text-[15px] leading-none ${r.dnf ? "text-signal" : "text-ink-faint"}`}>
                       Q{r.gridPosition}→{r.dnf ? "DNF" : r.position}
                     </span>
                     <span className="min-w-0 flex-1 truncate">{d?.shortName ?? r.driverId}</span>
                     <span className="text-[11px] text-ink-faint">{r.dnfReason && r.dnf ? r.dnfReason : r.fastestLap ? "fastest lap" : ""}</span>
-                    <span className="tabular text-ink-soft">{r.points > 0 ? `${r.points} pts` : ""}</span>
+                    <span className="num-data text-ink-soft">{r.points > 0 ? `${r.points} pts` : ""}</span>
                   </div>
                 );
               })}
@@ -368,9 +368,9 @@ function RaceResultReplay({ weekend, season, onClose }: { weekend: RaceWeekendRe
                   const d = driverById(r.driverId, season);
                   return (
                     <div key={r.driverId} className="flex items-center gap-2 px-3 py-1 text-sm">
-                      <span className="w-6 tabular text-ink-faint">{r.position ?? "DNF"}</span>
+                      <span className="pos-num w-6 text-[15px] leading-none text-ink-faint">{r.position ?? "DNF"}</span>
                       <span className="min-w-0 flex-1 truncate">{d?.shortName ?? r.driverId}</span>
-                      <span className="tabular text-ink-soft">{r.points > 0 ? `${r.points} pts` : ""}</span>
+                      <span className="num-data text-ink-soft">{r.points > 0 ? `${r.points} pts` : ""}</span>
                     </div>
                   );
                 })}

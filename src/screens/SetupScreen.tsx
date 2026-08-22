@@ -652,8 +652,8 @@ export default function SetupScreen({ cfg, onStart, onBack }: Props) {
                             <Tag tone={sp.tier === "title" ? "elite" : sp.tier === "major" ? "telemetry" : "ink"}>{sp.tier}</Tag>
                           </div>
                           <div className="ml-auto hidden shrink-0 text-right sm:block">
-                            <div className="text-[10px] uppercase tracking-widest text-ink-faint">Per season</div>
-                            <div className="tabular text-sm font-bold text-positive">{money(seasonTotal)}</div>
+                            <div className="label-tech text-[10px] text-ink-faint">Per season</div>
+                            <div className="num-data text-base text-positive">{money(seasonTotal)}</div>
                           </div>
                         </div>
                         <div className="mt-2 space-y-0.5 text-xs">
@@ -664,14 +664,14 @@ export default function SetupScreen({ cfg, onStart, onBack }: Props) {
                         </div>
                         <div className="mt-2 border-t border-hairline pt-2 text-right sm:hidden">
                           <span className="text-[10px] uppercase tracking-widest text-ink-faint">Per season </span>
-                          <span className="tabular text-sm font-bold text-positive">{money(seasonTotal)}</span>
+                          <span className="num-data text-sm text-positive">{money(seasonTotal)}</span>
                         </div>
                       </div>
                     );
                   })}
                   <div className="flex items-center justify-between border-t border-hairline pt-2 text-sm">
                     <span className="text-ink-faint">Total sponsor income per season</span>
-                    <span className="tabular font-bold text-positive">
+                    <span className="num-data text-base text-positive">
                       {money(
                         sponsorIds.reduce((a, id) => {
                           const sp = sponsorById(id);

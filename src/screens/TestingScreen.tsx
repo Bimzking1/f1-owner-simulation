@@ -85,11 +85,11 @@ export default function TestingScreen({ state, onRunTest, onStartSeason }: Props
             <div className="rounded-md border border-hairline bg-raised/50 p-3 text-sm">
               <div className="flex items-center justify-between">
                 <span className="text-ink-faint">Cost</span>
-                <Money value={budget[confirm]} className="font-display font-bold" />
+                <Money value={budget[confirm]} />
               </div>
               <div className="mt-1 flex items-center justify-between">
                 <span className="text-ink-faint">Report confidence</span>
-                <span className="tabular">55–95%</span>
+                <span className="num-data">55–95%</span>
               </div>
               <div className="mt-1 flex items-start justify-between gap-4">
                 <span className="text-ink-faint">Effect</span>

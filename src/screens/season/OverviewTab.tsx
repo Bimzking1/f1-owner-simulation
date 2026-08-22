@@ -18,6 +18,19 @@ export function OverviewTab({ state, onNewsAction, onRunRound, onNavigate }: Pro
   const t = state.team!;
   const next = state.calendar[state.round];
 
+  // per-driver achievement counts (current line-up) shown under the stat tiles
+  const myDrivers = state.standingsDrivers.filter((s) => s.teamId === t.constructorId);
+  const driverName = (id: string) => driverById(id, state.season)?.shortName ?? id;
+  // points/wins/podiums credited to the team but not to either current driver
+  // (scored by drivers who were swapped out mid-season — the team keeps them)
+  const sumOf = (pick: (s: (typeof myDrivers)[number]) => number) => myDrivers.reduce((a, s) => a + pick(s), 0);
+  const exDrivers = {
+    wins: t.wins - sumOf((s) => s.wins),
+    podiums: t.podiums - sumOf((s) => s.podiums),
+    points: t.points - sumOf((s) => s.points),
+  };
+  const hasExDrivers = exDrivers.wins !== 0 || exDrivers.podiums !== 0 || exDrivers.points !== 0;
+
   // group the feed into per-GP blocks with separators
   const groups: { round: number; items: NewsItem[] }[] = [];
   for (const n of state.news.slice(0, 80)) {
@@ -68,15 +81,13 @@ export function OverviewTab({ state, onNewsAction, onRunRound, onNavigate }: Pro
               if (!c) return null;
               return (
                 <>
-                  {/* mobile: logo inline with name/pts/pos, car below */}
+                  {/* mobile: logo inline with name/pos, car below */}
                   <div className="flex flex-col gap-3 lg:hidden">
                     <div className="flex items-center gap-3">
                       <Img src={c.image} alt={c.name} className="h-14 w-14 shrink-0 rounded-sm object-cover" />
                       <div className="min-w-0">
                         <div className="font-display text-lg font-bold leading-tight">{c.fullName}</div>
-                        <div className="text-[11px] text-ink-faint">
-                          {t.points} pts · P{pos} in constructors
-                        </div>
+                        <div className="text-[11px] text-ink-faint">P{pos} in constructors</div>
                       </div>
                     </div>
                     <Img src={c.carImage} alt={`${c.name} car`} className="w-auto max-w-full rounded-sm" />
@@ -89,9 +100,7 @@ export function OverviewTab({ state, onNewsAction, onRunRound, onNavigate }: Pro
                     </div>
                     <div className="min-w-0">
                       <div className="font-display text-lg font-bold leading-tight lg:truncate">{c.fullName}</div>
-                      <div className="text-[11px] text-ink-faint lg:whitespace-nowrap">
-                        {t.points} pts · P{pos} in constructors
-                      </div>
+                      <div className="text-[11px] text-ink-faint lg:whitespace-nowrap">P{pos} in constructors</div>
                     </div>
                   </div>
                 </>
@@ -140,6 +149,65 @@ export function OverviewTab({ state, onNewsAction, onRunRound, onNavigate }: Pro
               );
             })}
           </div>
+          {/* season achievements — under the driver form bars; breakdown always visible */}
+          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <div className="rounded-md border border-hairline bg-raised/50 px-3 py-1.5">
+              <div className="label-tech text-[9px] text-ink-faint">Races</div>
+              <div className="num-data text-lg leading-tight">{state.completedRounds}</div>
+            </div>
+            <div className="rounded-md border border-hairline bg-raised/50 px-3 py-1.5">
+              <div className="label-tech text-[9px] text-ink-faint">Wins</div>
+              <div className="num-data text-lg leading-tight">{t.wins}</div>
+            </div>
+            <div className="rounded-md border border-hairline bg-raised/50 px-3 py-1.5">
+              <div className="label-tech text-[9px] text-ink-faint">Podiums</div>
+              <div className="num-data text-lg leading-tight">{t.podiums}</div>
+            </div>
+            <div className="rounded-md border border-positive/30 bg-positive/10 px-3 py-1.5">
+              <div className="label-tech text-[9px] text-positive">WCC Pts</div>
+              <div className="num-data text-lg leading-tight text-positive">{t.points}</div>
+            </div>
+          </div>
+          {/* who scored them — current drivers, any points kept from swapped-out
+              drivers, and the team total (matches the WCC standings) */}
+          <table className="mt-2 w-full text-left text-xs lg:text-sm">
+            <thead>
+              <tr className="label-tech border-b border-hairline text-[8px] text-ink-faint lg:text-[9px]">
+                <th className="py-1 pr-2 font-medium lg:pr-6">Driver</th>
+                <th className="py-1 pr-2 text-right font-medium lg:px-5">Races</th>
+                <th className="py-1 pr-2 text-right font-medium lg:px-5">Wins</th>
+                <th className="py-1 pr-2 text-right font-medium lg:px-5">Podiums</th>
+                <th className="py-1 text-right font-medium lg:pl-5">Pts</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-hairline/40">
+              {myDrivers.map((s) => (
+                <tr key={s.driverId}>
+                  <td className="py-1 pr-2 text-ink-soft lg:pr-6">{driverName(s.driverId)}</td>
+                  <td className="num-data py-1 pr-2 text-right lg:px-5">{Math.max(0, state.completedRounds - s.dnfs)}</td>
+                  <td className="num-data py-1 pr-2 text-right lg:px-5">{s.wins}</td>
+                  <td className="num-data py-1 pr-2 text-right lg:px-5">{s.podiums}</td>
+                  <td className="num-data py-1 text-right text-ink lg:pl-5">{s.points}</td>
+                </tr>
+              ))}
+              {hasExDrivers && (
+                <tr title="Scored by a driver you replaced mid-season — the team keeps those points">
+                  <td className="py-1 pr-2 text-ink-faint italic lg:pr-6">Ex-drivers</td>
+                  <td className="num-data py-1 pr-2 text-right text-ink-faint lg:px-5">—</td>
+                  <td className={`num-data py-1 pr-2 text-right lg:px-5 ${exDrivers.wins ? "text-ink" : "text-ink-faint"}`}>{exDrivers.wins}</td>
+                  <td className={`num-data py-1 pr-2 text-right lg:px-5 ${exDrivers.podiums ? "text-ink" : "text-ink-faint"}`}>{exDrivers.podiums}</td>
+                  <td className={`num-data py-1 text-right lg:pl-5 ${exDrivers.points ? "text-ink" : "text-ink-faint"}`}>{exDrivers.points}</td>
+                </tr>
+              )}
+              <tr className="border-t border-hairline">
+                <td className="label-tech py-1 pr-2 text-[9px] lg:pr-6">Team WCC</td>
+                <td className="num-data py-1 pr-2 text-right lg:px-5">{state.completedRounds}</td>
+                <td className="num-data py-1 pr-2 text-right lg:px-5">{t.wins}</td>
+                <td className="num-data py-1 pr-2 text-right lg:px-5">{t.podiums}</td>
+                <td className="num-data py-1 text-right text-positive lg:pl-5">{t.points}</td>
+              </tr>
+            </tbody>
+          </table>
           <div className="mt-3 grid gap-2 sm:grid-cols-2">
             <Bar label="Aero" value={t.car.aero} />
             <Bar label="Chassis" value={t.car.chassis} />
@@ -186,7 +254,8 @@ export function OverviewTab({ state, onNewsAction, onRunRound, onNavigate }: Pro
 }
 
 function OwnerCard({ state }: { state: SimulationState }) {
-  const o = state.team!.owner;
+  const t = state.team!;
+  const o = t.owner;
   const trust = trustOf(state);
   const label =
     trust <= 25 ? "Distrusted" : trust <= 40 ? "Wary" : trust <= 55 ? "Respected" : trust <= 70 ? "Trusted" : "Ironclad";
@@ -205,14 +274,18 @@ function OwnerCard({ state }: { state: SimulationState }) {
           <div className="text-[11px] text-ink-faint">Called “{ownerTitle(state)}” around the paddock</div>
         </div>
       </div>
-      <div className="mt-3">
+      <div className="mt-3 space-y-2">
+        <div className="flex items-center justify-between gap-2 rounded-md border border-hairline bg-raised/50 px-3 py-1.5">
+          <span className="label-tech text-[9px] text-ink-faint">Reputation</span>
+          <span className="num-display text-lg leading-none">{t.reputation}</span>
+        </div>
         <Bar
           label="Trust"
           value={trust}
           tone={ratingTone(trust)}
           right={<span className="text-xs font-semibold">{label}</span>}
         />
-        <p className="mt-1 text-[10px] leading-relaxed text-ink-faint">
+        <p className="text-[10px] leading-relaxed text-ink-faint">
           Every call you make moves it — bonuses, backing and team days build trust; fines, rants, broken promises and
           mid-season sackings cost it.
         </p>
@@ -305,7 +378,7 @@ function SponsorProgressWidget({
                 <div className="flex items-center gap-2">
                   <Img src={spec.image} alt={spec.name} className="h-4 w-7 shrink-0 rounded-sm object-contain" />
                   <span className="min-w-0 flex-1 truncate text-xs font-semibold">{spec.name}</span>
-                  <span className="shrink-0 text-[11px] tabular text-ink-faint">
+                  <span className="num-data shrink-0 text-[13px] leading-none text-ink-faint">
                     {s.deadlineRound > 0 ? `${s.progress}/${s.required}` : "pending"}
                   </span>
                 </div>

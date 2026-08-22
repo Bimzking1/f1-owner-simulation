@@ -89,8 +89,8 @@ export function EndScreens({ state, onReset }: Props) {
     return (
       <div className="flex min-h-full items-center justify-center px-6 py-12">
         <div className="w-full max-w-xl rounded-md border border-signal/40 bg-surface p-8 text-center">
-          <div className="text-[11px] uppercase tracking-[0.3em] text-signal">Simulation terminated</div>
-          <h1 className="mt-2 font-display text-4xl font-bold uppercase">Team collapse</h1>
+          <div className="label-tech text-[11px] tracking-[0.3em] text-signal">Simulation terminated</div>
+          <h1 className="mt-2 font-display text-hero font-bold uppercase">Team collapse</h1>
           <p className="mx-auto mt-3 max-w-md text-sm text-ink-soft">
             The bank accounts ran dry. {ctor?.name ?? "The team"} ceased operations at round {state.completedRounds} of{" "}
             {state.calendar.length}. The paddock is already talking about the next owner.
@@ -134,12 +134,12 @@ export function EndScreens({ state, onReset }: Props) {
   return (
     <div className="mx-auto max-w-3xl px-4 py-10">
       <div className="rounded-md border border-hairline bg-surface p-6 sm:p-8">
-        <div className="text-[11px] uppercase tracking-[0.3em] text-ink-faint">
+        <div className="label-tech text-[11px] tracking-[0.3em] text-ink-faint">
           Season {state.season} · seed {state.seed} · final report
         </div>
-        <h1 className="mt-1 font-display text-5xl font-bold uppercase">
-          WCC P{pos}
-          <span className="text-signal">.</span>
+        <h1 className="mt-1 text-hero uppercase">
+          <span className="pos-num">WCC P{pos}</span>
+          <span className="font-display font-bold text-signal">.</span>
         </h1>
         <p className="mt-2 text-sm text-ink-soft">{headline}</p>
         <p className="mt-1 text-xs text-ink-faint">
@@ -169,9 +169,9 @@ export function EndScreens({ state, onReset }: Props) {
                   <div key={s.driverId} className="flex items-center justify-between">
                     <span>
                       {d.name}
-                      <span className="ml-1 text-[11px] text-ink-faint">WDC P{i + 1}</span>
+                      <span className="pos-num ml-1 text-[13px] leading-none text-ink-faint">WDC P{i + 1}</span>
                     </span>
-                    <span className="tabular text-ink-soft">{s.points} pts · {s.dnfs} DNF</span>
+                    <span className="num-data text-ink-soft">{s.points} pts · {s.dnfs} DNF</span>
                   </div>
                 );
               })}
@@ -182,7 +182,7 @@ export function EndScreens({ state, onReset }: Props) {
                   return (
                     <div key={ds.driverId} className="flex justify-between text-xs text-ink-soft">
                       <span>{d.shortName} — final</span>
-                      <span className="tabular">conf {ds.confidence} · mor {ds.morale}</span>
+                      <span className="num-data">conf {ds.confidence} · mor {ds.morale}</span>
                     </div>
                   );
                 })}
@@ -197,18 +197,18 @@ export function EndScreens({ state, onReset }: Props) {
               <div className="divide-y divide-hairline/60">
                 {state.standingsConstructors.slice(0, 10).map((s, i) => (
                   <div key={s.teamId} className={`flex items-center gap-2 py-1 text-sm ${s.teamId === t.constructorId ? "font-semibold text-ink" : "text-ink-soft"}`}>
-                    <span className="w-5 tabular text-ink-faint">{i + 1}</span>
+                    <span className="pos-num w-5 text-[15px] leading-none text-ink-faint">{i + 1}</span>
                     <span className="min-w-0 flex-1 truncate">{constructorById(s.teamId, state.season)?.name ?? s.teamId}</span>
-                    <span className="tabular">{s.points}</span>
+                    <span className="num-data">{s.points}</span>
                   </div>
                 ))}
               </div>
               <div className="divide-y divide-hairline/60">
                 {state.standingsDrivers.slice(0, 10).map((s, i) => (
                   <div key={s.driverId} className={`flex items-center gap-2 py-1 text-sm ${s.driverId === t.driver1Id || s.driverId === t.driver2Id ? "font-semibold text-ink" : "text-ink-soft"}`}>
-                    <span className="w-5 tabular text-ink-faint">{i + 1}</span>
+                    <span className="pos-num w-5 text-[15px] leading-none text-ink-faint">{i + 1}</span>
                     <span className="min-w-0 flex-1 truncate">{driverById(s.driverId, state.season)?.shortName ?? s.driverId}</span>
-                    <span className="tabular">{s.points}</span>
+                    <span className="num-data">{s.points}</span>
                   </div>
                 ))}
               </div>
@@ -219,9 +219,9 @@ export function EndScreens({ state, onReset }: Props) {
         <div className="mt-3">
           <Card title="Finance — season">
             <div className="grid gap-2 text-sm sm:grid-cols-2">
-              <div className="flex justify-between"><span className="text-ink-faint">Income (sponsors, promoter, prize)</span><span className="tabular text-positive">+{income.toFixed(1)}</span></div>
-              <div className="flex justify-between"><span className="text-ink-faint">Spending (staff, ops, tests, dev)</span><span className="tabular text-signal">-{Math.abs(spend).toFixed(1)}</span></div>
-              <div className="flex justify-between"><span className="text-ink-faint">Net flow</span><span className={`tabular ${net < 0 ? "text-signal" : "text-positive"}`}>{net >= 0 ? "+" : ""}{net.toFixed(1)}</span></div>
+              <div className="flex justify-between"><span className="text-ink-faint">Income (sponsors, promoter, prize)</span><span className="num-data text-positive">+{income.toFixed(1)}</span></div>
+              <div className="flex justify-between"><span className="text-ink-faint">Spending (staff, ops, tests, dev)</span><span className="num-data text-signal">-{Math.abs(spend).toFixed(1)}</span></div>
+              <div className="flex justify-between"><span className="text-ink-faint">Net flow</span><span className={`num-data ${net < 0 ? "text-signal" : "text-positive"}`}>{net >= 0 ? "+" : ""}{net.toFixed(1)}</span></div>
               <div className="flex justify-between"><span className="text-ink-faint">Cash on hand</span><Money value={t.cash} /></div>
               <div className="flex justify-between"><span className="text-ink-faint">Prize money (WCC P{pos})</span><Money value={prize} /></div>
             </div>
