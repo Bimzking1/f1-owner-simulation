@@ -41,7 +41,7 @@ export function FinanceTab({ state }: { state: SimulationState }) {
     <div className="grid gap-4 lg:grid-cols-3">
       <div className="lg:col-span-2">
         <Card title="Cash flow by round" right={<span className="text-[10px] uppercase tracking-wider text-ink-faint">all values $M</span>}>
-          <div className="grid grid-cols-[1fr_5rem_5rem_5rem] gap-2 border-b border-hairline pb-1 text-[10px] font-semibold uppercase tracking-widest text-ink-faint">
+          <div className="label-tech grid grid-cols-[1fr_5rem_5rem_5rem] gap-2 border-b border-hairline pb-1 text-[10px] text-ink-faint">
             <span>Race weekend</span>
             <span className="text-right">Income</span>
             <span className="text-right">Expenses</span>
@@ -56,9 +56,9 @@ export function FinanceTab({ state }: { state: SimulationState }) {
                     <span className="sm:hidden">R{r}</span>
                     <span className="hidden sm:inline">R{r}{gp ? ` — ${gp}` : ""}</span>
                   </span>
-                  <span className="tabular text-right text-positive">+{d.inc.toFixed(1)}</span>
-                  <span className="tabular text-right text-signal">{d.exp.toFixed(1)}</span>
-                  <span className={`tabular text-right ${d.inc + d.exp < 0 ? "text-signal" : "text-ink"}`}>
+                  <span className="num-data text-right text-positive">+{d.inc.toFixed(1)}</span>
+                  <span className="num-data text-right text-signal">{d.exp.toFixed(1)}</span>
+                  <span className={`num-data text-right ${d.inc + d.exp < 0 ? "text-signal" : "text-ink"}`}>
                     {(d.inc + d.exp) >= 0 ? "+" : ""}{(d.inc + d.exp).toFixed(1)}
                   </span>
                 </div>
@@ -81,7 +81,7 @@ export function FinanceTab({ state }: { state: SimulationState }) {
             </div>
             <div className="flex justify-between">
               <span className="text-ink-faint">Net flow</span>
-              <span className={`tabular ${net < 0 ? "text-signal" : "text-positive"}`}>
+              <span className={`num-data ${net < 0 ? "text-signal" : "text-positive"}`}>
                 {net >= 0 ? "+" : ""}{net.toFixed(1)}
               </span>
             </div>
@@ -99,7 +99,7 @@ export function FinanceTab({ state }: { state: SimulationState }) {
             <span className="flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-telemetry" />Dev & supplier</span>
             <span className="flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-hairline" />Other</span>
           </div>
-          <div className="grid grid-cols-[3.6rem_1fr_auto_5rem] gap-2 border-b border-hairline pb-1 text-[10px] font-semibold uppercase tracking-widest text-ink-faint">
+          <div className="label-tech mb-2 grid grid-cols-[3.6rem_1fr_auto_5rem] gap-2 border-b border-hairline pb-1 text-[10px] text-ink-faint">
             <span>Weekend</span>
             <span>Detail</span>
             <span />
@@ -117,7 +117,7 @@ export function FinanceTab({ state }: { state: SimulationState }) {
                   }`}
                 >
                   <span
-                    className="flex items-center gap-1.5 tabular text-ink-faint"
+                    className="num-data flex items-center gap-1.5 text-ink-faint"
                     title={`${CAT_LABEL[h.category] ?? h.category} · Round ${h.round}${gp ? ` — ${gp}` : ""}`}
                   >
                     <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${CAT_DOT[h.category] ?? "bg-hairline"}`} />
@@ -147,7 +147,7 @@ export function FinanceTab({ state }: { state: SimulationState }) {
           <div className="space-y-3 text-sm">
             <div className="flex items-center justify-between">
               <span className="text-ink-faint">Amount</span>
-              <Money value={selected.amount} className="font-display text-base font-bold" />
+              <Money value={selected.amount} className="text-base" />
             </div>
             <p className="whitespace-pre-line rounded-md border border-hairline bg-raised/40 p-3 text-xs leading-relaxed text-ink-soft">
               {selected.detail}

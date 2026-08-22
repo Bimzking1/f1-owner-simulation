@@ -11,7 +11,7 @@ export function MiniBar({ label, value, tone }: { label: string; value: number; 
     <div className="flex items-center gap-2 text-[10px]">
       <span className="w-9 text-ink-faint">{label}</span>
       <Meter value={value} tone={tone ?? ratingTone(value)} />
-      <span className={`w-6 text-right tabular ${tone ? "text-ink-faint" : ratingText(value)}`}>{Math.round(value)}</span>
+      <span className={`w-6 text-right text-sm num-data ${tone ? "text-ink-faint" : ratingText(value)}`}>{Math.round(value)}</span>
     </div>
   );
 }
@@ -74,7 +74,7 @@ export function NextRaceCard({ track, round }: { track: Track; round?: number })
             ].map(([label, value]) => (
               <span key={label} className="flex items-center justify-between gap-2 border-b border-hairline/40 pb-0.5">
                 <span>{label}</span>
-                <span className="tabular">{value}</span>
+                <span className="num-data text-[13px] leading-none">{value}</span>
               </span>
             ))}
           </div>
@@ -107,9 +107,9 @@ export function StandingsCard({ state, rows }: { state: SimulationState; rows?: 
         <div className="max-h-96 divide-y divide-hairline/60 overflow-auto pr-3 [scrollbar-gutter:stable]">
           {teams.map((s, i) => (
             <div key={s.teamId} className={`flex items-center gap-2 py-1 text-sm ${s.teamId === t.constructorId ? "font-semibold text-ink" : "text-ink-soft"}`}>
-              <span className="w-5 tabular text-ink-faint">{i + 1}</span>
+              <span className="pos-num w-5 text-[15px] leading-none text-ink-faint">{i + 1}</span>
               <span className="min-w-0 flex-1 truncate">{constructorById(s.teamId, state.season)?.name ?? s.teamId}</span>
-              <span className="tabular">{s.points}</span>
+              <span className="num-data">{s.points}</span>
             </div>
           ))}
         </div>
@@ -118,9 +118,9 @@ export function StandingsCard({ state, rows }: { state: SimulationState; rows?: 
             const mine = s.driverId === t.driver1Id || s.driverId === t.driver2Id;
             return (
               <div key={s.driverId} className={`flex items-center gap-2 py-1 text-sm ${mine ? "font-semibold text-ink" : "text-ink-soft"}`}>
-                <span className="w-5 tabular text-ink-faint">{i + 1}</span>
+                <span className="pos-num w-5 text-[15px] leading-none text-ink-faint">{i + 1}</span>
                 <span className="min-w-0 flex-1 truncate">{driverById(s.driverId, state.season)?.shortName ?? s.driverId}</span>
-                <span className="tabular">{s.points}</span>
+                <span className="num-data">{s.points}</span>
               </div>
             );
           })}

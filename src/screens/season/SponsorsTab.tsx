@@ -153,13 +153,13 @@ export function SponsorsTab({ state, act }: Props) {
             <div className="grid gap-2 rounded-md border border-hairline bg-raised/40 p-3 text-xs">
               <div className="flex items-center justify-between gap-2">
                 <span className="text-ink-faint">Benefit — per race</span>
-                <span className="tabular text-positive">
+                <span className="num-data text-positive">
                   <Money value={confirm.racePayment} /> + <Money value={confirm.bonus} /> bonus
                 </span>
               </div>
               <div className="flex items-center justify-between gap-2">
                 <span className="text-ink-faint">Payment</span>
-                <span className="tabular">
+                <span className="num-data">
                   <Money value={confirm.racePayment} /> paid every race · free to sign
                 </span>
               </div>

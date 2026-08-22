@@ -147,8 +147,8 @@ export default function LandingScreen({ onNewGame, onContinue, hasSave }: Props)
 
   return (
     <div className="mx-auto flex min-h-full max-w-3xl flex-col justify-center px-6 py-10">
-      <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.3em] text-ink-faint">a team management sim</div>
-      <h1 className="font-display text-5xl font-bold uppercase tracking-tight text-ink">
+      <div className="label-tech mb-2 text-[11px] tracking-[0.3em] text-ink-faint">a team management sim</div>
+      <h1 className="font-display text-hero font-bold uppercase text-ink">
         F1 <span className="text-signal">Owner</span>
       </h1>
       <p className="mt-2 max-w-xl text-sm leading-relaxed text-ink-soft">

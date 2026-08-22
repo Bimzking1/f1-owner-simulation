@@ -1,10 +1,62 @@
-@import url("https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap");
 @import "tailwindcss";
 
+/* ---------------------------------------------------------------------------
+   Local display faces (personal-use fan-made files; not affiliated with or
+   endorsed by Formula 1). Declared above the theme so tokens can use them.
+--------------------------------------------------------------------------- */
+@font-face {
+  font-family: "Formula1";
+  src: url("./assets/fonts/Formula1-Regular_web_0.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Formula1";
+  src: url("./assets/fonts/Formula1-Bold_web_0.ttf") format("truetype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Formula1-Wide";
+  src: url("./assets/fonts/Formula1-Wide_web_0.ttf") format("truetype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* ---------------------------------------------------------------------------
+   Typography system — motorsport / pit-wall telemetry
+   • Display/headings: "Formula1" 700 (local) → Barlow Condensed fallback
+   • Body/labels/metadata: Titillium Web (400 body · 600 emphasis · 700 strong)
+   • Numbers & data (tables, money, times): Titillium Web 600, tabular figures
+   • Race positions/rankings: Barlow Condensed 700 (condensed but readable)
+   • Hero stats only (cash, season year, final position): "Formula1-Wide" 700
+     (Google Fonts stay loaded as fallbacks via <link> in index.html)
+--------------------------------------------------------------------------- */
 @theme {
-  --font-display: "Rajdhani", "Segoe UI", sans-serif;
-  --font-body: "Inter", "Segoe UI", sans-serif;
-  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  --font-display: "Formula1", "Titillium Web", sans-serif;
+  --font-body: "Titillium Web", "Segoe UI", sans-serif;
+  --font-numbers: "Titillium Web", "Segoe UI", sans-serif;
+  --font-condensed: "Barlow Condensed", "Arial Narrow", sans-serif;
+  --font-stat: "Formula1-Wide", "Barlow Condensed", sans-serif;
+  --font-mono: ui-monospace, "Cascadia Mono", Consolas, monospace;
+
+  /* Fluid type scale — display / headings (body copy uses default sizes) */
+  --text-hero: clamp(2.5rem, 1.5rem + 3.8vw, 4rem);
+  --text-hero--line-height: 0.95;
+  --text-hero--letter-spacing: -0.03em;
+
+  --text-h1: clamp(1.75rem, 1.4rem + 1.6vw, 2.25rem);
+  --text-h1--line-height: 1.05;
+  --text-h1--letter-spacing: -0.02em;
+
+  --text-h2: clamp(1.375rem, 1.15rem + 0.9vw, 1.75rem);
+  --text-h2--line-height: 1.18;
+
+  --text-h3: clamp(1.125rem, 1.03rem + 0.45vw, 1.3125rem);
+  --text-h3--line-height: 1.3;
 
   --color-void: rgb(var(--bg-void));
   --color-surface: rgb(var(--bg-surface));
@@ -29,6 +81,62 @@
     rgb(var(--border-hairline)) 6px,
     rgb(var(--border-hairline)) 7px
   );
+}
+
+/* Small technical label — section eyebrows, scoreboard captions, metadata.
+   Size/color are set by the caller (e.g. `text-[10px] label-tech text-ink-faint`). */
+@utility label-tech {
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+/* Condensed numeric data — statistics, lap times, money, ratings, points.
+   Readable body-family numerals with tabular figures; pairs with `label-tech`
+   for stat blocks. */
+@utility num-data {
+  font-family: var(--font-numbers);
+  font-weight: 600;
+  line-height: 1.25;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Race position / car number — condensed for that timing-screen feel,
+   still readable at small sizes. */
+@utility pos-num {
+  font-family: var(--font-condensed);
+  font-weight: 700;
+  line-height: 0.95;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Hero stats ONLY — big obvious numbers (cash remaining, season year, final
+   classification). Too wide for dense tables; use sparingly. */
+@utility num-display {
+  font-family: var(--font-stat);
+  font-weight: 700;
+  line-height: 1.05;
+  font-variant-numeric: tabular-nums;
+}
+
+@layer base {
+  h1 {
+    font-size: var(--text-h1);
+    font-weight: 700;
+    line-height: var(--text-h1--line-height);
+    letter-spacing: var(--text-h1--letter-spacing);
+    text-transform: uppercase;
+  }
+  h2 {
+    font-size: var(--text-h2);
+    font-weight: 700;
+    line-height: var(--text-h2--line-height);
+  }
+  h3 {
+    font-size: var(--text-h3);
+    font-weight: 600;
+    line-height: var(--text-h3--line-height);
+  }
 }
 
 :root {

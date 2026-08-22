@@ -126,7 +126,7 @@ export function ManagementTab({ state, act, onNewsAction }: Props) {
                 >
                   <div className="flex items-center justify-between gap-2">
                     <span className="font-display text-sm font-bold">{info.label}</span>
-                    <span className="tabular text-xs font-bold text-positive">${info.cost}M</span>
+                    <span className="num-data text-sm text-positive">${info.cost}M</span>
                   </div>
                   <p className="mt-1 text-[11px] leading-relaxed text-ink-soft">{info.desc}</p>
                   <div className="mt-2 text-[10px] uppercase tracking-widest text-ink-faint">
@@ -250,11 +250,11 @@ function Modalish({
           <p className="rounded-md border border-hairline bg-raised/40 p-3 text-xs leading-relaxed text-ink-soft">{info.desc}</p>
           <div className="flex justify-between text-xs">
             <span className="text-ink-faint">Cost</span>
-            <span className="tabular">{info.cost > 0 ? `$${info.cost}M (cash now $${t.cash.toFixed(1)}M)` : "Free"}</span>
+            <span className="num-data">{info.cost > 0 ? `$${info.cost}M (cash now $${t.cash.toFixed(1)}M)` : "Free"}</span>
           </div>
           <div className="flex justify-between text-xs">
             <span className="text-ink-faint">Cooldown</span>
-            <span className="tabular">{info.cooldown} race weekends</span>
+            <span className="num-data">{info.cooldown} race weekends</span>
           </div>
           <div className="flex justify-end gap-2 pt-1">
             <Button small variant="ghost" onClick={onClose}>Cancel</Button>
@@ -290,11 +290,11 @@ function TeamModal({
           <p className="rounded-md border border-hairline bg-raised/40 p-3 text-xs leading-relaxed text-ink-soft">{info.desc}</p>
           <div className="flex justify-between text-xs">
             <span className="text-ink-faint">Cost</span>
-            <span className="tabular">${info.cost}M (cash now ${t.cash.toFixed(1)}M → ${(t.cash - info.cost).toFixed(1)}M)</span>
+            <span className="num-data">${info.cost}M (cash now ${t.cash.toFixed(1)}M → ${(t.cash - info.cost).toFixed(1)}M)</span>
           </div>
           <div className="flex justify-between text-xs">
             <span className="text-ink-faint">Cooldown</span>
-            <span className="tabular">{info.cooldown} race weekends</span>
+            <span className="num-data">{info.cooldown} race weekends</span>
           </div>
           <div className="flex justify-end gap-2 pt-1">
             <Button small variant="ghost" onClick={onClose}>Cancel</Button>

@@ -161,19 +161,19 @@ function SwapConfirmModal({
         <div className="grid gap-2 rounded-md border border-hairline bg-raised/40 p-3 text-xs">
           <div className="flex items-center justify-between">
             <span className="text-ink-faint">Current condition</span>
-            <span className={`tabular font-semibold ${cur.condition < 50 ? "text-caution" : ""}`}>{cur.condition.toFixed(1)}%</span>
+            <span className={`num-data ${cur.condition < 50 ? "text-caution" : ""}`}>{cur.condition.toFixed(1)}%</span>
           </div>
           <div className="flex items-center justify-between">
             <span className="text-ink-faint">Current age</span>
-            <span className="tabular">{cur.age} race(s)</span>
+            <span className="num-data">{cur.age} race(s)</span>
           </div>
           <div className="flex items-center justify-between">
             <span className="text-ink-faint">After replacement</span>
-            <span className="tabular font-semibold text-positive">100% · age 0</span>
+            <span className="num-data text-positive">100% · age 0</span>
           </div>
           <div className="mt-1 flex items-center justify-between border-t border-hairline pt-2">
             <span className="text-ink-faint">Cost</span>
-            <span className="tabular font-semibold text-caution">−<Money value={cost} /></span>
+            <span className="num-data text-caution">−<Money value={cost} /></span>
           </div>
           <div className="flex items-center justify-between">
             <span className="text-ink-faint">Cash now</span>
@@ -181,7 +181,7 @@ function SwapConfirmModal({
           </div>
           <div className="flex items-center justify-between">
             <span className="text-ink-faint">Cash after</span>
-            <span className={`tabular font-bold ${cashAfter < 0 ? "text-signal" : cashAfter < 10 ? "text-caution" : "text-positive"}`}>
+            <span className={`num-data ${cashAfter < 0 ? "text-signal" : cashAfter < 10 ? "text-caution" : "text-positive"}`}>
               ${cashAfter.toFixed(2)}M
             </span>
           </div>
@@ -208,8 +208,8 @@ function SwapRow({
   return (
     <div className="rounded-md border border-hairline p-3">
       <div className="flex items-center justify-between">
-        <span className="font-display font-bold">{label}</span>
-        <span className={`tabular text-sm ${condition < 50 ? "text-caution" : "text-ink-soft"}`}>{condition.toFixed(1)}%</span>
+        <span className="font-display font-bold uppercase">{label}</span>
+        <span className={`num-data text-base ${condition < 50 ? "text-caution" : "text-ink-soft"}`}>{condition.toFixed(1)}%</span>
       </div>
       <Meter value={condition} tone={ratingTone(condition)} className="my-2" />
       <div className="flex items-center justify-between text-xs text-ink-faint">

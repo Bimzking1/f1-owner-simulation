@@ -8,24 +8,40 @@ import { ovrClass, ratingTextClass, ratingTone, type KitTone } from "./ratings";
 
 /** OVR badge — light purple for top drivers, green mid, grey low. */
 export function Ovr({ value, className = "" }: { value: number; className?: string }) {
-  return <span className={`tabular font-semibold ${ovrClass(value)} ${className}`}>OVR {value}</span>;
+  return <span className={`num-data ${ovrClass(value)} ${className}`}>OVR {value}</span>;
 }
 
 /** Rated attribute — colored by its 0-100 rank (use `rank` when higher is worse). */
 export function Rating({ label, value, rank }: { label: string; value: ReactNode; rank?: number }) {
   const r = rank ?? (typeof value === "number" ? value : 0);
   return (
-    <span className="tabular">
+    <span>
       <span className="text-ink-faint">{label} </span>
-      <span className={`font-semibold ${ratingTextClass(r)}`}>{value}</span>
+      <span className={`num-data ${ratingTextClass(r)}`}>{value}</span>
     </span>
   );
+}
+
+/** Race position / classification number — Barlow Condensed 700. */
+export function Pos({ pos, prefix, className = "" }: { pos: number | string; prefix?: string; className?: string }) {
+  return (
+    <span className={`pos-num ${className}`}>
+      {prefix}
+      {pos}
+    </span>
+  );
+}
+
+/** Numeric value inside a stat block — Barlow Condensed 600, tabular figures.
+ *  Use for bare numbers (`<StatValue>24</StatValue>`) that must read as data. */
+export function StatValue({ children, className = "" }: { children: ReactNode; className?: string }) {
+  return <span className={`num-data ${className}`}>{children}</span>;
 }
 
 export function Money({ value, className = "" }: { value: number; className?: string }) {
   const neg = value < 0;
   return (
-    <span className={`tabular ${neg ? "text-caution" : ""} ${className}`}>
+    <span className={`num-data ${neg ? "text-caution" : ""} ${className}`}>
       {neg ? "-$" : "$"}
       {Math.abs(Math.round(value * 100) / 100).toFixed(value % 1 === 0 ? 0 : 1)}M
     </span>
@@ -70,7 +86,7 @@ export function Bar({ label, value, tone, right, max = 100 }: { label: string; v
     <div className="flex items-center gap-2">
       <span className="w-24 shrink-0 text-xs text-ink-soft">{label}</span>
       <Meter value={value} max={max} tone={tone ?? ratingTone(value)} />
-      <span className={`min-w-8 shrink-0 text-right text-xs tabular ${tone ? "text-ink-soft" : ratingTextClass(value)}`}>{right ?? Math.round(value)}</span>
+      <span className={`min-w-8 shrink-0 text-right text-sm num-data ${tone ? "text-ink-soft" : ratingTextClass(value)}`}>{right ?? Math.round(value)}</span>
     </div>
   );
 }
@@ -80,7 +96,7 @@ export function Card({ title, right, children, className = "", pad = true }: { t
     <section className={`rounded-md border border-hairline bg-surface/70 ${className}`}>
       {(title || right) && (
         <header className="flex items-center justify-between gap-2 border-b border-hairline px-3 py-2">
-          <h3 className="font-display text-sm font-bold uppercase tracking-widest text-ink-soft">{title}</h3>
+          <h3 className="font-display text-base font-bold uppercase tracking-widest text-ink-soft">{title}</h3>
           {right}
         </header>
       )}
@@ -144,9 +160,9 @@ export function Stat({ label, value, sub, tone }: { label: string; value: ReactN
   const toneCls = tone === "signal" ? "text-signal" : tone === "positive" ? "text-positive" : tone === "caution" ? "text-caution" : "text-ink";
   return (
     <div className="rounded-md border border-hairline bg-raised/60 px-3 py-2">
-      <div className="text-[10px] font-semibold uppercase tracking-widest text-ink-faint">{label}</div>
-      <div className={`font-display text-lg font-bold tabular ${toneCls}`}>{value}</div>
-      {sub && <div className="text-[11px] text-ink-faint">{sub}</div>}
+      <div className="label-tech text-[10px] text-ink-faint">{label}</div>
+      <div className={`num-display mt-0.5 text-xl ${toneCls}`}>{value}</div>
+      {sub && <div className="mt-0.5 text-[11px] leading-snug text-ink-faint">{sub}</div>}
     </div>
   );
 }

@@ -306,11 +306,11 @@ function TestConfirmModal({
         <div className="grid gap-1 rounded-md border border-hairline bg-raised/40 p-3 text-xs">
           <div className="flex items-center justify-between gap-2">
             <span className="text-ink-faint">Cost</span>
-            <span className="tabular">−<Money value={cost} /></span>
+            <span className="num-data">−<Money value={cost} /></span>
           </div>
           <div className="flex items-center justify-between gap-2">
             <span className="text-ink-faint">Cash</span>
-            <span className="tabular">${t.cash.toFixed(1)}M → ${(t.cash - cost).toFixed(1)}M</span>
+            <span className="num-data">${t.cash.toFixed(1)}M → ${(t.cash - cost).toFixed(1)}M</span>
           </div>
         </div>
         <div className="flex justify-end gap-2 pt-1">
@@ -379,7 +379,7 @@ function OrdersConfirmModal({
               <div key={r.slot} className="flex items-center gap-2 px-3 py-1.5 text-xs">
                 <Tag tone={isLeader ? "signal" : "ink"}>{isLeader ? "Leader" : `Seat ${r.slot}`}</Tag>
                 <span className="min-w-0 flex-1 truncate font-semibold">{r.name}</span>
-                <span className="tabular text-ink-faint">{state.completedRounds > 0 ? `WDC P${r.wdc} · ${r.pts} pts` : "no races yet"}</span>
+                <span className="num-data text-ink-faint">{state.completedRounds > 0 ? `WDC P${r.wdc} · ${r.pts} pts` : "no races yet"}</span>
               </div>
             );
           })}
@@ -456,16 +456,16 @@ function StaffConfirmModal({
           <div className="flex items-center justify-between gap-2">
             <span className="text-ink-faint">{hiring ? "Salary" : "Severance (50% of salary)"}</span>
             {hiring ? (
-              <span className="tabular">
+              <span className="num-data">
                 <Money value={staff.cost} />/yr ≈ <Money value={weekly} />/weekend
               </span>
             ) : (
-              <span className="tabular text-signal">−<Money value={severance} /></span>
+              <span className="num-data text-signal">−<Money value={severance} /></span>
             )}
           </div>
           <div className="flex items-center justify-between gap-2">
             <span className="text-ink-faint">Payable now</span>
-            <span className="tabular">{hiring ? "—" : `−${severance.toFixed(1)}M`}</span>
+            <span className="num-data">{hiring ? "—" : `−${severance.toFixed(1)}M`}</span>
           </div>
         </div>
 
@@ -550,9 +550,9 @@ function SwapConfirm({
             const delta = b - a;
             return (
               <div key={key} className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 px-3 py-1 text-sm">
-                <span className="text-right tabular">{a}</span>
+                <span className="text-right num-data text-[15px] leading-none">{a}</span>
                 <span className="text-[10px] uppercase tracking-wider text-ink-faint">{label}</span>
-                <span className={`text-left tabular ${b > a ? "text-positive" : b < a ? "text-signal" : "text-ink-soft"}`}>
+                <span className={`text-left num-data text-[15px] leading-none ${b > a ? "text-positive" : b < a ? "text-signal" : "text-ink-soft"}`}>
                   {b}
                   {delta !== 0 && <span className="ml-1 text-[10px]">{delta > 0 ? `+${delta}` : delta}</span>}
                 </span>
@@ -564,13 +564,13 @@ function SwapConfirm({
         <div className="space-y-1 rounded-md border border-hairline bg-raised/40 p-3 text-sm">
           <div className="flex justify-between">
             <span className="text-ink-faint">Salary prorated (rounds left)</span>
-            <span className={`tabular ${quote.prorated > 0 ? "text-signal" : "text-positive"}`}>
+            <span className={`num-data ${quote.prorated > 0 ? "text-signal" : "text-positive"}`}>
               {quote.prorated > 0 ? "+" : "−"}${quote.prorated.toFixed(1)}M
             </span>
           </div>
           <div className="flex justify-between">
             <span className="text-ink-faint">Break fee</span>
-            <span className="tabular text-signal">−$2.0M</span>
+            <span className="num-data text-signal">−$2.0M</span>
           </div>
           <div className="flex justify-between border-t border-hairline pt-1 font-semibold">
             <span>Total cost</span>
