@@ -1,8 +1,9 @@
+import { useState } from "react";
 import type { NewsItem, SimulationState } from "@/simulation/types";
 import { driverById, constructorById, sponsorById } from "@/data";
 import { boostDesc } from "@/actions";
-import { ownerTitle, trustOf } from "@/state";
-import { Bar, Button, Card, Img, Meter, Ovr, Tag } from "@/ui/kit";
+import { ownerTitle, sponsorSlotsOf, trustOf } from "@/state";
+import { Bar, Button, Card, ImageLightbox, Img, Meter, Ovr, Tag } from "@/ui/kit";
 import { ratingTone } from "@/ui/ratings";
 import { driverImage } from "@/data/assets";
 import { MiniBar, StandingsCard } from "./parts";
@@ -17,6 +18,7 @@ interface Props {
 export function OverviewTab({ state, onNewsAction, onRunRound, onNavigate }: Props) {
   const t = state.team!;
   const next = state.calendar[state.round];
+  const [zoom, setZoom] = useState<{ src: string; alt: string } | null>(null);
 
   // per-driver achievement counts (current line-up) shown under the stat tiles
   const myDrivers = state.standingsDrivers.filter((s) => s.teamId === t.constructorId);
@@ -90,13 +92,27 @@ export function OverviewTab({ state, onNewsAction, onRunRound, onNavigate }: Pro
                         <div className="text-[11px] text-ink-faint">P{pos} in constructors</div>
                       </div>
                     </div>
-                    <Img src={c.carImage} alt={`${c.name} car`} className="w-auto max-w-full rounded-sm" />
+                    <button
+                      type="button"
+                      onClick={() => setZoom({ src: c.carImage, alt: `${c.name} car` })}
+                      title="Click to enlarge"
+                      className="cursor-zoom-in transition hover:opacity-90"
+                    >
+                      <Img src={c.carImage} alt={`${c.name} car`} className="w-auto max-w-full rounded-sm" />
+                    </button>
                   </div>
                   {/* desktop: logo + car row, details beside */}
                   <div className="hidden lg:flex lg:flex-row lg:items-center lg:gap-3">
                     <div className="flex flex-wrap items-center gap-3">
                       <Img src={c.image} alt={c.name} className="h-14 w-14 shrink-0 rounded-sm object-cover" />
-                      <Img src={c.carImage} alt={`${c.name} car`} className="h-14 w-auto shrink-0 rounded-sm" />
+                      <button
+                        type="button"
+                        onClick={() => setZoom({ src: c.carImage, alt: `${c.name} car` })}
+                        title="Click to enlarge"
+                        className="cursor-zoom-in transition hover:opacity-90"
+                      >
+                        <Img src={c.carImage} alt={`${c.name} car`} className="h-14 w-auto shrink-0 rounded-sm" />
+                      </button>
                     </div>
                     <div className="min-w-0">
                       <div className="font-display text-lg font-bold leading-tight lg:truncate">{c.fullName}</div>
@@ -249,6 +265,8 @@ export function OverviewTab({ state, onNewsAction, onRunRound, onNavigate }: Pro
 
         <SponsorProgressWidget state={state} onNavigate={onNavigate} />
       </div>
+
+      {zoom && <ImageLightbox src={zoom.src} alt={zoom.alt} onClose={() => setZoom(null)} />}
     </div>
   );
 }
@@ -261,35 +279,29 @@ function OwnerCard({ state }: { state: SimulationState }) {
     trust <= 25 ? "Distrusted" : trust <= 40 ? "Wary" : trust <= 55 ? "Respected" : trust <= 70 ? "Trusted" : "Ironclad";
   return (
     <Card title="Team principal">
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2.5">
         {o?.image ? (
-          <Img src={o.image} alt={o.name} className="h-14 w-14 shrink-0 rounded-full object-cover" />
+          <Img src={o.image} alt={o.name} className="h-9 w-9 shrink-0 rounded-full object-cover" />
         ) : (
-          <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-signal/15 font-display text-xl font-bold text-signal">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-signal/15 font-display text-sm font-bold text-signal">
             {(o?.name ?? "O").charAt(0).toUpperCase()}
           </span>
         )}
-        <div className="min-w-0 flex-1">
-          <div className="truncate font-display text-lg font-bold leading-tight">{o?.name ?? "The Owner"}</div>
-          <div className="text-[11px] text-ink-faint">Called “{ownerTitle(state)}” around the paddock</div>
+        <div className="min-w-0 flex-1 leading-tight">
+          <div className="truncate font-display text-sm font-bold">{o?.name ?? "The Owner"}</div>
+          <div className="truncate text-[10px] text-ink-faint">Called “{ownerTitle(state)}” in the paddock</div>
+        </div>
+        <div className="shrink-0 text-right leading-tight" title={`Paddock reputation ${t.reputation}/100`}>
+          <div className="label-tech text-[8px] text-ink-faint">REP</div>
+          <div className="num-data text-lg">{t.reputation}</div>
         </div>
       </div>
-      <div className="mt-3 space-y-2">
-        <div className="flex items-center justify-between gap-2 rounded-md border border-hairline bg-raised/50 px-3 py-1.5">
-          <span className="label-tech text-[9px] text-ink-faint">Reputation</span>
-          <span className="num-display text-lg leading-none">{t.reputation}</span>
-        </div>
-        <Bar
-          label="Trust"
-          value={trust}
-          tone={ratingTone(trust)}
-          right={<span className="text-xs font-semibold">{label}</span>}
-        />
-        <p className="text-[10px] leading-relaxed text-ink-faint">
-          Every call you make moves it — bonuses, backing and team days build trust; fines, rants, broken promises and
-          mid-season sackings cost it.
-        </p>
-      </div>
+      <Bar
+        label="Trust"
+        value={trust}
+        tone={ratingTone(trust)}
+        right={<span className="text-[11px] font-semibold">{label}</span>}
+      />
     </Card>
   );
 }
@@ -358,8 +370,9 @@ function SponsorProgressWidget({
 }) {
   const t = state.team!;
   const active = t.sponsors.filter((s) => s.active);
+  const slots = sponsorSlotsOf(state.difficulty);
   return (
-    <Card title="Sponsor objectives" right={<Tag tone="telemetry">{active.length}/5</Tag>}>
+    <Card title="Sponsor objectives" right={<Tag tone="telemetry">{active.length}/{slots}</Tag>}>
       {active.length === 0 ? (
         <div className="text-xs text-ink-faint">
           No active sponsors.{" "}

@@ -18,13 +18,14 @@ export const DIFFICULTIES: DifficultyConfig[] = [
     costMultiplier: 0.8,
     failureMultiplier: 0.6,
     sponsorMultiplier: 0.7,
+    sponsorSlots: 7,
     infoLevel: "high",
     bankruptcyGrace: true,
     moraleMultiplier: 1.0,
     description:
-      "Generous pocket money and forged screws. Mechanical failures are forgiving, sponsors are patient, and the bank will step in once before you go under.",
+      "Generous pocket money and forged screws. Mechanical failures are forgiving, sponsors are patient, and you can hold up to 7 sponsor deals. The bank will step in once before you go under.",
     enjoyer:
-      "A gentle first season. You have more money, cheap parts and forgiving sponsors — a safety net if things go wrong.",
+      "A gentle first season. You have more money, cheap parts, forgiving sponsors and a deep 7-slot sponsor board — a safety net if things go wrong.",
   },
   {
     id: "professional",
@@ -33,13 +34,14 @@ export const DIFFICULTIES: DifficultyConfig[] = [
     costMultiplier: 1.0,
     failureMultiplier: 1.0,
     sponsorMultiplier: 1.0,
+    sponsorSlots: 5,
     infoLevel: "normal",
     bankruptcyGrace: false,
     moraleMultiplier: 1.0,
     description:
-      "Recommended. Balanced economy, realistic costs and reliability. Your decisions decide the season.",
+      "Recommended. Balanced economy, realistic costs and reliability. Five sponsor slots. Your decisions decide the season.",
     enjoyer:
-      "The proper F1 business sim experience. Fair prices, fair risks, fair consequences.",
+      "The proper F1 business sim experience. Fair prices, fair risks, fair consequences — and room for five partners on the car.",
   },
   {
     id: "expert",
@@ -48,13 +50,14 @@ export const DIFFICULTIES: DifficultyConfig[] = [
     costMultiplier: 1.15,
     failureMultiplier: 1.3,
     sponsorMultiplier: 1.25,
+    sponsorSlots: 4,
     infoLevel: "low",
     bankruptcyGrace: false,
     moraleMultiplier: 1.15,
     description:
-      "A tighter wallet, pricier development and stricter sponsors. Reliability bites harder and morale swings are stronger. Less information is revealed.",
+      "A tighter wallet, pricier development and stricter sponsors. Only four sponsor slots. Reliability bites harder and morale swings are stronger. Less information is revealed.",
     enjoyer:
-      "A real test of budget discipline. Parts break, sponsors complain, and the report card is written in red ink.",
+      "A real test of budget discipline. Parts break, sponsors complain, and with just four slots every deal has to earn its place on the car.",
   },
   {
     id: "ruthless",
@@ -63,13 +66,14 @@ export const DIFFICULTIES: DifficultyConfig[] = [
     costMultiplier: 1.3,
     failureMultiplier: 1.5,
     sponsorMultiplier: 1.5,
+    sponsorSlots: 3,
     infoLevel: "low",
     bankruptcyGrace: false,
     moraleMultiplier: 1.3,
     description:
-      "Hardcore. Own the cheapest rooms at the motorhome. Severe reliability, strict sponsors, strong morale effects — bankruptcy is a real ending.",
+      "Hardcore. Own the cheapest rooms at the motorhome. Severe reliability, strict sponsors, only three sponsor slots, strong morale effects — bankruptcy is a real ending.",
     enjoyer:
-      "The paddock's wolf mode. If you survive the season with money left, you're already a legend.",
+      "The paddock's wolf mode. Three partners, zero slack — if you survive the season with money left, you're already a legend.",
   },
 ];
 

@@ -1,11 +1,11 @@
 import { useState } from "react";
-import type { SimulationState } from "@/simulation/types";
+import type { SimulationState, TestType } from "@/simulation/types";
 import {
   generateDevOptions,
   isDevWindow,
   replacementCost,
 } from "@/simulation/systems";
-import { replaceEngine, replaceGearbox, startDev } from "@/actions";
+import { replaceEngine, replaceGearbox, runTest, startDev, testingBudget } from "@/actions";
 import { Button, Card, Empty, Meter, Modal, Money } from "@/ui/kit";
 import { ratingTone } from "@/ui/ratings";
 import type { Act } from "./parts";
@@ -19,26 +19,38 @@ export function GarageTab({ state, act }: Props) {
   const t = state.team!;
   const devWindow = isDevWindow(state);
   const options = generateDevOptions(state);
+  const upgrades = options.filter((o) => o.target !== "pitCrew" && o.target !== "driverTraining");
+  const trainings = options.filter((o) => o.target === "pitCrew" || o.target === "driverTraining");
+  const trainingDone = (id: string) => (t.trainings ?? []).some((x) => x.id === id && x.round >= state.completedRounds);
   const devInterval = Math.max(3, Math.round(state.calendar.length / 4));
   const roundsToWindow = devInterval - (state.completedRounds % devInterval);
   const [confirmSwap, setConfirmSwap] = useState<"engine" | "gearbox" | null>(null);
+  const [testPick, setTestPick] = useState<TestType | null>(null);
+  const costs = testingBudget();
 
   return (
     <div className="grid gap-4 lg:grid-cols-3">
       <div className="space-y-4 lg:col-span-2">
-        <Card title="Development window">
+        <Card
+          title="Development window"
+          right={
+            !devWindow ? (
+              <span className="text-[10px] uppercase tracking-wider text-caution">frozen · next in {roundsToWindow} round(s)</span>
+            ) : undefined
+          }
+        >
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="text-sm text-ink-soft">
               {devWindow
-                ? "A development window is OPEN. Choose one upgrade to start."
-                : `Next development window in ${roundsToWindow} round${roundsToWindow === 1 ? "" : "s"}.`}
+                ? "A development window is OPEN. Choose one car upgrade to start."
+                : `Car development is frozen. Next development window in ${roundsToWindow} round${roundsToWindow === 1 ? "" : "s"}.`}
             </div>
             <div className="flex items-center gap-2">
               <Meter value={state.completedRounds % devInterval} max={devInterval} tone="elite" className="w-32" />
             </div>
           </div>
           <div className={`mt-3 grid gap-2 sm:grid-cols-2 ${!devWindow ? "pointer-events-none opacity-50" : ""}`}>
-            {options.map((o) => {
+            {upgrades.map((o) => {
               const running = t.upgrades.some((u) => u.id === o.id);
               return (
                 <div key={o.id} className="rounded-md border border-hairline p-3">
@@ -58,6 +70,43 @@ export function GarageTab({ state, act }: Props) {
                       onClick={() => act((x) => startDev(x, o).message)}
                     >
                       {running ? "In progress" : "Start"}
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+
+        <Card title="Weekly programmes" right={<span className="text-[10px] uppercase tracking-wider text-ink-faint">every race weekend</span>}>
+          <p className="mb-3 text-xs text-ink-faint">
+            Training is not affected by the development freeze — each programme can be run once per race weekend.
+          </p>
+          {trainings.length === 0 && <Empty>No training programmes available right now.</Empty>}
+          <div className="grid gap-2 sm:grid-cols-2">
+            {trainings.map((o) => {
+              const running = t.upgrades.some((u) => u.id === o.id);
+              const doneThisWeekend = trainingDone(o.id);
+              const blocked = running || doneThisWeekend;
+              return (
+                <div key={o.id} className="rounded-md border border-hairline p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-display font-bold">{o.name}</span>
+                    <Money value={o.cost} className="text-sm font-bold" />
+                  </div>
+                  <p className="mt-1 text-[11px] text-ink-soft">{o.description}</p>
+                  <div className="mt-2 flex items-center justify-between">
+                    <span className="text-[11px] text-ink-faint">
+                      {doneThisWeekend ? "run this weekend · " : ""}
+                      {o.duration} races · risk {Math.round(o.risk * 100)}%
+                    </span>
+                    <Button
+                      small
+                      variant={blocked ? "ghost" : "primary"}
+                      disabled={blocked}
+                      onClick={() => act((x) => startDev(x, o).message)}
+                    >
+                      {running ? "In progress" : doneThisWeekend ? "Done today" : "Run"}
                     </Button>
                   </div>
                 </div>
@@ -110,6 +159,33 @@ export function GarageTab({ state, act }: Props) {
           </p>
         </Card>
 
+        <Card title="Testing" right={<span className="text-[10px] uppercase tracking-wider text-ink-faint">confirm before spend</span>}>
+          <div className="space-y-2">
+            {(["performance", "reliability", "tire", "driver"] as TestType[]).map((type) => (
+              <button
+                key={type}
+                type="button"
+                disabled={t.cash < costs[type]}
+                onClick={() => setTestPick(type)}
+                className="flex w-full items-center justify-between rounded-sm border border-hairline px-2 py-1.5 text-sm hover:border-telemetry disabled:opacity-40"
+              >
+                <span className="capitalize">{type} test</span>
+                <Money value={costs[type]} className="text-xs text-ink-faint" />
+              </button>
+            ))}
+          </div>
+          {state.testing.length > 0 && (
+            <div className="mt-3 max-h-56 space-y-1 overflow-auto">
+              {state.testing.map((r, i) => (
+                <div key={i} className="flex items-center justify-between text-xs text-ink-soft">
+                  <span className="capitalize">{r.label}</span>
+                  <span>{r.value}/100 · {r.confidence}% conf</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+
         <Card title="Car philosophy">
           <div className="space-y-1 text-sm text-ink-soft">
             <div>
@@ -131,7 +207,64 @@ export function GarageTab({ state, act }: Props) {
           }}
         />
       )}
+      {testPick && (
+        <TestConfirmModal
+          state={state}
+          type={testPick}
+          onClose={() => setTestPick(null)}
+          onConfirm={() => {
+            act((s) => {
+              const r = runTest(s, testPick);
+              return `${r.label}: ${r.value}/100 (${r.confidence}% confidence).`;
+            });
+            setTestPick(null);
+          }}
+        />
+      )}
     </div>
+  );
+}
+
+const TEST_INFO: Record<TestType, string> = {
+  performance: "Aero rake runs and power bench tests. Estimates the car's current performance level (aero/chassis/power blend) before you commit development money.",
+  reliability: "Endurance rig testing. Estimates component reliability and highlights the DNF-risk areas of the car.",
+  tire: "Tire wear simulation across compounds. Estimates how kindly the car treats its tires over long stints.",
+  driver: "Simulator session for your race drivers. Reports driver form and gives both a small confidence/morale boost.",
+};
+
+function TestConfirmModal({
+  state,
+  type,
+  onClose,
+  onConfirm,
+}: {
+  state: SimulationState;
+  type: TestType;
+  onClose: () => void;
+  onConfirm: () => void;
+}) {
+  const t = state.team!;
+  const cost = testingBudget()[type];
+  return (
+    <Modal open onClose={onClose} title={`Run ${type} test?`}>
+      <div className="space-y-3 text-sm">
+        <p className="rounded-md border-l-2 border-telemetry/50 bg-raised/40 p-3 text-xs leading-relaxed text-ink-soft">{TEST_INFO[type]}</p>
+        <div className="grid gap-1 rounded-md border border-hairline bg-raised/40 p-3 text-xs">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-ink-faint">Cost</span>
+            <span className="num-data">−<Money value={cost} /></span>
+          </div>
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-ink-faint">Cash</span>
+            <span className="num-data">${t.cash.toFixed(1)}M → ${(t.cash - cost).toFixed(1)}M</span>
+          </div>
+        </div>
+        <div className="flex justify-end gap-2 pt-1">
+          <Button small variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button small onClick={onConfirm}>Yes, run test</Button>
+        </div>
+      </div>
+    </Modal>
   );
 }
 

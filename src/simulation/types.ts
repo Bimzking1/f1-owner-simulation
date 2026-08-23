@@ -379,6 +379,12 @@ export interface UpgradeProject {
   underperformed?: boolean;
 }
 
+/** A training programme started during a race weekend (round = weekend index). */
+export interface TrainingLog {
+  id: string;
+  round: number;
+}
+
 /** Owner → driver management actions (speech, bonus, fine, rant) for cooldowns. */
 export interface MgmtLog {
   driverId: string; // "*team*" for whole-team activities
@@ -450,6 +456,8 @@ export interface TeamState {
   upgrades: UpgradeProject[];
   drivers: DriverState[];
   sponsors: SponsorState[];
+  /** Training programmes (pit crew / driver) already run, keyed by round — one per weekend each. */
+  trainings?: TrainingLog[];
   pitCrew: number; // 0-100 pit crew level (upgradeable)
   history: FinancialTransaction[];
   mgmt?: MgmtLog[]; // owner interventions per driver (cooldown tracking)
@@ -533,6 +541,8 @@ export interface DifficultyConfig {
   costMultiplier: number;
   failureMultiplier: number;
   sponsorMultiplier: number;
+  /** How many concurrent sponsor contracts the team may hold. */
+  sponsorSlots: number;
   infoLevel: "high" | "normal" | "low";
   bankruptcyGrace: boolean;
   moraleMultiplier: number;

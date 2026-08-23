@@ -31,6 +31,7 @@ import { DIFFICULTIES, PHILOSOPHIES } from "@/data/config";
 import { Bar, Button, Card, Img, InfoTip, Money, Ovr, Rating, SeniorityBadge, Tag } from "@/ui/kit";
 import { useHoldOpen } from "@/ui/hooks";
 import { driverImage } from "@/data/assets";
+import { sponsorSlotsOf } from "@/state";
 import {
   DEPARTMENT_INFO,
   MECHANIC_TIER_INFO,
@@ -169,6 +170,7 @@ export default function SetupScreen({ cfg, onStart, onBack }: Props) {
   }
 
   const sponsors = availableSponsors(cfg.season, ctor?.dna.reputation ?? 0);
+  const sponsorLimit = sponsorSlotsOf(cfg.difficulty);
 
   return (
     <div className="mx-auto max-w-5xl px-6 pb-36 lg:pb-36">
@@ -491,22 +493,26 @@ export default function SetupScreen({ cfg, onStart, onBack }: Props) {
 
       {/* SPONSORS */}
       {step === "Sponsors" && (
-        <Card title={`Sponsors (${sponsorIds.length}/5 slots)`}>
+        <Card title={`Sponsors (${sponsorIds.length}/${sponsorLimit} slots)`}>
           {sponsors.length === 0 && (
             <div className="text-xs text-ink-faint">No sponsors are interested in this team right now.</div>
           )}
           <div className="grid gap-2 sm:grid-cols-2">
             {sponsors.map((s) => {
               const signed = sponsorIds.includes(s.id);
+              const full = sponsorIds.length >= sponsorLimit;
               return (
                 <button
                   key={s.id}
                   type="button"
+                  disabled={!signed && full}
                   onClick={() => setSponsorIds(signed ? sponsorIds.filter((x) => x !== s.id) : [...sponsorIds, s.id])}
-                  className={`rounded-md border p-3 text-left transition ${
+                  className={`rounded-md border p-3 text-left transition disabled:cursor-default ${
                     signed
                       ? "border-positive/50 bg-positive/10"
-                      : "border-hairline bg-surface hover:border-ink-faint"
+                      : full
+                        ? "border-hairline bg-surface opacity-50"
+                        : "border-hairline bg-surface hover:border-ink-faint"
                   }`}
                 >
                   <div className="flex items-center justify-between gap-2">
@@ -528,10 +534,12 @@ export default function SetupScreen({ cfg, onStart, onBack }: Props) {
                       className={`inline-flex shrink-0 items-center rounded-sm border px-2 py-1 font-display text-[11px] font-bold uppercase tracking-widest ${
                         signed
                           ? "border-positive/40 bg-positive/15 text-positive"
-                          : "border-hairline bg-raised text-ink-soft"
+                          : full
+                            ? "border-hairline bg-raised text-ink-faint"
+                            : "border-hairline bg-raised text-ink-soft"
                       }`}
                     >
-                      {signed ? "Signed" : s.tier === "title" ? "Sign Title" : "Sign"}
+                      {signed ? "Signed" : full ? "No slot left" : s.tier === "title" ? "Sign Title" : "Sign"}
                     </span>
                   </div>
                 </button>
@@ -539,7 +547,9 @@ export default function SetupScreen({ cfg, onStart, onBack }: Props) {
             })}
           </div>
           <p className="mt-3 text-[11px] text-ink-faint">
-            No up-front fee: sponsors pay their race rate every weekend you keep the contract.
+            No up-front fee: sponsors pay their race rate every weekend you keep the contract. Slot limit scales with
+            difficulty — {diff.label} allows {sponsorLimit} concurrent deals (Rookie 7 · Professional 5 · Expert 4 ·
+            Ruthless 3).
           </p>
         </Card>
       )}
@@ -633,7 +643,7 @@ export default function SetupScreen({ cfg, onStart, onBack }: Props) {
             <div className="mt-3 border-t border-hairline pt-3">
               <div className="mb-2 flex items-center justify-between">
                 <span className="font-display text-sm font-bold uppercase tracking-wider">Sponsors</span>
-                <span className="text-[11px] text-ink-faint">{sponsorIds.length}/5 slots</span>
+                <span className="text-[11px] text-ink-faint">{sponsorIds.length}/{sponsorLimit} slots</span>
               </div>
               {sponsorIds.length === 0 ? (
                 <p className="text-xs text-ink-faint">No sponsors signed yet.</p>

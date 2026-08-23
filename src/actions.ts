@@ -8,6 +8,7 @@ import type { DevOption } from "@/simulation/systems";
 import {
   addReputation,
   generateDevOptions,
+  isDevWindow,
   replaceComponent,
   startProject,
   prizeMoney,
@@ -15,7 +16,7 @@ import {
 import { resolveNewsAction } from "@/simulation/sim";
 import { createRng, clamp } from "@/simulation/rng";
 import { driverById, engineerById, mechanicById, sponsorById } from "@/data";
-import { difficultyOf } from "./state";
+import { difficultyOf, sponsorSlotsOf } from "./state";
 
 export type ActionResult = { ok: boolean; message: string };
 
@@ -214,7 +215,9 @@ export function signSponsor(state: SimulationState, sponsorId: string): ActionRe
   const result: ActionResult = { ok: false, message: "" };
   const t = state.team!;
   if (t.sponsors.some((s) => s.sponsorId === sponsorId)) return msg(result, false, "Already signed.");
-  if (t.sponsors.filter((s) => s.active).length >= 5) return msg(result, false, "Max 5 sponsor slots.");
+  const maxSlots = sponsorSlotsOf(state.difficulty);
+  if (t.sponsors.filter((s) => s.active).length >= maxSlots)
+    return msg(result, false, `All ${maxSlots} sponsor slots are taken on ${difficultyOf(state).label} — terminate a deal first.`);
   const spec = sponsorById(sponsorId);
   if (!spec) return msg(result, false, "Unknown sponsor.");
   if (t.reputation < (spec.tier === "title" ? 30 : 0)) return msg(result, false, "Reputation too low for a title sponsor.");
@@ -345,9 +348,30 @@ function buildTestReport(state: SimulationState, type: TestType, rng: () => numb
 
 export { generateDevOptions, startProject, replaceComponent, resolveNewsAction };
 
+/** Trainings (pit crew / driver coaching) are weekly programmes, not frozen car upgrades. */
+export function isTrainingOption(option: Pick<DevOption, "target">): boolean {
+  return option.target === "pitCrew" || option.target === "driverTraining";
+}
+
+/** True when this training programme was already started during the current weekend. */
+export function trainingDoneThisWeekend(state: SimulationState, optionId: string): boolean {
+  return (state.team?.trainings ?? []).some((x) => x.id === optionId && x.round >= state.completedRounds);
+}
+
 export function startDev(state: SimulationState, option: DevOption): ActionResult {
   const result: ActionResult = { ok: false, message: "" };
+  if (isTrainingOption(option)) {
+    if (trainingDoneThisWeekend(state, option.id))
+      return msg(result, false, `${option.name} was already run this weekend — available again next race.`);
+  } else if (!isDevWindow(state)) {
+    return msg(result, false, "Car upgrades can only be started in a development window.");
+  }
   if (!startProject(state, option)) return msg(result, false, "Not enough cash.");
+  if (isTrainingOption(option)) {
+    const t = state.team!;
+    t.trainings ??= [];
+    t.trainings.push({ id: option.id, round: state.completedRounds });
+  }
   return msg(result, true, `${option.name} started ($${option.cost}M).`);
 }
 

@@ -1,6 +1,7 @@
+import { useState } from "react";
 import type { SimulationState, Track } from "@/simulation/types";
 import { constructorById, driverById, trackById } from "@/data";
-import { Card, Img, Meter, Tag } from "@/ui/kit";
+import { Card, ImageLightbox, Img, Meter, Tag } from "@/ui/kit";
 import { ratingTone, type KitTone } from "@/ui/ratings";
 import { driverImage } from "@/data/assets";
 
@@ -36,6 +37,7 @@ function attendanceFor(track: Track): number {
 }
 
 export function NextRaceCard({ track, round }: { track: Track; round?: number }) {
+  const [zoom, setZoom] = useState(false);
   const weatherNote =
     track.characteristics.weatherRisk > 65
       ? "High weather risk — strategy will matter."
@@ -80,19 +82,25 @@ export function NextRaceCard({ track, round }: { track: Track; round?: number })
           </div>
         </div>
         <div className="w-full shrink-0 md:w-auto">
-          <div className="flex aspect-[4/3] w-full items-center justify-center overflow-hidden rounded-sm bg-white p-2 md:h-44 md:w-auto">
+          <button
+            type="button"
+            onClick={() => setZoom(true)}
+            title="Click to enlarge circuit map"
+            className="flex aspect-[4/3] w-full cursor-zoom-in items-center justify-center overflow-hidden rounded-sm bg-white p-2 transition hover:opacity-90 md:h-44 md:w-auto"
+          >
             <Img
               src={track.image}
               alt={`${track.name} circuit layout`}
               fallback={<span className="text-[10px] text-ink-faint">Layout</span>}
               className="max-h-full max-w-full object-contain"
             />
-          </div>
+          </button>
           <div className="mt-1 text-center text-[10px] uppercase tracking-widest text-ink-faint">
             R{round ?? "?"} circuit map
           </div>
         </div>
       </div>
+      {zoom && <ImageLightbox src={track.image} alt={`${track.name} circuit map`} onClose={() => setZoom(false)} light />}
     </Card>
   );
 }

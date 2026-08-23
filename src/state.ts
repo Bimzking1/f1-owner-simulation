@@ -139,6 +139,11 @@ export function difficultyOf(state: SimulationState) {
   return DIFFICULTIES.find((d) => d.id === state.difficulty) ?? DIFFICULTIES[1];
 }
 
+/** Concurrent sponsor contracts allowed at a difficulty (Rookie 7 · Pro 5 · Expert 4 · Ruthless 3). */
+export function sponsorSlotsOf(difficultyId: DifficultyId): number {
+  return DIFFICULTIES.find((d) => d.id === difficultyId)?.sponsorSlots ?? 5;
+}
+
 export function constructorName(team: TeamState): string {
   return constructorById(team.constructorId)?.name ?? team.constructorId;
 }

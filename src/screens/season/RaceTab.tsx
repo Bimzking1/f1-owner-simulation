@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { RaceWeekendResult, SimulationState } from "@/simulation/types";
 import { driverById, trackById } from "@/data";
-import { Button, Card, Empty, Img, Meter, Modal, Tag } from "@/ui/kit";
+import { Button, Card, Empty, ImageLightbox, Img, Meter, Modal, Tag } from "@/ui/kit";
 import { ratingTone } from "@/ui/ratings";
 import { driverImage } from "@/data/assets";
 import { NextRaceCard } from "./parts";
@@ -159,6 +159,7 @@ function WeekendClassification({ state, weekend }: { state: SimulationState; wee
 
 function ResultCard({ weekend, season }: { weekend: RaceWeekendResult; season: number }) {
   const [open, setOpen] = useState(false);
+  const [zoom, setZoom] = useState<{ src: string; alt: string } | null>(null);
   const track = trackById(weekend.trackId);
   const finishes = weekend.playerEntries.map((p) => (p.dnf ? 999 : p.position));
   const best = finishes.length ? Math.min(...finishes) : 999;
@@ -192,14 +193,19 @@ function ResultCard({ weekend, season }: { weekend: RaceWeekendResult; season: n
         </div>
         {track && (
           <div className="shrink-0 lg:w-44">
-            <div className="flex h-28 items-center justify-center overflow-hidden rounded-sm bg-white p-1.5">
+            <button
+              type="button"
+              onClick={() => setZoom({ src: track.image, alt: `${track.name} circuit map` })}
+              title="Click to enlarge circuit map"
+              className="flex h-28 w-full cursor-zoom-in items-center justify-center overflow-hidden rounded-sm bg-white p-1.5 transition hover:opacity-90"
+            >
               <Img
                 src={track.image}
                 alt={`${track.name} circuit layout`}
                 fallback={<span className="text-[10px] text-ink-faint">Layout</span>}
                 className="max-h-full max-w-full object-contain"
               />
-            </div>
+            </button>
             <div className="mt-1 text-center text-[10px] uppercase tracking-widest text-ink-faint">
               R{weekend.round} circuit map
             </div>
@@ -261,6 +267,7 @@ function ResultCard({ weekend, season }: { weekend: RaceWeekendResult; season: n
         </span>
       </div>
       {open && <RaceResultReplay weekend={weekend} season={season} onClose={() => setOpen(false)} />}
+      {zoom && <ImageLightbox src={zoom.src} alt={zoom.alt} onClose={() => setZoom(null)} light />}
     </Card>
   );
 }

@@ -10,7 +10,7 @@ Built with **React 19 + TypeScript + Vite**, styled with **Tailwind CSS 4**. No 
 
 ### Career setup
 - **Two eras**: the 2013 V8 season (19 races, no sprints) or 2025 (24 races, six sprint weekends, fastest-lap point).
-- **Four difficulties** — Rookie, Professional, Expert, Ruthless — scaling your budget, part prices, failure rates, sponsor patience and how much information the sim reveals.
+- **Four difficulties** — Rookie, Professional, Expert, Ruthless — scaling your budget, part prices, failure rates, sponsor patience and how much information the sim reveals. Difficulty also sets how many **sponsor slots** you get: Rookie 7 · Professional 5 · Expert 4 · Ruthless 3.
 - **Season detail level** — Short (summarized GPs) up to Hardcore (practice, full qualifying, event logs).
 - **Deterministic seeds** — same seed + same choices = same season. Share a seed and race a friend's save.
 - **Team principal profile** — name, photo and what the paddock calls you ("Boss", "Sir", custom…). It shows up in messages and on your season report.
@@ -25,12 +25,14 @@ Built with **React 19 + TypeScript + Vite**, styled with **Tailwind CSS 4**. No 
 - Points, podiums, fastest laps, sprint points and prize money all feed the championship and your accounts.
 
 ### Running the team
-- **Overview** — owner card (cash, reputation, trust), standings, next-race briefing, latest news.
-- **Management** — driver chats that need answers (support or tough love), interventions (speech, bonus, fine, rant) with lingering morale boosts and cooldowns, plus garage-wide actions (team building, training camp, psychologist). Everything moves driver morale, confidence and frustration — and now the team's public reputation too.
-- **Market** — mid-season driver swaps (prorated salaries, break fee, one undo), hiring/firing engineers per department and pit crews, paid testing programme, team orders.
-- **Sponsors** — live objectives with deadlines and patience; meet them for bonuses or lose them for good. The tab badge shows green when an objective is met, yellow when you're close.
-- **Garage** — component wear, failures and repair bills, engine/gearbox replacement, and development projects between rounds shaped by your engineers.
+- **Overview** — owner card (cash, reputation, trust), standings, next-race briefing, latest news. Your car photo is clickable for a full-screen look.
+- **Management** — driver chats that need answers (support or tough love), interventions (speech, bonus, fine, rant) with lingering morale boosts and cooldowns, plus garage-wide actions (team building, training camp, psychologist). Team orders live here too: equal treatment or a designated lead driver. Everything moves driver morale, confidence and frustration — and now the team's public reputation too.
+- **Market** — mid-season driver swaps (prorated salaries, break fee, one undo) plus hiring/firing engineers per department and pit crews.
+- **Sponsors** — live objectives with deadlines and patience; meet them for bonuses or lose them for good. The tab badge shows green when an objective is met, yellow when you're close. Slot count depends on difficulty, and terminating a contract mid-season asks for confirmation with the full cost breakdown.
+- **Garage** — component wear, failures and repair bills, engine/gearbox replacement, paid circuit testing, weekly pit-crew/driver training programmes, and development projects between rounds shaped by your engineers (upgrades wait for the dev window; trainings don't).
 - **Finance** — round-by-round cash flow, a categorized ledger with drill-down detail modals, season totals and bankruptcy watch.
+
+Car and circuit images anywhere in the season open in a lightbox — click the image, then click away / ✕ / Esc to dismiss.
 
 ### Living systems
 - **Reputation (0–100)** moves every weekend: wins, podiums and points raise it; scoreless weekends and double DNFs cost it. Driver moods, garage trust, your management conduct and leading the championship all add drift — and reputation gates title sponsors.
