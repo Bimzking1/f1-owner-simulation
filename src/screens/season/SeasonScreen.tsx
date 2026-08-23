@@ -62,6 +62,19 @@ export default function SeasonScreen({ state, onRunRound, onNewsAction, act, onR
 
   const openChats = state.news.filter((n) => n.kind === "chat" && !n.resolved).length;
 
+  // Sponsors badge: green = objective met, yellow = closing in on it.
+  const activeSps = t.sponsors.filter((s) => s.active && s.deadlineRound > 0);
+  const spDone = activeSps.filter((s) => s.required > 0 && s.progress >= s.required).length;
+  const spNear = activeSps.filter(
+    (s) => s.required > 0 && s.progress < s.required && s.progress / s.required >= 2 / 3,
+  ).length;
+  const sponsorsBadge =
+    spDone > 0
+      ? { count: spDone, cls: "bg-positive" }
+      : spNear > 0
+        ? { count: spNear, cls: "bg-caution" }
+        : null;
+
   return (
     <div className="mx-auto max-w-6xl px-4 pb-16">
       <header className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2 border-b border-hairline bg-surface/70 px-3 py-3 sm:px-5">
@@ -110,26 +123,38 @@ export default function SeasonScreen({ state, onRunRound, onNewsAction, act, onR
         </div>
       </header>
 
-      <nav className="sticky top-0 z-30 -mx-4 mb-4 flex flex-wrap gap-1 border-b border-hairline bg-void/95 px-4 py-2 shadow-lg backdrop-blur">
-        {TABS.map((tb) => (
-          <button
-            key={tb}
-            type="button"
-            onClick={() => setTab(tb)}
-            className={`relative rounded-sm border px-3 py-1.5 text-xs font-bold uppercase tracking-widest transition ${
-              tab === tb
-                ? "border-signal/40 bg-signal/15 text-signal"
-                : "border-transparent bg-raised/40 text-ink-soft hover:bg-raised hover:text-ink"
-            }`}
-          >
-            {tb}
-            {tb === "Management" && openChats > 0 && (
-              <span className="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-signal px-1 text-[9px] font-bold text-white">
-                {openChats}
-              </span>
-            )}
-          </button>
-        ))}
+      <nav className="sticky top-0 z-30 -mx-4 mb-4 border-b border-hairline bg-void/95 px-3 py-2 shadow-lg backdrop-blur sm:px-4">
+        <div className="flex flex-wrap gap-1.5 sm:flex-nowrap">
+          {TABS.map((tb) => {
+            const badge =
+              tb === "Management" && openChats > 0
+                ? { count: openChats, cls: "bg-signal" }
+                : tb === "Sponsors"
+                  ? sponsorsBadge
+                  : null;
+            return (
+              <button
+                key={tb}
+                type="button"
+                onClick={() => setTab(tb)}
+                className={`relative min-w-[4.6rem] flex-1 rounded-sm border px-2 py-2.5 text-xs font-bold uppercase tracking-widest transition sm:min-w-[5.5rem] sm:flex-initial sm:px-3.5 sm:py-2 ${
+                  tab === tb
+                    ? "border-signal bg-signal text-white shadow-md"
+                    : "border-hairline bg-raised/70 text-ink-soft hover:border-ink-faint hover:bg-raised hover:text-ink"
+                }`}
+              >
+                {tb}
+                {badge && (
+                  <span
+                    className={`absolute -right-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-void px-1 text-[10px] font-bold text-white ${badge.cls}`}
+                  >
+                    {badge.count}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
       </nav>
 
       {tab === "Overview" && (

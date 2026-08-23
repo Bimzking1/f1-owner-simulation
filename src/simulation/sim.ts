@@ -22,6 +22,7 @@ import {
   advanceWear,
   applyMorale,
   applyRaceFinance,
+  applyReputation,
   applyStandings,
   bankruptcyCheck,
   evaluateSponsors,
@@ -178,6 +179,7 @@ export function runRound(state: SimulationState): RoundOutcome {
 
   applyStandings(state, weekend);
   applyMorale(state, weekend);
+  applyReputation(state, weekend);
   advanceWear(state, weekend, rng);
   const finance = applyRaceFinance(state, weekend);
   void finance;

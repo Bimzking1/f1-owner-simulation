@@ -20,7 +20,7 @@ import {
   testingBudget,
   undoDriverSwap,
 } from "@/actions";
-import { Button, Card, Img, Modal, Money, Ovr, Rating, Tag } from "@/ui/kit";
+import { Button, Card, Img, Modal, Money, Ovr, Rating, SeniorityBadge, Tag } from "@/ui/kit";
 import { driverImage } from "@/data/assets";
 import type { Act } from "./parts";
 
@@ -134,7 +134,7 @@ export function MarketTab({ state, act }: Props) {
             {engineers.map((e) => {
               const hired = t.engineerIds.includes(e.id);
               return (
-                <div key={e.id} className="rounded-sm border border-hairline px-2 py-1.5 text-sm">
+                <div key={e.id} className={`rounded-sm border px-2 py-1.5 text-sm ${hired ? "border-positive/50 bg-positive/5" : "border-hairline"}`}>
                   <div className="flex items-center gap-2">
                     <span className="min-w-0 flex-1 truncate">{e.name}</span>
                     {hired ? (
@@ -150,8 +150,8 @@ export function MarketTab({ state, act }: Props) {
                     )}
                   </div>
                   <div className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[10px]">
-                    <Tag tone={engineerSeniority(e).tone}>{engineerSeniority(e).label}</Tag>
-                    <Tag tone="telemetry">{engineerRole(e)}</Tag>
+                    <SeniorityBadge tone={engineerSeniority(e).tone} label={engineerSeniority(e).label} />
+                    <Tag tone="ink">{engineerRole(e)}</Tag>
                     <Rating label="Exp" value={e.expertise} />
                     <Rating label="Dev" value={e.developmentSpeed} />
                   </div>
@@ -166,7 +166,7 @@ export function MarketTab({ state, act }: Props) {
             {mechanics.map((m) => {
               const hired = t.mechanicIds.includes(m.id);
               return (
-                <div key={m.id} className="rounded-sm border border-hairline px-2 py-1.5 text-sm">
+                <div key={m.id} className={`rounded-sm border px-2 py-1.5 text-sm ${hired ? "border-positive/50 bg-positive/5" : "border-hairline"}`}>
                   <div className="flex items-center gap-2">
                     <span className="min-w-0 flex-1 truncate">{m.name}</span>
                     {hired ? (
@@ -182,8 +182,8 @@ export function MarketTab({ state, act }: Props) {
                     )}
                   </div>
                   <div className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[10px]">
-                    <Tag tone={mechanicTier(m).tone}>{mechanicTier(m).label}</Tag>
-                    <Tag tone="telemetry">Pit crew</Tag>
+                    <SeniorityBadge tone={mechanicTier(m).tone} label={mechanicTier(m).label} />
+                    <Tag tone="ink">Pit crew</Tag>
                     <Rating label="Pit" value={`${m.pitStop.toFixed(2)}s`} rank={100 - Math.round((m.pitStop - 2) * 40)} />
                     <Rating label="Err" value={`${m.errorChance}%`} rank={100 - Math.round(m.errorChance * 10)} />
                     <Rating label="Repair" value={m.repairEfficiency} />

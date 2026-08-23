@@ -150,6 +150,7 @@ export function FinanceTab({ state }: { state: SimulationState }) {
         open={!!selected}
         onClose={() => setSelected(null)}
         title={selected ? `${selected.label} · R${selected.round}${state.calendar[selected.round - 1] ? ` — ${state.calendar[selected.round - 1].grandPrix}` : ""}` : ""}
+        z={60}
       >
         {selected && (
           <div className="space-y-3 text-sm">
