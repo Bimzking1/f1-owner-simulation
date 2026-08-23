@@ -6,6 +6,7 @@
 import type { Driver, DriverBoost, DriverState, SimulationState, TestReport, TestType } from "@/simulation/types";
 import type { DevOption } from "@/simulation/systems";
 import {
+  addReputation,
   generateDevOptions,
   replaceComponent,
   startProject,
@@ -455,6 +456,9 @@ export function manageDriver(state: SimulationState, driverId: string, action: M
     if (existing) existing.racesLeft = Math.max(existing.racesLeft, tail.racesLeft);
     else ds.boosts.push(tail);
   }
+  // owner conduct shapes the team's public standing
+  const repDelta: Record<MgmtAction, number> = { speech: 0.2, bonus: 0.5, fine: -0.6, rant: -0.8 };
+  addReputation(t, repDelta[action]);
   return msg(result, true, `${info.label}: ${effect}.${tail ? ` Lingering: ${boostDesc(tail)}.` : ""}${trustNote(addTrust(t, TRUST_DELTA[action]))}`);
 }
 
@@ -552,6 +556,9 @@ export function manageTeam(state: SimulationState, action: TeamAction): ActionRe
   }
   if (action === "teambuilding") t.pitCrew = clamp(t.pitCrew + 1, 0, 100);
   const teamTrust: Record<TeamAction, number> = { teambuilding: 2, trainingcamp: 2, psych: 1 };
+  // investing in the people reads well in the paddock
+  const teamRep: Record<TeamAction, number> = { teambuilding: 0.4, trainingcamp: 0.5, psych: 0.3 };
+  addReputation(t, teamRep[action]);
   return msg(result, true, `${info.label}: ${effect}. Lingering: ${boostDesc(tails[action])} each.${trustNote(addTrust(t, teamTrust[action]))}`);
 }
 

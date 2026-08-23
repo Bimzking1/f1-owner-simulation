@@ -430,6 +430,8 @@ export interface TeamState {
   sponsorIds: string[];
   cash: number;
   reputation: number;
+  /** Fractional reputation accumulator — small weekly deltas land as integer rep. */
+  repAcc?: number;
   /** Paddock trust in the owner, 0-100 — moves with every decision (spec §24). */
   trust?: number;
   startCash: number;

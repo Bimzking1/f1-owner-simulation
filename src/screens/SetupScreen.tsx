@@ -28,7 +28,7 @@ import {
   sponsorById,
 } from "@/data";
 import { DIFFICULTIES, PHILOSOPHIES } from "@/data/config";
-import { Bar, Button, Card, Img, InfoTip, Money, Ovr, Rating, Tag } from "@/ui/kit";
+import { Bar, Button, Card, Img, InfoTip, Money, Ovr, Rating, SeniorityBadge, Tag } from "@/ui/kit";
 import { useHoldOpen } from "@/ui/hooks";
 import { driverImage } from "@/data/assets";
 import {
@@ -764,19 +764,6 @@ function TechPick({ active, onClick, title, stats, extra, cost, tip }: { active:
 }
 
 /** Seniority / tier badge — outlined diamond pill, visually distinct from role Tags. */
-function SeniorityBadge({ tone, label }: { tone: "ink" | "telemetry" | "elite" | "caution"; label: string }) {
-  const cls = {
-    elite: "border-elite/60 bg-elite/10 text-elite",
-    telemetry: "border-telemetry/50 bg-telemetry/10 text-telemetry",
-    caution: "border-caution/50 bg-caution/10 text-caution",
-    ink: "border-hairline bg-transparent text-ink-faint",
-  }[tone];
-  return (
-    <span className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-px text-[9px] font-bold uppercase tracking-widest ${cls}`}>
-      ◆ {label}
-    </span>
-  );
-}
 
 function StaffCard({
   hired,

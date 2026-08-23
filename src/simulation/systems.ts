@@ -15,6 +15,88 @@ import { DIFFICULTIES } from "@/data/config";
 import { clamp, type Rng } from "./rng";
 
 // ---------------------------------------------------------------------------
+// Reputation (moves all season: results, driver mood, owner conduct)
+
+/**
+ * Apply a fractional reputation delta; whole points land immediately, the
+ * remainder accumulates on the team so small weekly moves are not lost.
+ * Returns the integer amount actually applied.
+ */
+export function addReputation(t: TeamState, delta: number): number {
+  if (!delta) return 0;
+  t.repAcc = Math.round(((t.repAcc ?? 0) + delta) * 100) / 100;
+  let applied = 0;
+  while (t.repAcc >= 1) {
+    applied++;
+    t.repAcc -= 1;
+  }
+  while (t.repAcc <= -1) {
+    applied--;
+    t.repAcc += 1;
+  }
+  if (applied !== 0) t.reputation = clamp(t.reputation + applied, 0, 100);
+  return applied;
+}
+
+/** Post-weekend reputation drift from results, driver mood and owner standing. */
+export function applyReputation(state: SimulationState, weekend: RaceWeekendResult) {
+  const t = state.team;
+  if (!t) return;
+  const diff = DIFFICULTIES.find((d) => d.id === state.difficulty) ?? DIFFICULTIES[1];
+  const mult = diff.sponsorMultiplier;
+
+  const entries = weekend.playerEntries;
+  const wins = entries.filter((e) => e.position === 1).length;
+  const podiums = entries.filter((e) => !e.dnf && e.position <= 3).length;
+  const scorers = entries.filter((e) => e.points > 0).length;
+  const scored = scorers > 0;
+
+  let delta = 0;
+  // results
+  delta += wins * 2.2;
+  delta += (podiums - wins) * 0.9;
+  delta += (scorers - podiums) * 0.35;
+  if (!scored) delta -= 0.9;
+  if (entries.length > 0 && entries.every((e) => e.dnf)) delta -= 0.6;
+
+  // driver feedback — the squad's mood leaks into the paddock narrative
+  if (t.drivers.length) {
+    const avgMorale = t.drivers.reduce((a, d) => a + d.morale, 0) / t.drivers.length;
+    const avgFrustration = t.drivers.reduce((a, d) => a + d.frustration, 0) / t.drivers.length;
+    if (avgMorale >= 72) delta += 0.4;
+    else if (avgMorale < 38) delta -= 0.4;
+    if (avgFrustration >= 60) delta -= 0.4;
+  }
+
+  // team feedback — how the garage rates its owner colors the coverage
+  const trust = t.trust ?? 50;
+  if (trust >= 70) delta += 0.3;
+  else if (trust <= 32) delta -= 0.3;
+
+  // leading the championship carries its own glow
+  const wccPos = state.standingsConstructors.findIndex((c) => c.teamId === t.constructorId) + 1;
+  if (wccPos === 1 && state.completedRounds > 2) delta += 0.5;
+
+  const applied = addReputation(t, delta * mult);
+  if (Math.abs(applied) >= 2) {
+    const round = state.completedRounds + 1;
+    state.news.unshift({
+      id: `rep-${round}`,
+      round,
+      tag: "info",
+      priority: "info" satisfies NewsPriority,
+      title: applied > 0 ? `Reputation rising — ${t.reputation}/100` : `Reputation slipping — ${t.reputation}/100`,
+      body:
+        applied > 0
+          ? `Strong weekend: the paddock rates the operation higher (${applied >= 3 ? "+" : "+"}${applied} this round). Better results keep sponsors and drivers interested.`
+          : `A rough weekend: questions are being asked upstairs (${applied} this round). Points and happier drivers turn it around.`,
+      bodyEnjoyer:
+        applied > 0 ? "The paddock is warming to your outfit." : "The paddock's patience with your team is thinning.",
+    });
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Championship (spec §53)
 
 export function applyStandings(state: SimulationState, weekend: RaceWeekendResult) {
@@ -703,15 +785,16 @@ export function generateDriverChat(state: SimulationState, rng: Rng) {
 }
 
 export function applyChatResponse(state: SimulationState, driverId: string, response: string): string | null {
-  const t = state.team;
-  if (!t) return null;
-  const ds = t.drivers.find((x) => x.driverId === driverId);
-  if (!ds) return null;
-  switch (response) {
-    case "chat-support": {
-      ds.morale = clamp(ds.morale + 6, 0, 100);
-      ds.confidence = clamp(ds.confidence + 3, 0, 100);
-      t.trust = clamp((t.trust ?? 50) + 1, 0, 100);
+    const t = state.team;
+    if (!t) return null;
+    const ds = t.drivers.find((x) => x.driverId === driverId);
+    if (!ds) return null;
+    switch (response) {
+      case "chat-support": {
+        ds.morale = clamp(ds.morale + 6, 0, 100);
+        ds.confidence = clamp(ds.confidence + 3, 0, 100);
+        t.trust = clamp((t.trust ?? 50) + 1, 0, 100);
+        addReputation(t, 0.4);
       ds.boosts ??= [];
       const ex = ds.boosts.find((b) => b.label === "Public backing");
       if (ex) ex.racesLeft = Math.max(ex.racesLeft, 2);
@@ -729,11 +812,12 @@ export function applyChatResponse(state: SimulationState, driverId: string, resp
       else ds.boosts.push({ label: "Upgrade promise", confidence: 2, racesLeft: 3 });
       return "Upgrade promise made — expectations rise.";
     }
-    case "chat-tough": {
-      ds.frustration = clamp(ds.frustration - 8, 0, 100);
-      ds.morale = clamp(ds.morale - 3, 0, 100);
-      ds.confidence = clamp(ds.confidence + 2, 0, 100);
-      t.trust = clamp((t.trust ?? 50) + 1, 0, 100);
+      case "chat-tough": {
+        ds.frustration = clamp(ds.frustration - 8, 0, 100);
+        ds.morale = clamp(ds.morale - 3, 0, 100);
+        ds.confidence = clamp(ds.confidence + 2, 0, 100);
+        t.trust = clamp((t.trust ?? 50) + 1, 0, 100);
+        addReputation(t, 0.3);
       ds.boosts ??= [];
       const ex = ds.boosts.find((b) => b.label === "Tough love");
       if (ex) ex.racesLeft = Math.max(ex.racesLeft, 2);

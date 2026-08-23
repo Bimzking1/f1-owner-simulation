@@ -64,6 +64,22 @@ export function Tag({ children, tone = "ink" }: { children: ReactNode; tone?: "i
   );
 }
 
+/** Seniority / tier badge — outlined diamond pill, visually distinct from role Tags.
+ *  Shared by team setup (Staff step) and the season Market workshops. */
+export function SeniorityBadge({ tone, label }: { tone: "ink" | "telemetry" | "elite" | "caution"; label: string }) {
+  const cls = {
+    elite: "border-elite/60 bg-elite/10 text-elite",
+    telemetry: "border-telemetry/50 bg-telemetry/10 text-telemetry",
+    caution: "border-caution/50 bg-caution/10 text-caution",
+    ink: "border-hairline bg-transparent text-ink-faint",
+  }[tone];
+  return (
+    <span className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-px text-[9px] font-bold uppercase tracking-widest ${cls}`}>
+      ◆ {label}
+    </span>
+  );
+}
+
 export function Meter({ value, max = 100, tone = "telemetry", className = "" }: { value: number; max?: number; tone?: KitTone; className?: string }) {
   const pct = Math.max(0, Math.min(100, (value / max) * 100));
   const tones: Record<string, string> = {
@@ -125,10 +141,10 @@ export function Button({ children, onClick, variant = "primary", disabled, class
   );
 }
 
-export function Modal({ open, onClose, title, children, wide }: { open: boolean; onClose: () => void; title?: ReactNode; children: ReactNode; wide?: boolean }) {
+export function Modal({ open, onClose, title, children, wide, z = 50 }: { open: boolean; onClose: () => void; title?: ReactNode; children: ReactNode; wide?: boolean; z?: number }) {
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
+    <div className="fixed inset-0 flex items-center justify-center bg-black/70 p-4" style={{ zIndex: z }} onClick={onClose}>
       <div
         className={`max-h-[88vh] w-full ${wide ? "max-w-4xl" : "max-w-2xl"} overflow-auto rounded-md border border-hairline bg-surface shadow-2xl`}
         onClick={(e) => e.stopPropagation()}

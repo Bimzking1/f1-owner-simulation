@@ -7,10 +7,11 @@ import { buildSimulation, loadState, saveState } from "@/state";
 import type { SetupConfig } from "@/screens/SetupScreen";
 import LandingScreen from "@/screens/LandingScreen";
 import SetupScreen from "@/screens/SetupScreen";
+import ExpectationsScreen from "@/screens/ExpectationsScreen";
 import TestingScreen from "@/screens/TestingScreen";
 import SeasonScreen from "@/screens/season/SeasonScreen";
 
-type Screen = "landing" | "setup" | "testing" | "season";
+type Screen = "landing" | "setup" | "expectations" | "testing" | "season";
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>("landing");
@@ -49,6 +50,10 @@ export default function App() {
     if (!cfg) return;
     const s = buildSimulation({ ...cfg, team: built }, seed || `F1-${cfg.season}`);
     setSim(s);
+    setScreen("expectations");
+  };
+
+  const afterExpectations = () => {
     setScreen("testing");
   };
 
@@ -117,6 +122,8 @@ export default function App() {
         return cfg ? (
           <SetupScreen cfg={cfg} onStart={startSeason} onBack={() => setScreen("landing")} />
         ) : null;
+      case "expectations":
+        return sim ? <ExpectationsScreen state={sim} onContinue={afterExpectations} /> : null;
       case "testing":
         return sim ? (
           <TestingScreen state={sim} onRunTest={test} onStartSeason={beginSeason} />
