@@ -8,6 +8,7 @@ interface Props {
   onNewGame: (cfg: { season: SeasonId; difficulty: DifficultyId; gameLength: GameLengthId; seed: string; owner: OwnerProfile }) => void;
   onContinue: () => void;
   hasSave: boolean;
+  onChangelog: () => void;
 }
 
 interface Option<T> {
@@ -83,7 +84,7 @@ function SelectField<T extends string | number>({
   );
 }
 
-export default function LandingScreen({ onNewGame, onContinue, hasSave }: Props) {
+export default function LandingScreen({ onNewGame, onContinue, hasSave, onChangelog }: Props) {
   const [season, setSeason] = useState<SeasonId>(2025);
   const [difficulty, setDifficulty] = useState<DifficultyId>("professional");
   const [gameLength, setGameLength] = useState<GameLengthId>("standard");
@@ -146,7 +147,17 @@ export default function LandingScreen({ onNewGame, onContinue, hasSave }: Props)
   });
 
   return (
-    <div className="mx-auto flex min-h-full max-w-3xl flex-col justify-center px-6 py-10">
+    <div className="relative mx-auto flex min-h-full max-w-3xl flex-col justify-center px-6 py-10">
+      {/* change log — fixed top-right, reachable from anywhere on the page */}
+      <button
+        type="button"
+        onClick={onChangelog}
+        title="What changed between updates"
+        className="fixed right-3 top-3 z-30 flex items-center gap-1.5 rounded-sm border border-hairline bg-surface/95 px-2.5 py-2 text-[11px] font-bold uppercase tracking-widest text-ink-soft shadow-lg backdrop-blur transition hover:border-telemetry/50 hover:text-telemetry sm:right-5 sm:top-5 sm:px-3.5"
+      >
+        <span aria-hidden>⟳</span> Change log
+      </button>
+
       <div className="label-tech mb-2 text-[11px] tracking-[0.3em] text-ink-faint">a team management sim</div>
       <h1 className="font-display text-hero font-bold uppercase text-ink">
         F1 <span className="text-signal">Owner</span>

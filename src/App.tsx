@@ -7,11 +7,12 @@ import { buildSimulation, loadState, saveState } from "@/state";
 import type { SetupConfig } from "@/screens/SetupScreen";
 import LandingScreen from "@/screens/LandingScreen";
 import SetupScreen from "@/screens/SetupScreen";
+import ChangeLogScreen from "@/screens/ChangeLogScreen";
 import ExpectationsScreen from "@/screens/ExpectationsScreen";
 import TestingScreen from "@/screens/TestingScreen";
 import SeasonScreen from "@/screens/season/SeasonScreen";
 
-type Screen = "landing" | "setup" | "expectations" | "testing" | "season";
+type Screen = "landing" | "changelog" | "setup" | "expectations" | "testing" | "season";
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>("landing");
@@ -117,7 +118,16 @@ export default function App() {
   const body = useMemo(() => {
     switch (screen) {
       case "landing":
-        return <LandingScreen onNewGame={newGame} onContinue={continueSave} hasSave={hasSave} />;
+        return (
+          <LandingScreen
+            onNewGame={newGame}
+            onContinue={continueSave}
+            hasSave={hasSave}
+            onChangelog={() => setScreen("changelog")}
+          />
+        );
+      case "changelog":
+        return <ChangeLogScreen onBack={() => setScreen("landing")} />;
       case "setup":
         return cfg ? (
           <SetupScreen cfg={cfg} onStart={startSeason} onBack={() => setScreen("landing")} />
