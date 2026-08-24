@@ -3,6 +3,7 @@ import type { NewsItem, SimulationState } from "@/simulation/types";
 import { driverById, constructorById, sponsorById } from "@/data";
 import { boostDesc } from "@/actions";
 import { ownerTitle, sponsorSlotsOf, trustOf } from "@/state";
+import { effectiveCarStats } from "@/simulation/systems";
 import { Bar, Button, Card, ImageLightbox, Img, Meter, Ovr, Tag } from "@/ui/kit";
 import { ratingTone } from "@/ui/ratings";
 import { driverImage } from "@/data/assets";
@@ -225,12 +226,25 @@ export function OverviewTab({ state, onNewsAction, onRunRound, onNavigate }: Pro
             </tbody>
           </table>
           <div className="mt-3 grid gap-2 sm:grid-cols-2">
-            <Bar label="Aero" value={t.car.aero} />
-            <Bar label="Chassis" value={t.car.chassis} />
-            <Bar label="Reliability" value={t.car.reliability} />
-            <Bar label="Power" value={t.car.power} />
-            <Bar label="Tires" value={t.car.tireBehavior} />
-            <Bar label="Gearbox" value={t.car.gearboxPerf} />
+            {(["car1", "car2"] as const).map((seat) => {
+              const d = driverById(seat === "car1" ? t.driver1Id : t.driver2Id, state.season);
+              const eff = effectiveCarStats(t, state.season, seat);
+              return (
+                <div key={seat} className="rounded-md border border-hairline p-2">
+                  <div className="mb-1.5 flex items-center gap-2">
+                    <Img src={driverImage(d?.id ?? "", state.season)} alt={d?.shortName ?? seat} className="h-5 w-5 rounded-sm object-cover" />
+                    <span className="font-display text-xs font-bold uppercase tracking-wide">{d?.shortName ?? seat}</span>
+                    <span className="text-[9px] uppercase tracking-widest text-ink-faint">car {seat === "car1" ? 1 : 2} form</span>
+                  </div>
+                  <Bar label="Aero" value={eff.aero} />
+                  <Bar label="Chassis" value={eff.chassis} />
+                  <Bar label="Reliability" value={eff.reliability} />
+                  <Bar label="Power" value={eff.power} />
+                  <Bar label="Tires" value={eff.tireBehavior} />
+                  <Bar label="Gearbox" value={eff.gearboxPerf} />
+                </div>
+              );
+            })}
           </div>
         </Card>
 

@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import type { ComponentState, RaceWeekendResult, SimulationState } from "@/simulation/types";
+import type { ComponentState, RaceWeekendResult, Seat, SimulationState, TeamState } from "@/simulation/types";
 import { driverById, trackById } from "@/data";
 import { powerUnitForSeason } from "@/data/powerUnits";
 import { Button, Card, Empty, ImageLightbox, Img, Meter, Modal, Tag } from "@/ui/kit";
 import { ratingTone } from "@/ui/ratings";
 import { driverImage } from "@/data/assets";
-import { carParts, urgentRepairs } from "@/simulation/systems";
+import { carParts, effectiveCarStats, urgentRepairs } from "@/simulation/systems";
 import { type LiveCommand, type LiveView } from "./parts";
 import { PositionChart } from "./PositionChart";
 
@@ -517,6 +517,49 @@ function RetireConfirmModal({
 // Components — same detail level as the Garage, split PER CAR: each driver
 // runs their own engine/gearbox/era parts since v0.10.
 
+/** Per-car performance form — the team's car stats plus that seat's own
+ *  upgrade bonuses, so a one-car development split is visible at a glance. */
+const STAT_KEYS: { key: keyof ReturnType<typeof effectiveCarStats>; label: string }[] = [
+  { key: "aero", label: "Aero" },
+  { key: "chassis", label: "Chas" },
+  { key: "power", label: "Pwr" },
+  { key: "reliability", label: "Rel" },
+  { key: "tireBehavior", label: "Tire" },
+  { key: "gearboxPerf", label: "Gbx" },
+];
+
+function CarFormStrip({ t, season, seat }: { t: TeamState; season: number; seat: Seat }) {
+  const eff = effectiveCarStats(t, season, seat);
+  const other = effectiveCarStats(t, season, seat === "car1" ? "car2" : "car1");
+  const divergent = STAT_KEYS.some((s) => eff[s.key] !== other[s.key]);
+  return (
+    <div className="mb-2 rounded-md border border-hairline bg-raised/40 p-2">
+      <div className="flex items-center justify-between text-[9px] uppercase tracking-widest text-ink-faint">
+        <span>car form</span>
+        {divergent && <span className="text-elite">single-car upgrades active</span>}
+      </div>
+      <div className="mt-1 grid grid-cols-3 gap-1">
+        {STAT_KEYS.map((s) => {
+          const v = Math.round(eff[s.key]);
+          const dv = v - Math.round(other[s.key]);
+          return (
+            <div key={s.key} className="flex items-center justify-between gap-1 rounded-sm bg-void/50 px-1.5 py-0.5">
+              <span className="text-[9px] uppercase tracking-wider text-ink-faint">{s.label}</span>
+              <span className="num-data text-[11px] font-bold">{v}</span>
+              {dv !== 0 && (
+                <span className={`num-data text-[9px] ${dv > 0 ? "text-positive" : "text-signal"}`}>
+                  {dv > 0 ? "+" : ""}
+                  {dv}
+                </span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function ComponentsCard({ state, onOpenGarage }: { state: SimulationState; onOpenGarage?: () => void }) {
   const t = state.team!;
   const pu = powerUnitForSeason(state.season);
@@ -544,6 +587,7 @@ function ComponentsCard({ state, onOpenGarage }: { state: SimulationState; onOpe
                 <span className="text-[10px] uppercase tracking-widest text-ink-faint">Car {seat === "car1" ? 1 : 2}</span>
                 {seatRepairs > 0 && <Tag tone="signal">{seatRepairs} broken</Tag>}
               </div>
+              <CarFormStrip t={t} season={state.season} seat={seat} />
               <div className="space-y-2">
                 {([
                   { label: pu.engineName, spec: pu.engineSpec, c: parts.engine },
@@ -609,8 +653,8 @@ function ComponentsCard({ state, onOpenGarage }: { state: SimulationState; onOpe
         <Meter value={t.pitCrew} tone={ratingTone(t.pitCrew)} className="mt-1.5" />
       </div>
       <p className="mt-2 text-[10px] leading-relaxed text-ink-faint">
-        Every car runs its own hardware — wear, failures and grid penalties are per driver. Tap any part to manage it in
-        the Garage tab.
+        Every car runs its own hardware and its own upgrade level — wear, failures, grid penalties and dev bonuses are
+        per driver. Tap any part to manage it in the Garage tab.
       </p>
     </Card>
   );

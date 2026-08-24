@@ -28,7 +28,7 @@ Built with **React 19 + TypeScript + Vite**, styled with **Tailwind CSS 4**. No 
 - Points, podiums, fastest laps, sprint points and prize money all feed the championship and your accounts.
 
 ### Running the team
-- **Overview** — owner card (cash, reputation, trust), standings, next-race briefing, latest news. Your car photo is clickable for a full-screen look.
+- **Overview** — owner card (cash, reputation, trust), standings, next-race briefing, latest news. Your car photo is clickable for a full-screen look. Car performance stats are shown **per driver** (Car 1 / Car 2 columns), reflecting each seat's own upgrades.
 - **Management** — driver chats that need answers (support or tough love), interventions (speech, bonus, fine, rant) with lingering morale boosts and cooldowns, plus garage-wide actions (team building, training camp, psychologist). Team orders live here too: equal treatment or a designated lead driver. Everything moves driver morale, confidence and frustration — and now the team's public reputation too.
 - **Market** — mid-season driver swaps (prorated salaries, break fee + star markup, one undo) plus hiring/firing engineers per department and pit crews. The market has a **reputation gate**: drivers above OVR ~68 demand team reputation before they'll sign (Verstappen needs 68+), so champions must be earned, not just bought.
 - **Sponsors** — live objectives with deadlines and patience; meet them for bonuses or lose them for good. The tab badge shows green when an objective is met, yellow when you're close. Slot count depends on difficulty, and terminating a contract mid-season asks for confirmation with the full cost breakdown.
@@ -38,7 +38,7 @@ Built with **React 19 + TypeScript + Vite**, styled with **Tailwind CSS 4**. No 
 
 Car and circuit images anywhere in the season open in a lightbox — click the image, then click away / ✕ / Esc to dismiss.
 
-The Race tab's components panel mirrors the Garage at a glance, per car: every era part (V8/KERS or the seven-piece turbo-hybrid) with condition, Fresh/Worn/Broken status, age, mileage and damage notes. **Tap any part card to jump straight to that hardware in the Garage**, where full specs and replacements live.
+The Race tab's components panel mirrors the Garage at a glance, per car: every era part (V8/KERS or the seven-piece turbo-hybrid) with condition, Fresh/Worn/Broken status, age, mileage and damage notes, plus each car's own **performance form** (aero/chassis/power/reliability/tires/gearbox incl. that seat's upgrade bonuses — badges show where one-car dev has split the garage). **Tap any part card to jump straight to that hardware in the Garage**, where full specs and replacements live.
 
 ### Living systems
 - **Reputation (0–100)** moves every weekend: wins, podiums and points raise it; scoreless weekends and double DNFs cost it. Driver moods, garage trust, your management conduct and leading the championship all add drift — and reputation gates title sponsors **and star drivers**.
@@ -106,7 +106,7 @@ public/assets/       # images (drivers, cars, sponsors, tracks…)
 
 ## Changelog
 
-See the in-game **Change log** button on the landing page — it renders `src/data/changelog.ts`. Current build: **v0.11** (24 August 2026 · 15:38).
+See the in-game **Change log** button on the landing page — it renders `src/data/changelog.ts`. Current build: **v0.12** (24 August 2026 · 15:48).
 
 ---
 

@@ -22,6 +22,18 @@ export interface ChangeLogEntry {
 
 export const CHANGE_LOG: ChangeLogEntry[] = [
   {
+    version: "v0.12",
+    title: "Car form, per driver — the stat sheet catches up with per-car hardware",
+    when: "24 August 2026 · 15:48",
+    summary:
+      "Since v0.10 each car owns its hardware and can receive its own upgrades — but the car's performance numbers were still shown as one shared set. Now the stats are differentiated per driver everywhere they matter. The Race tab's power-unit panel leads each car block with a 'car form' strip (aero, chassis, power, reliability, tires, gearbox) computed from that seat's own upgrade bonuses; when single-car development makes the cars differ, the higher value carries a +N badge and a 'single-car upgrades active' note appears. The Overview tab's car bars split into two per-driver columns with portraits, so you always see which car is genuinely quicker and where.",
+    items: [
+      { kind: "new", text: "Per-car form in the Race tab: every car block in the POWER UNIT panel now shows its own six performance stats derived from that seat's upgrade level, with +/− badges against the other car and an indicator whenever one-car dev projects have split the garage." },
+      { kind: "improve", text: "Overview tab car stats split into CAR 1 / CAR 2 columns under each driver's portrait — base team stats plus that seat's bonuses instead of a single misleading set." },
+      { kind: "docs", text: "README notes the per-driver car form displays." },
+    ],
+  },
+  {
     version: "v0.11",
     title: "A pause button, a conscience for retirements & a clearer pit wall",
     when: "24 August 2026 · 15:38",
