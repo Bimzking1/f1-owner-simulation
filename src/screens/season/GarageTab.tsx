@@ -668,7 +668,13 @@ function PuRow({
           </div>
           <div className="flex items-center justify-between gap-2 pt-1">
             <span className="text-[11px] text-ink-faint">fresh unit → 100% · age 0</span>
-            <Button small variant="ghost" disabled={cash < row.cost} onClick={onSwap}>
+            <Button
+              small
+              variant={row.c.damaged ? "signal" : "positive"}
+              disabled={cash < row.cost}
+              onClick={onSwap}
+              title={`Swap in a brand-new ${row.name} for $${row.cost}M`}
+            >
               Replace ${row.cost}M
             </Button>
           </div>

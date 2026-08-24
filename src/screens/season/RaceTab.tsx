@@ -16,10 +16,12 @@ interface Props {
   live?: LiveView | null;
   sendCommand?: (cmd: LiveCommand) => void;
   onResume?: () => void;
+  onPause?: () => void;
   onSkipToEnd?: () => void;
+  onOpenGarage?: () => void;
 }
 
-export function RaceTab({ state, onRunRound, live, sendCommand, onResume, onSkipToEnd }: Props) {
+export function RaceTab({ state, onRunRound, live, sendCommand, onResume, onPause, onSkipToEnd, onOpenGarage }: Props) {
   const t = state.team!;
   const done = state.completedRounds >= state.calendar.length;
   const next = state.calendar[state.round];
@@ -67,10 +69,16 @@ export function RaceTab({ state, onRunRound, live, sendCommand, onResume, onSkip
         </Card>
 
         {live && live.paused && !live.done && sendCommand && (
-          <PitWallPanel live={live} state={state} sendCommand={sendCommand} onResume={onResume} />
+          <PitWallPanel
+            live={live}
+            state={state}
+            sendCommand={sendCommand}
+            onResume={onResume}
+            manual={!!live.manualPaused}
+          />
         )}
         {live && (
-          <LiveRacePanel live={live} state={state} onSkipToEnd={onSkipToEnd} />
+          <LiveRacePanel live={live} state={state} onSkipToEnd={onSkipToEnd} onPause={onPause} />
         )}
 
         {!live && last?.lapOrder && last.lapOrder.length > 1 && (
@@ -84,13 +92,15 @@ export function RaceTab({ state, onRunRound, live, sendCommand, onResume, onSkip
           </Card>
         )}
 
-        {last && <WeekendClassification state={state} weekend={last} />}
+        {/* The previous GP's classification stays hidden while the current
+            race runs — two classifications at once read as a bug. */}
+        {last && !busy && <WeekendClassification state={state} weekend={last} />}
       </div>
 
       {/* --------------------------------------------- RIGHT — the paddock */}
       <div className="space-y-4 lg:col-span-2">
         {last && !busy && <ResultCard weekend={last} season={state.season} />}
-        <ComponentsCard state={state} />
+        <ComponentsCard state={state} onOpenGarage={onOpenGarage} />
         {t.upgrades.length > 0 && (
           <Card title="Development in progress">
             <div className="space-y-2">
@@ -128,21 +138,28 @@ function PitWallPanel({
   state,
   sendCommand,
   onResume,
+  manual,
 }: {
   live: LiveView;
   state: SimulationState;
   sendCommand: (cmd: LiveCommand) => void;
   onResume?: () => void;
+  /** True when the owner paused the race themselves, not a checkpoint. */
+  manual?: boolean;
 }) {
   return (
     <div className="rounded-lg border-2 border-signal bg-signal/10 p-4 shadow-lg shadow-signal/20">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-        <span className="relative flex h-3.5 w-3.5 shrink-0">
-          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-signal opacity-60" />
-          <span className="relative inline-flex h-3.5 w-3.5 rounded-full bg-signal" />
-        </span>
+        {manual ? (
+          <span className="inline-flex h-3.5 w-3.5 shrink-0 rounded-full bg-signal" />
+        ) : (
+          <span className="relative flex h-3.5 w-3.5 shrink-0">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-signal opacity-60" />
+            <span className="relative inline-flex h-3.5 w-3.5 rounded-full bg-signal" />
+          </span>
+        )}
         <h3 className="font-display text-base font-bold uppercase tracking-widest text-signal">
-          Pit wall — decision required
+          Pit wall — {manual ? "race paused by you" : "decision required"}
         </h3>
         <span className="num-data text-sm text-ink-faint">
           Lap {live.currentLap}/{live.laps} · {live.grandPrix}
@@ -162,6 +179,7 @@ function PitWallPanel({
             stance={live.stances[id] ?? "steady"}
             motivateUsed={!!live.motivateUsed[id]}
             retired={!!live.retired[id]}
+            retireReason={live.retireReasons?.[id]}
             sendCommand={sendCommand}
           />
         ))}
@@ -213,10 +231,12 @@ function LiveRacePanel({
   live,
   state,
   onSkipToEnd,
+  onPause,
 }: {
   live: LiveView;
   state: SimulationState;
   onSkipToEnd?: () => void;
+  onPause?: () => void;
 }) {
   return (
     <Card
@@ -224,16 +244,23 @@ function LiveRacePanel({
         <span className="flex items-center gap-2">
           R{live.roundIdx + 1} · {live.grandPrix}
           {live.paused ? (
-            <Tag tone="caution">Paused</Tag>
+            <Tag tone="caution">{live.manualPaused ? "Paused by you" : "Paused"}</Tag>
           ) : (
             <Tag tone="signal">LIVE</Tag>
           )}
         </span>
       }
       right={
-        <Button small variant="ghost" onClick={onSkipToEnd}>
-          Skip to result ⏭
-        </Button>
+        <span className="flex gap-2">
+          {!live.paused && !live.done && onPause && (
+            <Button small variant="ghost" onClick={onPause} title="Halt the race and open the pit wall for orders">
+              ⏸ Pause
+            </Button>
+          )}
+          <Button small variant="ghost" onClick={onSkipToEnd}>
+            Skip to result ⏭
+          </Button>
+        </span>
       }
     >
       <PositionChart
@@ -259,7 +286,8 @@ function LiveRacePanel({
 
       {!live.paused && (
         <p className="mt-3 text-[11px] leading-relaxed text-ink-faint">
-          Orders open automatically at the lap ~33% and ~66% checkpoints.
+          Orders open automatically at the lap ~33% and ~66% checkpoints — or hit ⏸ Pause any time to halt the race and
+          talk to your drivers.
         </p>
       )}
     </Card>
@@ -273,6 +301,7 @@ function DriverOrderRow({
   stance,
   motivateUsed,
   retired,
+  retireReason,
   sendCommand,
 }: {
   driverId: string;
@@ -281,10 +310,12 @@ function DriverOrderRow({
   stance: "push" | "steady" | "conserve";
   motivateUsed: boolean;
   retired: boolean;
+  retireReason?: string;
   sendCommand: (cmd: LiveCommand) => void;
 }) {
   const d = driverById(driverId, season);
   const car = live.cars[driverId];
+  const [confirmRetire, setConfirmRetire] = useState(false);
   const btn = (kind: "push" | "steady" | "conserve", label: string, hint: string, cls: string) => (
     <button
       type="button"
@@ -314,6 +345,10 @@ function DriverOrderRow({
           </span>
           <Tag tone="signal">Retired</Tag>
           <span className="num-data ml-auto text-[11px] text-ink-faint">out of the race</span>
+        </div>
+        <div className="mt-1.5 rounded-sm border-l-2 border-signal/60 bg-void/60 px-2 py-1 text-[11px] leading-relaxed text-ink-soft">
+          <b className="text-ink-faint">Why he's out:</b>{" "}
+          {reasonCopy(retireReason)}
         </div>
       </div>
     );
@@ -351,14 +386,130 @@ function DriverOrderRow({
         </button>
         <button
           type="button"
-          title="Call the car into the pits and retire from the race. Drivers fighting near the front may refuse — a refusal frustrates them (+7)."
-          onClick={() => sendCommand({ driverId, kind: "retire" })}
+          title="Call the car into the pits and retire from the race. Opens a briefing first."
+          onClick={() => setConfirmRetire(true)}
           className="flex-1 rounded-md border border-signal/60 px-3 py-2 text-xs font-bold uppercase tracking-wider text-signal transition hover:bg-signal/15"
         >
           Retire car
         </button>
       </div>
+      {confirmRetire && car && (
+        <RetireConfirmModal
+          live={live}
+          name={d?.shortName ?? driverId}
+          car={car}
+          stance={stance}
+          onCancel={() => setConfirmRetire(false)}
+          onConfirm={() => {
+            setConfirmRetire(false);
+            sendCommand({ driverId, kind: "retire" });
+          }}
+        />
+      )}
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Retirement call — a modal briefing before the owner pulls the trigger.
+
+/** Owner-call rating for a retirement order, from race context. */
+function retireVerdict(car: NonNullable<LiveView["cars"][string]>, lapsLeft: number): {
+  label: string;
+  tone: "positive" | "caution" | "signal";
+  note: string;
+} {
+  if (car.health < 35)
+    return { label: "Wise call", tone: "positive", note: "The car is on its last legs — better to park it in the garage than scatter debris." };
+  if (car.tire < 20)
+    return { label: "Sensible", tone: "positive", note: "The tires are gone. Every extra lap is pure risk for no reward." };
+  if (car.pos <= 3)
+    return { label: "Out of mind", tone: "signal", note: `You are retiring a P${car.pos} car with ${lapsLeft} lap(s) left. The garage will be speechless.` };
+  if (car.pos <= 8)
+    return { label: "Questionable", tone: "caution", note: "Points were on the table. This will raise eyebrows on the pit wall." };
+  if (car.pos <= 12)
+    return { label: "Debatable", tone: "caution", note: "Mid-grid salvage — defensible if you fear a failure, but nobody will cheer it." };
+  return { label: "Wise call", tone: "positive", note: "Outside the points with hardware to save — textbook damage limitation." };
+}
+
+/** Rough refusal odds mirroring the sim's formula, in plain words. */
+function refusalRisk(pos: number, stance: string): string {
+  if (stance === "conserve" && pos <= 10) return "possible — he's already saving the car, but he'll hate it";
+  if (pos <= 5) return "very high — he is fighting at the front and will almost certainly defy the call";
+  if (pos <= 10) return "real — points are within reach and he knows it";
+  return "low — deep in the field, he'll accept the order";
+}
+
+function reasonCopy(reason?: string): string {
+  if (!reason) return "The team ended his race.";
+  const r = reason.toLowerCase();
+  if (r.includes("called into the pits by the team")) return "Forced to retire by the team owner — called into the pits against his racing instincts.";
+  if (r.includes("contact") || r.includes("crash") || r.includes("accident")) return `Accident — ${reason}.`;
+  return `Mechanical failure — ${reason}.`;
+}
+
+function RetireConfirmModal({
+  live,
+  name,
+  car,
+  stance,
+  onCancel,
+  onConfirm,
+}: {
+  live: LiveView;
+  name: string;
+  car: NonNullable<LiveView["cars"][string]>;
+  stance: "push" | "steady" | "conserve";
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  const lapsLeft = Math.max(0, live.laps - live.currentLap);
+  const verdict = retireVerdict(car, lapsLeft);
+  const risk = refusalRisk(car.pos, stance);
+  return (
+    <Modal open onClose={onCancel} title={`Retire ${name}'s car?`}>
+      <div className="space-y-3 text-sm">
+        <p className="text-ink-soft">
+          You are about to call <b>{name}</b> into the pits and end his race. He is running{" "}
+          <b>P{car.pos}</b>, {car.gapS.toFixed(1)}s behind the leader, with <b>{lapsLeft}</b> lap(s) remaining.
+        </p>
+        <div className="grid grid-cols-3 gap-1.5 text-xs">
+          <div className="rounded-sm border border-hairline bg-raised/40 px-2 py-1">
+            <div className="text-[9px] uppercase tracking-wider text-ink-faint">Tire life</div>
+            <div className="num-data font-bold">{car.tire}%</div>
+          </div>
+          <div className="rounded-sm border border-hairline bg-raised/40 px-2 py-1">
+            <div className="text-[9px] uppercase tracking-wider text-ink-faint">Car health</div>
+            <div className="num-data font-bold">{car.health}%</div>
+          </div>
+          <div className="rounded-sm border border-hairline bg-raised/40 px-2 py-1">
+            <div className="text-[9px] uppercase tracking-wider text-ink-faint">Form</div>
+            <div className="num-data font-bold">
+              {car.form >= 0 ? "+" : ""}
+              {car.form}
+            </div>
+          </div>
+        </div>
+        <div className={`rounded-md border-l-2 p-2 text-xs leading-relaxed ${
+          verdict.tone === "signal" ? "border-signal bg-signal/10 text-signal" : verdict.tone === "caution" ? "border-caution bg-caution/10 text-caution" : "border-positive bg-positive/10 text-positive"
+        }`}>
+          <b className="font-display uppercase tracking-widest">Paddock verdict: {verdict.label}</b>
+          <div className="mt-0.5">{verdict.note}</div>
+        </div>
+        <p className="rounded-md border-l-2 border-hairline bg-raised/30 p-2 text-xs leading-relaxed text-ink-soft">
+          <b>Driver rage:</b> refusal risk looks {risk} — and every refusal costs{" "}
+          <b>+7 frustration</b> and −1 trust. A refused driver switches himself to conserve and brings it home slowly.
+        </p>
+        <div className="flex justify-end gap-2 pt-1">
+          <Button small variant="ghost" onClick={onCancel}>
+            Keep him racing
+          </Button>
+          <Button small variant="signal" onClick={onConfirm}>
+            Call him in — retire
+          </Button>
+        </div>
+      </div>
+    </Modal>
   );
 }
 
@@ -366,7 +517,7 @@ function DriverOrderRow({
 // Components — same detail level as the Garage, split PER CAR: each driver
 // runs their own engine/gearbox/era parts since v0.10.
 
-function ComponentsCard({ state }: { state: SimulationState }) {
+function ComponentsCard({ state, onOpenGarage }: { state: SimulationState; onOpenGarage?: () => void }) {
   const t = state.team!;
   const pu = powerUnitForSeason(state.season);
   const repairs = urgentRepairs(state);
@@ -407,9 +558,16 @@ function ComponentsCard({ state }: { state: SimulationState }) {
                   const damaged = c.damaged === true;
                   const worn = !damaged && c.condition < 40;
                   return (
-                    <div
+                    <button
                       key={r.label}
-                      className={`rounded-md border p-2 ${damaged ? "border-signal/50 bg-signal/10" : "border-hairline bg-raised/40"}`}
+                      type="button"
+                      title={`Open ${drv?.shortName ?? "this"} car's ${r.label} in the Garage`}
+                      onClick={onOpenGarage}
+                      className={`block w-full rounded-md border p-2 text-left transition ${
+                        damaged
+                          ? "border-signal/50 bg-signal/10 hover:bg-signal/20"
+                          : "border-hairline bg-raised/40 hover:border-azure/50 hover:bg-raised"
+                      }`}
                     >
                       <div className="flex items-center gap-2">
                         <span className="min-w-0 truncate text-xs font-semibold">{r.label}</span>
@@ -435,7 +593,7 @@ function ComponentsCard({ state }: { state: SimulationState }) {
                           {c.damagedNote}
                         </div>
                       )}
-                    </div>
+                    </button>
                   );
                 })}
               </div>
@@ -451,8 +609,8 @@ function ComponentsCard({ state }: { state: SimulationState }) {
         <Meter value={t.pitCrew} tone={ratingTone(t.pitCrew)} className="mt-1.5" />
       </div>
       <p className="mt-2 text-[10px] leading-relaxed text-ink-faint">
-        Every car runs its own hardware — wear, failures and grid penalties are per driver. Full specs and replacements
-        live in the Garage tab.
+        Every car runs its own hardware — wear, failures and grid penalties are per driver. Tap any part to manage it in
+        the Garage tab.
       </p>
     </Card>
   );

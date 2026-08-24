@@ -28,13 +28,17 @@ export interface LiveView {
   playerIds: string[];
   stances: Record<string, "push" | "steady" | "conserve">;
   motivateUsed: Record<string, boolean>;
-  /** Player drivers whose car is out of the race (retired/DNF). */
+  /** Player drivers whose car is out of the race, with the reason it stopped. */
   retired: Record<string, boolean>;
+  /** Why each retired car is out ("mechanical failure…", "called into the pits by the team"…). */
+  retireReasons: Record<string, string>;
   /** Live per-car telemetry for the pit wall. */
   cars: Record<string, { pos: number; gapS: number; tire: number; health: number; form: number }>;
   gridPenaltyApplied: number;
   /** True while the race is held at a checkpoint awaiting owner orders. */
   paused: boolean;
+  /** True when the pause came from the owner's pause button, not a checkpoint. */
+  manualPaused?: boolean;
   /** True once every lap has run and the weekend is being finalized. */
   done: boolean;
 }

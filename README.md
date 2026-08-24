@@ -21,7 +21,7 @@ Built with **React 19 + TypeScript + Vite**, styled with **Tailwind CSS 4**. No 
 
 ### Race weekends
 - Practice forecast → qualifying → race (with sprint sessions in 2025), weather and track chaos.
-- **Live racing on desktop**: RUN GP streams the race on the Race tab — the position chart builds lap by lap while the race-control log scrolls. At two checkpoints the pit wall is yours: a loud decision panel takes over with big order buttons per driver (**Push** for pace at real mechanical/accident risk, **Steady**, **Conserve** to save car and tires, a one-shot **Motivate** pep talk, or **Retire** the car), then throw the green flag. Retired cars dim into a RETIRED card, every order answers with a toast confirmation, and each live car shows its own telemetry strip (position, gap, tyre life, car health, form). Retire isn't guaranteed either — a proud driver near the front may **refuse the call**, nurse it home on conserve and take his frustration out on you (+7 per refusal). Skip to the result any time; mobile keeps instant simulation.
+- **Live racing on desktop**: RUN GP streams the race on the Race tab — the position chart builds lap by lap while the race-control log scrolls. At two checkpoints the pit wall is yours: a loud decision panel takes over with big order buttons per driver (**Push** for pace at real mechanical/accident risk, **Steady**, **Conserve** to save car and tires, a one-shot **Motivate** pep talk, or **Retire** the car), then throw the green flag — or hit **⏸ Pause any time** to halt the race and open the pit wall on your own schedule. Retiring a car opens a **briefing modal** first: live context (position, gap, laps left, tires, health), a paddock verdict on your call (*Wise call → Out of mind*), a driver-rage forecast and the +7 frustration cost of a refusal. Retired cars dim into a RETIRED card that explains why they're out ("forced to retire by the team owner", accident or mechanical failure), every order answers with a toast confirmation, and each live car shows its own telemetry strip (position, gap, tyre life, car health, form). Skip to the result any time; mobile keeps instant simulation.
 - While the race runs, the **Race tab button pulses like a siren** and every other tab shows a race-in-progress strip (live lap counter, pause alerts) — one click jumps you back to the action.
 - After the flag, the desktop Race tab keeps the **position-movement chart** (playback + scrubber, click a line to isolate a driver) and the full race log without opening Replay. During the race the chart spans the full GP distance and fills in lap by lap, with a **★ marking each of your drivers' lines**. The result card only appears once the GP is actually finished, and the weekend classification hides while a race runs.
 - **AUTO** simulates weekends until something needs its owner — broken parts, a driver demanding a meeting, bankruptcy or the flag.
@@ -38,7 +38,7 @@ Built with **React 19 + TypeScript + Vite**, styled with **Tailwind CSS 4**. No 
 
 Car and circuit images anywhere in the season open in a lightbox — click the image, then click away / ✕ / Esc to dismiss.
 
-The Race tab's components panel mirrors the Garage at a glance, per car: every era part (V8/KERS or the seven-piece turbo-hybrid) with condition, Fresh/Worn/Broken status, age, mileage and damage notes — full specs and replacements stay in the Garage.
+The Race tab's components panel mirrors the Garage at a glance, per car: every era part (V8/KERS or the seven-piece turbo-hybrid) with condition, Fresh/Worn/Broken status, age, mileage and damage notes. **Tap any part card to jump straight to that hardware in the Garage**, where full specs and replacements live.
 
 ### Living systems
 - **Reputation (0–100)** moves every weekend: wins, podiums and points raise it; scoreless weekends and double DNFs cost it. Driver moods, garage trust, your management conduct and leading the championship all add drift — and reputation gates title sponsors **and star drivers**.
@@ -106,7 +106,7 @@ public/assets/       # images (drivers, cars, sponsors, tracks…)
 
 ## Changelog
 
-See the in-game **Change log** button on the landing page — it renders `src/data/changelog.ts`. Current build: **v0.10** (24 August 2026 · 15:13).
+See the in-game **Change log** button on the landing page — it renders `src/data/changelog.ts`. Current build: **v0.11** (24 August 2026 · 15:38).
 
 ---
 

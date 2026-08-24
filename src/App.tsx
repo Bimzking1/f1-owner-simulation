@@ -30,6 +30,8 @@ interface LiveEngine {
   /** Laps at which the race pauses for owner orders; empty → run to flag. */
   stops: number[];
   paused: boolean;
+  /** True when paused by the owner's pause button (not a checkpoint). */
+  userPaused?: boolean;
 }
 
 const STEP_MS = 620;
@@ -85,6 +87,9 @@ export default function App() {
       retired: Object.fromEntries(
         s.running.filter((r) => r.out).map((r) => [r.comp.driverId, true]),
       ) as Record<string, boolean>,
+      retireReasons: Object.fromEntries(
+        s.running.filter((r) => r.out && r.dnfReason).map((r) => [r.comp.driverId, r.dnfReason!]),
+      ),
       cars: Object.fromEntries(
         s.running.map((r) => {
           const alive = s.running.filter((x) => !x.out);
@@ -105,6 +110,7 @@ export default function App() {
       ) as LiveView["cars"],
       gridPenaltyApplied: eng.prep.gridPenaltyApplied,
       paused: eng.paused,
+      manualPaused: !!eng.userPaused,
       done: false,
     };
   };
@@ -215,8 +221,22 @@ export default function App() {
     if (!eng) return;
     clearTimer();
     eng.paused = false;
+    eng.userPaused = false;
     setLive(snapshotOf(eng));
     scheduleNext();
+  };
+
+  /** Owner-initiated freeze: halt the clock and open the pit wall for orders. */
+  const pauseLive = () => {
+    const eng = engineRef.current;
+    if (!eng || eng.paused) return;
+    const s = eng.prep.session;
+    if (s.finished) return;
+    clearTimer();
+    eng.paused = true;
+    eng.userPaused = true;
+    setLive(snapshotOf(eng));
+    setToast(`Race halted at lap ${s.currentLap}/${s.laps} — pit wall open.`);
   };
 
   const skipLiveToEnd = () => {
@@ -435,6 +455,7 @@ export default function App() {
             live={live}
             sendCommand={sendLiveCommand}
             onResume={resumeLive}
+            onPause={pauseLive}
             onSkipToEnd={skipLiveToEnd}
             onNewsAction={newsAction}
             act={act}

@@ -26,6 +26,7 @@ interface Props {
   live?: LiveView | null;
   sendCommand?: (cmd: LiveCommand) => void;
   onResume?: () => void;
+  onPause?: () => void;
   onSkipToEnd?: () => void;
   onNewsAction: (newsId: string, action: string) => void;
   act: Act;
@@ -44,6 +45,7 @@ export default function SeasonScreen({
   live,
   sendCommand,
   onResume,
+  onPause,
   onSkipToEnd,
   onNewsAction,
   act,
@@ -238,7 +240,7 @@ export default function SeasonScreen({
           <span className="min-w-0 text-sm leading-snug text-ink-soft">
             <b className="text-ink">
               Race in progress — R{live.roundIdx + 1} {live.grandPrix}, lap {live.currentLap}/{live.laps}
-              {live.paused && <span className="text-signal"> · PIT WALL DECISION REQUIRED</span>}
+              {live.paused && <span className="text-signal"> · PIT WALL OPEN</span>}
             </b>
             {" — head back to the Race tab to follow or intervene."}
           </span>
@@ -256,7 +258,9 @@ export default function SeasonScreen({
           live={live}
           sendCommand={sendCommand}
           onResume={onResume}
+          onPause={onPause}
           onSkipToEnd={onSkipToEnd}
+          onOpenGarage={() => setTab("Garage")}
         />
       )}
       {tab === "Management" && <ManagementTab state={state} act={act} onNewsAction={handleNewsAction} />}

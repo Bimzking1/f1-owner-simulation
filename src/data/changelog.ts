@@ -22,6 +22,22 @@ export interface ChangeLogEntry {
 
 export const CHANGE_LOG: ChangeLogEntry[] = [
   {
+    version: "v0.11",
+    title: "A pause button, a conscience for retirements & a clearer pit wall",
+    when: "24 August 2026 · 15:38",
+    summary:
+      "Race-control polish from the latest feedback pass. Retiring a car is no longer a single twitchy click — it now opens a full briefing modal with the driver's live situation (position, gap, laps left, tires, health), a paddock verdict on your call (Wise call / Sensible / Debatable / Questionable / Out of mind), an honest driver-rage forecast, and the +7 frustration cost of a refusal. New ⏸ Pause button halts the race whenever you like so orders can be given any time, not just at checkpoints. Retired cars now explain themselves on the pit wall ('Forced to retire by the team owner', accident or mechanical failure). The previous GP's weekend classification hides while the new race runs — no more two-classifications confusion. The Garage's Replace buttons got real visual weight (green normally, red when the part is broken), and every power-unit card in the Race tab's components panel is now clickable, jumping straight to that hardware in the Garage.",
+    items: [
+      { kind: "new", text: "Retirement briefing: clicking 'Retire car' opens a confirmation modal with live context (P#, gap, laps remaining, tire life, car health, form), a paddock verdict rating the call from Wise call to Out of mind, a refusal-risk forecast in plain words, and Cancel/Confirm actions." },
+      { kind: "new", text: "⏸ Pause at the pit wall: halt the race at any lap to open the pit wall and issue orders — no more waiting for the 33%/66% checkpoints. The panel reads 'race paused by you' (steady light instead of the alarm pulse) and the Green Flag button restarts the clock." },
+      { kind: "new", text: "Retired cars tell you why: the pit wall's RETIRED card shows the reason — forced retirement by the owner, accident contact, or the exact mechanical failure." },
+      { kind: "fix", text: "Weekend classification (the previous GP's quali/race/sprint tables) is hidden while a race is running in the Race tab, ending the confusion of last week's results sitting next to this week's live chart." },
+      { kind: "improve", text: "Garage Replace buttons are impossible to miss: solid green normally, red when the part is broken, with a tooltip restating the price. No more hunting for the ghost button." },
+      { kind: "improve", text: "Every part card in the Race tab's POWER UNIT panel is clickable and jumps straight to the Garage tab; the footnote says so. The race-in-progress strip now reads 'PIT WALL OPEN' when paused." },
+      { kind: "docs", text: "README updated for the pause button, retirement briefings, tap-through component cards and hidden classification." },
+    ],
+  },
+  {
     version: "v0.10",
     title: "Two cars, two sets of hardware — and drivers who talk back",
     when: "24 August 2026 · 15:13",
