@@ -24,7 +24,7 @@ import {
   type PuStatSpec,
 } from "@/data/powerUnits";
 import { replaceEngine, replaceGearbox, replacePuComponent, runTest, startDev, testingBudget } from "@/actions";
-import { Button, Card, Empty, Img, Meter, Modal, Money, Tag } from "@/ui/kit";
+import { Button, Card, Empty, Img, Meter, Modal, Money, ScrollText, Tag } from "@/ui/kit";
 import { ratingTone } from "@/ui/ratings";
 import type { Act } from "./parts";
 
@@ -584,10 +584,10 @@ function PowerSystemCard({
           const rows = partRows(state, seat);
           return (
             <div key={seat} className="rounded-md border border-hairline p-2.5">
-              <div className="mb-2 flex items-center gap-2">
-                <Img src={driverImage(drv?.id ?? "", state.season)} alt={drv?.shortName ?? seat} className="h-7 w-7 rounded-sm object-cover" />
-                <div className="min-w-0">
-                  <div className="truncate font-display text-sm font-bold uppercase tracking-wide">{drv?.shortName ?? seat}</div>
+              <div className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-1">
+                <Img src={driverImage(drv?.id ?? "", state.season)} alt={drv?.shortName ?? seat} className="h-7 w-7 shrink-0 rounded-sm object-cover" />
+                <div className="min-w-0 max-w-[10rem]">
+                  <div className="truncate font-display text-sm font-bold uppercase tracking-wide">{drv?.name ?? drv?.shortName ?? seat}</div>
                   <div className="text-[10px] uppercase tracking-widest text-ink-faint">Car {seat === "car1" ? 1 : 2}</div>
                 </div>
               </div>
@@ -643,7 +643,7 @@ function PuRow({
     <div className={`rounded-md border p-3 ${worn ? "border-caution/60" : "border-hairline"}`}>
       <button type="button" onClick={onToggle} className="flex w-full items-center justify-between gap-2 text-left">
         <div className="min-w-0">
-          <div className="truncate font-display font-bold uppercase">{row.name}</div>
+          <ScrollText className="font-display font-bold uppercase">{row.name}</ScrollText>
           <div className="text-[10px] text-ink-faint">
             age {row.c.age} · {row.c.replacements} replaced{open ? "" : " · tap for detail"}
           </div>

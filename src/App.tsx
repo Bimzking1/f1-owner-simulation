@@ -104,6 +104,7 @@ export default function App() {
               tire: tireLife,
               health: Math.round(Math.min(r.comp.engineCond, r.comp.gearboxCond)),
               form: Math.round(r.comp.driverState?.form ?? 0),
+              frs: Math.round(r.comp.driverState?.frustration ?? 0),
             },
           ];
         }),
@@ -271,7 +272,11 @@ export default function App() {
     const who = car.comp.driver.shortName;
     const last = s.events[s.events.length - 1];
     if (cmd.kind === "retire" && last && last.actor === cmd.driverId && last.text.includes("REFUSES")) {
-      setToast(`Radio: ${who} refuses the retirement call — he'll nurse it home. Frustration will rise.`);
+      setToast(`Radio: ${who} refuses the call — frustration +7, trust −1. He'll nurse it home.`);
+      return;
+    }
+    if (cmd.kind === "retire") {
+      setToast(`${who} RETIRED from the race — he takes it hard (+4 frustration, −2 trust).`);
       return;
     }
     setToast(
@@ -281,9 +286,7 @@ export default function App() {
           ? `Pit wall: ${who} told to hold STEADY.`
           : cmd.kind === "conserve"
             ? `Pit wall: ${who} told to CONSERVE.`
-            : cmd.kind === "motivate"
-              ? `Radio: ${who} fired up by the pep talk.`
-              : `Pit wall: ${who} RETIRED from the race.`,
+            : `Radio: ${who} fired up by the pep talk.`,
     );
   };
 

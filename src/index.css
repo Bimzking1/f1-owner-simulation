@@ -188,6 +188,26 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+/* Marquee scroll for truncated labels — ScrollText drives the shift distance
+   via --marquee-shift (px) and toggles .marquee-run on hover. */
+@keyframes marquee-scroll {
+  0%,
+  15% {
+    transform: translateX(0);
+  }
+  55%,
+  80% {
+    transform: translateX(var(--marquee-shift, -100%));
+  }
+  100% {
+    transform: translateX(0);
+  }
+}
+
+.marquee-run {
+  animation: marquee-scroll 4.5s ease-in-out infinite;
+}
+
 ::selection {
   background: rgb(var(--accent-signal) / 0.35);
 }

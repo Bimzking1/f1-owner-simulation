@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 import { ovrClass, ratingTextClass, ratingTone, type KitTone } from "./ratings";
 
@@ -320,6 +320,43 @@ export function InfoTip({
       <Modal open={modal} onClose={() => setModal(false)} title={title}>
         <div className="text-sm leading-relaxed text-ink-soft">{children}</div>
       </Modal>
+    </span>
+  );
+}
+
+/** Truncated text that scrolls like a marquee while hovered — for long part
+ *  names ("ICE — Internal Combustion") in tight rows. No-op when it fits. */
+export function ScrollText({ children, className = "" }: { children: ReactNode; className?: string }) {
+  const outer = useRef<HTMLSpanElement>(null);
+  const inner = useRef<HTMLSpanElement>(null);
+  const [run, setRun] = useState(false);
+  const [shift, setShift] = useState(0);
+
+  const check = () => {
+    const o = outer.current;
+    const i = inner.current;
+    if (!o || !i) return;
+    const over = i.scrollWidth - o.clientWidth;
+    if (over > 2) {
+      setShift(over + 12);
+      setRun(true);
+    }
+  };
+
+  return (
+    <span
+      ref={outer}
+      className={`block overflow-hidden whitespace-nowrap ${className}`}
+      onMouseEnter={check}
+      onMouseLeave={() => setRun(false)}
+    >
+      <span
+        ref={inner}
+        style={run ? ({ "--marquee-shift": `${-shift}px` } as CSSProperties) : undefined}
+        className={`inline-block ${run ? "marquee-run" : ""}`}
+      >
+        {children}
+      </span>
     </span>
   );
 }

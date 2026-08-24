@@ -11,6 +11,7 @@ import type {
   RaceEvent,
   RaceWeekendResult,
   SeasonId,
+  TeamState,
   Track,
   WeatherId,
 } from "./types";
@@ -231,7 +232,11 @@ export interface RaceSession {
   lapOrder: string[][];
   stances: Map<string, "push" | "steady" | "conserve">;
   motivateUntil: Map<string, number>;
-  /** Drivers who refused a team retirement call — finalizeRound adds frustration. */
+  /** Live handle on the player's team so order consequences (frustration,
+   *  trust) land the moment the driver answers the radio. Transient — set by
+   *  prepareRound, never persisted. */
+  team?: TeamState;
+  /** Drivers who refused a team retirement call — finalizeRound writes news. */
   retireRefusals: string[];
   finished: boolean;
 }
@@ -388,23 +393,31 @@ export function advanceRace(session: RaceSession, toLap: number, commands?: (Rac
       if (chance(session.input.rng, refuseChance)) {
         session.retireRefusals.push(cmd.driverId);
         session.stances.set(cmd.driverId, "conserve"); // he'll nurse it home himself
+        // He tells the owner exactly what he thinks of the call — right now.
+        const ds = car.comp.driverState;
+        if (ds) ds.frustration = clamp(ds.frustration + 7, 0, 100);
+        if (session.team) session.team.trust = clamp((session.team.trust ?? 50) - 1, 0, 100);
         session.events.push({
           lap: session.currentLap,
           type: "driver",
           severity: "warning",
           actor: cmd.driverId,
-          text: `PIT WALL — ${car.comp.driver.shortName} REFUSES the retirement call: "I'm bringing this home!" He runs in conservation mode.`,
+          text: `PIT WALL — ${car.comp.driver.shortName} REFUSES the retirement call: "I'm bringing this home!" He runs in conservation mode. Frustration +7.`,
           textEnjoyer: `${car.comp.driver.shortName} ignores the team and carries on, gently.`,
         });
       } else {
         car.out = true;
         car.dnfReason = "called into the pits by the team";
+        // Even a driver who obeys hates being parked — it stings immediately.
+        const ds = car.comp.driverState;
+        if (ds) ds.frustration = clamp(ds.frustration + 4, 0, 100);
+        if (session.team) session.team.trust = clamp((session.team.trust ?? 50) - 2, 0, 100);
         session.events.push({
           lap: session.currentLap,
           type: "strategy",
           severity: "danger",
           actor: cmd.driverId,
-          text: `PIT WALL — ${car.comp.driver.shortName} is RETIRED from the race.`,
+          text: `PIT WALL — ${car.comp.driver.shortName} is RETIRED from the race. He is not happy about it (+4 frustration).`,
           textEnjoyer: `${car.comp.driver.shortName} parks it. Team call.`,
         });
       }

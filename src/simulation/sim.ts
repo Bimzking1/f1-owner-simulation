@@ -248,6 +248,8 @@ export function prepareRound(state: SimulationState): PreparedRound | null {
   }
 
   const session = beginRace(input, weatherId, grid, [25, 18, 15, 12, 10, 8, 6, 4, 2, 1], state.season === 2025);
+  // Live handle for order consequences — same objects finalizeRound commits.
+  session.team = state.team!;
 
   return {
     roundIdx: idx,
@@ -291,13 +293,9 @@ export function finalizeRound(state: SimulationState, prep: PreparedRound): Roun
   void finance;
   evaluateSponsors(state);
   resolveDriverChallenge(state, weekend);
-  // drivers who refused a team retirement call take it out on the garage
-  const team = state.team!;
+  // drivers who refused a team retirement call get a news story — the
+  // frustration/trust cost was already applied live in advanceRace
   for (const id of prep.session.retireRefusals) {
-    const ds = team.drivers.find((x) => x.driverId === id);
-    if (!ds) continue;
-    ds.frustration = clamp(ds.frustration + 7, 0, 100);
-    team.trust = clamp((team.trust ?? 50) - 1, 0, 100);
     const d = driverById(id, state.season);
     state.news.unshift({
       id: `refuse-${prep.roundIdx}-${id}`,
