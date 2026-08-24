@@ -366,6 +366,23 @@ export interface ComponentState {
   replacements: number;
 }
 
+/**
+ * Era-specific power-unit parts tracked alongside the shared engine/gearbox.
+ * 2013 (V8 era): kers · 2025 (turbo-hybrid era): turbo, mguK, mguH,
+ * energyStore, controlElectronics, exhaust.
+ */
+export type EraComponentId =
+  | "kers"
+  | "turbo"
+  | "mguK"
+  | "mguH"
+  | "energyStore"
+  | "controlElectronics"
+  | "exhaust";
+
+/** Anything in the garage that can be swapped for a fresh unit. */
+export type ComponentKey = "engine" | "gearbox" | EraComponentId;
+
 export interface UpgradeProject {
   id: string;
   name: string;
@@ -452,6 +469,12 @@ export interface TeamState {
   components: {
     engine: ComponentState;
     gearbox: ComponentState;
+    /**
+     * Era-specific power-unit parts (2013: kers · 2025: turbo, mguK, mguH,
+     * energyStore, controlElectronics, exhaust). Optional so pre-era saves
+     * keep loading — parts are initialised lazily on the next race weekend.
+     */
+    powerUnit?: Partial<Record<EraComponentId, ComponentState>>;
   };
   upgrades: UpgradeProject[];
   drivers: DriverState[];

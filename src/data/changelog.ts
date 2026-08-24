@@ -22,6 +22,21 @@ export interface ChangeLogEntry {
 
 export const CHANGE_LOG: ChangeLogEntry[] = [
   {
+    version: "v0.5",
+    title: "Era-aware Garage & geekier Technical draft",
+    when: "24 August 2026 · 02:20",
+    summary:
+      "The Garage now speaks the technology of your season: 2013 shows a 2.4L V8 + KERS power system, 2025 shows the full seven-part 1.6L V6 turbo-hybrid power unit. Every component carries condition, wear rate, reliability estimates and mileage — and the setup Technical step explains the era before you spend a dollar.",
+    items: [
+      { kind: "new", text: "Era-aware Garage power sections. 2013 renders POWER SYSTEM — \"2.4L V8 + KERS\": engine (2.4L NA V8 spec) plus a dedicated KERS part (harvesting, boost delivery). No turbocharger, MGU-K/MGU-H or energy store anywhere in 2013 — those parts simply don't exist in that era." },
+      { kind: "new", text: "2025 renders POWER UNIT — \"1.6L V6 Turbo Hybrid\": ICE, Turbocharger, MGU-K (electrical performance, energy recovery), MGU-H (heat recovery, hybrid response), Energy Store (capacity, degradation), Control Electronics and Exhaust, each with its own hardware spec line, wear profile and replacement price." },
+      { kind: "improve", text: "Every garage component row is expandable: geek spec line (rpm limits, kJ allowances, bar pressure…), an honest role description, and live stat tiles — condition, ≈wear per race, reliability estimate from supplier base × health, output/effectiveness with usage fatigue, age in races and mileage in km. A blended system-health meter summarizes the whole installed power unit." },
+      { kind: "improve", text: "Any component can be replaced mid-season for a one-time fee (KERS $2.5M; turbo $3M, MGU-K $3.5M, MGU-H $3M, store $4.5M, electronics $2M, exhaust $1.5M) via the same confirm modal as engine/gearbox swaps. Ledger entries use proper part names." },
+      { kind: "improve", text: "The race engine now reads whole-power-system health instead of raw engine condition: a worn MGU-H, degraded battery or cracked exhaust raises mechanical DNF risk through the existing failure channels. 2013 blends V8 (80%) + KERS (20%); 2025 weights all seven subsystems by criticality. Old saves migrate lazily — era parts appear with plausible inherited wear after the next race weekend." },
+      { kind: "improve", text: "Setup Technical step gains an era banner (POWER SYSTEM vs POWER UNIT) listing that season's components with a plain-language tech explainer, season-specific Engine/Gearbox card titles, an Efficiency stat on engine picks, and expanded tooltips covering KERS mechanics (2013) and PU subsystem anatomy (2025)." },
+    ],
+  },
+  {
     version: "v0.4",
     title: "Sponsor slots by difficulty, garage & management reshuffle, image lightbox",
     when: "24 August 2026 · 01:51",

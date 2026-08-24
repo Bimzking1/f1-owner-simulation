@@ -5,6 +5,8 @@
 // ============================================================================
 
 import type {
+  ComponentKey,
+  EraComponentId,
   NewsPriority,
   RaceWeekendResult,
   SimulationState,
@@ -12,6 +14,7 @@ import type {
 } from "./types";
 import { driverById, engineById, engineerById, mechanicById, sponsorById } from "@/data";
 import { DIFFICULTIES } from "@/data/config";
+import { componentLabel, powerUnitForSeason, puComponentConfig } from "@/data/powerUnits";
 import { clamp, type Rng } from "./rng";
 
 // ---------------------------------------------------------------------------
@@ -142,7 +145,65 @@ export function applyStandings(state: SimulationState, weekend: RaceWeekendResul
 }
 
 // ---------------------------------------------------------------------------
-// Component wear (spec §42)
+// Component wear (spec §42) — era-aware power-unit parts included
+
+/**
+ * Make sure every power-unit component of the current era is tracked.
+ * Fresh saves start everything at 100%; saves resumed mid-season inherit
+ * plausible wear from the engine's mileage so the garage never shows a
+ * brand-new MGU-H inside a 10-race-old car.
+ */
+export function ensurePuComponents(state: SimulationState): void {
+  const t = state.team;
+  if (!t) return;
+  const cfg = powerUnitForSeason(state.season);
+  t.components.powerUnit ??= {};
+  const pu = t.components.powerUnit;
+  for (const part of cfg.components) {
+    if (!pu[part.id]) {
+      pu[part.id] =
+        t.components.engine.age === 0
+          ? { condition: 100, age: 0, replacements: 0 }
+          : {
+              condition: Math.max(70, Math.round(96 - t.components.engine.age * 1.2)),
+              age: t.components.engine.age,
+              replacements: 0,
+            };
+    }
+  }
+}
+
+/**
+ * Single health number for the whole installed power system, used by the race
+ * engine wherever it used to read raw engine condition. 2013 blends V8 + KERS;
+ * 2025 weights all seven subsystems by how hard each failure hits the unit.
+ */
+export function effectivePuHealth(state: SimulationState): number {
+  const t = state.team;
+  if (!t) return 100;
+  const eng = t.components.engine.condition;
+  const pu = t.components.powerUnit ?? {};
+  const val = (id: EraComponentId): number => pu[id]?.condition ?? eng;
+  return state.season === 2013
+    ? clamp(eng * 0.8 + val("kers") * 0.2, 1, 100)
+    : clamp(
+        eng * 0.45 +
+          val("turbo") * 0.18 +
+          val("mguK") * 0.12 +
+          val("mguH") * 0.08 +
+          val("energyStore") * 0.1 +
+          val("controlElectronics") * 0.03 +
+          val("exhaust") * 0.04,
+        1,
+        100,
+      );
+}
+
+/** Wear one era part over a weekend. */
+function wearPuPart(part: { wear: [number, number] }, c: { condition: number }, rng: Rng, wearMult: number, stress: number): void {
+  const loss = (part.wear[0] + rng() * (part.wear[1] - part.wear[0])) * wearMult * stress;
+  c.condition = Math.round(clamp(c.condition - loss, 5, 100) * 10) / 10;
+}
 
 export function advanceWear(state: SimulationState, weekend: RaceWeekendResult, rng: Rng) {
   const t = state.team;
@@ -151,39 +212,65 @@ export function advanceWear(state: SimulationState, weekend: RaceWeekendResult, 
   const rel = t.car.reliability;
   const wearMult = 1.15 - rel / 150;
   const stress = t.car.reliability < 60 ? 1.35 : 1.0;
+
+  ensurePuComponents(state);
+  const cfg = powerUnitForSeason(state.season);
+
   const eLoss = (2.4 + rng() * 1.6) * wearMult * stress;
   const gLoss = (1.9 + rng() * 1.2) * wearMult * stress;
-
   t.components.engine.condition = Math.round(clamp(t.components.engine.condition - eLoss, 5, 100) * 10) / 10;
   t.components.gearbox.condition = Math.round(clamp(t.components.gearbox.condition - gLoss, 5, 100) * 10) / 10;
   t.components.engine.age++;
   t.components.gearbox.age++;
+
+  const pu = t.components.powerUnit!;
+  for (const part of cfg.components) {
+    const c = pu[part.id];
+    if (c) {
+      wearPuPart(part, c, rng, wearMult, stress);
+      c.age++;
+    }
+  }
 }
 
-/** Cost in $M to replace a component; null if unavailable. */
-export function replacementCost(component: "engine" | "gearbox", state: SimulationState): number | null {
+/** Cost in $M to replace a component; null if unavailable this season. */
+export function replacementCost(component: ComponentKey, state: SimulationState): number | null {
   if (!state.team) return null;
   if (component === "engine") return state.season === 2013 ? 4.5 : 6;
-  return state.season === 2013 ? 3 : 3.5;
+  if (component === "gearbox") return state.season === 2013 ? 3 : 3.5;
+  return puComponentConfig(state.season, component)?.replaceCost ?? null;
 }
 
-export function replaceComponent(draft: SimulationState, component: "engine" | "gearbox") {
+export function replaceComponent(draft: SimulationState, component: ComponentKey) {
   const t = draft.team;
   if (!t) return;
   const cost = replacementCost(component, draft);
   if (cost === null || t.cash < cost) return;
   t.cash = Math.round((t.cash - cost) * 100) / 100;
-  t.components[component] = {
-    condition: 100,
-    age: 0,
-    replacements: t.components[component].replacements + 1,
-  };
+  const label = componentLabel(component, draft.season);
+
+  if (component === "engine" || component === "gearbox") {
+    t.components[component] = {
+      condition: 100,
+      age: 0,
+      replacements: t.components[component].replacements + 1,
+    };
+  } else {
+    ensurePuComponents(draft);
+    const prev = t.components.powerUnit![component]!;
+    t.components.powerUnit![component] = {
+      condition: 100,
+      age: 0,
+      replacements: prev.replacements + 1,
+    };
+  }
+
   t.history.push({
     round: draft.completedRounds + 1,
-    label: `${component === "engine" ? "Engine" : "Gearbox"} replacement`,
+    label: `${label} replacement`,
     amount: -cost,
     category: "other",
-    detail: `${component === "engine" ? "Engine" : "Gearbox"} unit purchased.\nPaid in full up front — one-time part purchase, not a recurring fee.`,
+    detail: `${label} unit purchased.\nPaid in full up front — one-time part purchase, not a recurring fee.`,
   });
 }
 

@@ -25,6 +25,7 @@ import {
   applyReputation,
   applyStandings,
   bankruptcyCheck,
+  effectivePuHealth,
   evaluateSponsors,
   generateDriverChat,
   generatePaddockNews,
@@ -243,7 +244,9 @@ function buildCompetitors(state: SimulationState, rng: Rng): Competitor[] {
       driverState: t.drivers.find((ds) => ds.driverId === did),
       car: t.car,
       reliability: t.car.reliability,
-      engineCond: t.components.engine.condition,
+      // Whole installed power system (2013: V8+KERS · 2025: all 7 PU parts) —
+      // a tired MGU-H or cracked exhaust raises mechanical-failure risk too.
+      engineCond: effectivePuHealth(state),
       gearboxCond: t.components.gearbox.condition,
       pitStop: Math.round(mechPit * (1 - pitBonus) * 100) / 100,
       errorChance: mechErr * (1 - pitBonus),

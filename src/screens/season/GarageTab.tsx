@@ -1,12 +1,25 @@
 import { useState } from "react";
-import type { SimulationState, TestType } from "@/simulation/types";
+import type { ComponentKey, ComponentState, SimulationState, TestType } from "@/simulation/types";
 import {
+  effectivePuHealth,
   generateDevOptions,
   isDevWindow,
   replacementCost,
 } from "@/simulation/systems";
-import { replaceEngine, replaceGearbox, runTest, startDev, testingBudget } from "@/actions";
-import { Button, Card, Empty, Meter, Modal, Money } from "@/ui/kit";
+import { engineById } from "@/data";
+import {
+  componentLabel,
+  gearboxEraNote,
+  powerUnitForSeason,
+  puEffectiveness,
+  reliabilityEstimate,
+  usageKm,
+  wearRateLabel,
+  type PuStatKind,
+  type PuStatSpec,
+} from "@/data/powerUnits";
+import { replaceEngine, replaceGearbox, replacePuComponent, runTest, startDev, testingBudget } from "@/actions";
+import { Button, Card, Empty, Meter, Modal, Money, Tag } from "@/ui/kit";
 import { ratingTone } from "@/ui/ratings";
 import type { Act } from "./parts";
 
@@ -24,7 +37,8 @@ export function GarageTab({ state, act }: Props) {
   const trainingDone = (id: string) => (t.trainings ?? []).some((x) => x.id === id && x.round >= state.completedRounds);
   const devInterval = Math.max(3, Math.round(state.calendar.length / 4));
   const roundsToWindow = devInterval - (state.completedRounds % devInterval);
-  const [confirmSwap, setConfirmSwap] = useState<"engine" | "gearbox" | null>(null);
+  const [confirmSwap, setConfirmSwap] = useState<ComponentKey | null>(null);
+  const [openPart, setOpenPart] = useState<ComponentKey | null>(null);
   const [testPick, setTestPick] = useState<TestType | null>(null);
   const costs = testingBudget();
 
@@ -132,31 +146,24 @@ export function GarageTab({ state, act }: Props) {
       </div>
 
       <div className="space-y-4">
-        <Card title="Component swaps">
-          <div className="space-y-3">
-            <SwapRow
-              label="Engine"
-              condition={t.components.engine.condition}
-              age={t.components.engine.age}
-              replacements={t.components.engine.replacements}
-              cost={replacementCost("engine", state) ?? 0}
-              cash={t.cash}
-              onSwap={() => setConfirmSwap("engine")}
-            />
-            <SwapRow
-              label="Gearbox"
-              condition={t.components.gearbox.condition}
-              age={t.components.gearbox.age}
-              replacements={t.components.gearbox.replacements}
-              cost={replacementCost("gearbox", state) ?? 0}
-              cash={t.cash}
-              onSwap={() => setConfirmSwap("gearbox")}
-            />
-          </div>
-          <p className="mt-3 text-[11px] text-ink-faint">
-            Fresh components run at 100% and lower the failure chance in races. Wear grows every weekend and speeds up as
-            reliability drops.
-          </p>
+        <PowerSystemCard
+          state={state}
+          openPart={openPart}
+          onToggle={(key) => setOpenPart((cur) => (cur === key ? null : key))}
+          onSwap={(key) => setConfirmSwap(key)}
+        />
+
+        <Card title="Gearbox">
+          <SwapRow
+            label="Gearbox"
+            condition={t.components.gearbox.condition}
+            age={t.components.gearbox.age}
+            replacements={t.components.gearbox.replacements}
+            cost={replacementCost("gearbox", state) ?? 0}
+            cash={t.cash}
+            onSwap={() => setConfirmSwap("gearbox")}
+          />
+          <p className="mt-3 text-[11px] text-ink-faint">{gearboxEraNote(state.season)}</p>
         </Card>
 
         <Card title="Testing" right={<span className="text-[10px] uppercase tracking-wider text-ink-faint">confirm before spend</span>}>
@@ -202,7 +209,13 @@ export function GarageTab({ state, act }: Props) {
           component={confirmSwap}
           onClose={() => setConfirmSwap(null)}
           onConfirm={() => {
-            act((s) => (confirmSwap === "engine" ? replaceEngine(s).message : replaceGearbox(s).message));
+            act((s) =>
+              confirmSwap === "engine"
+                ? replaceEngine(s).message
+                : confirmSwap === "gearbox"
+                  ? replaceGearbox(s).message
+                  : replacePuComponent(s, confirmSwap).message,
+            );
             setConfirmSwap(null);
           }}
         />
@@ -275,15 +288,18 @@ function SwapConfirmModal({
   onConfirm,
 }: {
   state: SimulationState;
-  component: "engine" | "gearbox";
+  component: ComponentKey;
   onClose: () => void;
   onConfirm: () => void;
 }) {
   const t = state.team!;
   const cost = replacementCost(component, state) ?? 0;
-  const cur = t.components[component];
+  const cur: ComponentState =
+    component === "engine" || component === "gearbox"
+      ? t.components[component]
+      : (t.components.powerUnit?.[component] ?? { condition: 100, age: 0, replacements: 0 });
   const cashAfter = Math.round((t.cash - cost) * 100) / 100;
-  const label = component === "engine" ? "Engine" : "Gearbox";
+  const label = componentLabel(component, state.season);
   return (
     <Modal open onClose={onClose} title={`Replace ${label}?`}>
       <div className="space-y-3 text-sm">
@@ -332,6 +348,198 @@ function SwapConfirmModal({
         </div>
       </div>
     </Modal>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Era-aware power system / power unit — configuration lives in data/powerUnits.
+// ---------------------------------------------------------------------------
+
+interface PartRow {
+  key: ComponentKey;
+  name: string;
+  spec: string;
+  role: string;
+  c: ComponentState;
+  wear: [number, number];
+  ageDrag: number;
+  cost: number;
+  baseRel: number;
+  stats: PuStatSpec[];
+}
+
+const ENGINE_WEAR: [number, number] = [2.4, 4.0];
+const ENGINE_AGE_DRAG = 0.8;
+
+function partRows(state: SimulationState): PartRow[] {
+  const t = state.team!;
+  const cfg = powerUnitForSeason(state.season);
+  const pu = t.components.powerUnit ?? {};
+  // Mirrors systems.ensurePuComponents so pre-init saves display the same
+  // inherited wear the sim will write on the next race weekend.
+  const fallback = (): ComponentState =>
+    t.components.engine.age === 0
+      ? { condition: 100, age: 0, replacements: 0 }
+      : {
+          condition: Math.max(70, Math.round(96 - t.components.engine.age * 1.2)),
+          age: t.components.engine.age,
+          replacements: 0,
+        };
+  const engBase = engineById(t.engineId)?.reliability ?? t.car.reliability;
+  return [
+    {
+      key: "engine",
+      name: cfg.engineName,
+      spec: cfg.engineSpec,
+      role: cfg.engineRole,
+      c: t.components.engine,
+      wear: ENGINE_WEAR,
+      ageDrag: ENGINE_AGE_DRAG,
+      cost: replacementCost("engine", state) ?? 0,
+      baseRel: engBase,
+      stats: [
+        { kind: "condition", label: "Condition", hint: "Health of the installed unit." },
+        { kind: "reliability", label: "Reliability", hint: "Estimated odds of surviving the weekend." },
+        { kind: "output", label: "Output", hint: "Power delivery vs the day it left the factory." },
+        { kind: "usageRaces", label: "Age", hint: "Race weekends completed on this unit." },
+        { kind: "usageKm", label: "Mileage", hint: "Distance covered since installation." },
+      ],
+    },
+    ...cfg.components.map((p): PartRow => ({
+      key: p.id,
+      name: p.name,
+      spec: p.spec,
+      role: p.role,
+      c: pu[p.id] ?? fallback(),
+      wear: p.wear,
+      ageDrag: p.ageDrag,
+      cost: replacementCost(p.id, state) ?? 0,
+      baseRel: engBase,
+      stats: p.stats,
+    })),
+  ];
+}
+
+function statText(kind: PuStatKind, row: PartRow): string {
+  switch (kind) {
+    case "condition":
+      return `${row.c.condition.toFixed(1)}%`;
+    case "wearRate":
+      return wearRateLabel(row.wear);
+    case "reliability":
+      return String(reliabilityEstimate(row.baseRel, row.c));
+    case "degradation":
+      return `${(100 - row.c.condition).toFixed(1)}%`;
+    case "usageRaces":
+      return String(row.c.age);
+    case "usageKm":
+      return `${usageKm(row.c.age).toLocaleString("en-US")} km`;
+    default:
+      return `${puEffectiveness(row.ageDrag, row.c)}%`;
+  }
+}
+
+function PowerSystemCard({
+  state,
+  openPart,
+  onToggle,
+  onSwap,
+}: {
+  state: SimulationState;
+  openPart: ComponentKey | null;
+  onToggle: (key: ComponentKey) => void;
+  onSwap: (key: ComponentKey) => void;
+}) {
+  const t = state.team!;
+  const cfg = powerUnitForSeason(state.season);
+  const sys = effectivePuHealth(state);
+  const rows = partRows(state);
+
+  return (
+    <Card title={cfg.heading} right={<Tag tone="elite">{cfg.title}</Tag>}>
+      <p className="mb-3 text-xs leading-relaxed text-ink-faint">{cfg.blurb}</p>
+
+      <div className="mb-3 rounded-md border border-hairline bg-raised/40 p-2">
+        <div className="flex items-center justify-between text-[10px] uppercase tracking-widest text-ink-faint">
+          <span>system health</span>
+          <span className={`num-data text-xs ${sys < 50 ? "text-caution" : sys > 90 ? "text-positive" : "text-ink-soft"}`}>
+            {sys.toFixed(1)}%
+          </span>
+        </div>
+        <Meter value={sys} tone={ratingTone(sys)} className="mt-1" />
+      </div>
+
+      <div className="space-y-2">
+        {rows.map((r) => (
+          <PuRow
+            key={r.key}
+            row={r}
+            cash={t.cash}
+            open={openPart === r.key}
+            onToggle={() => onToggle(r.key)}
+            onSwap={() => onSwap(r.key)}
+          />
+        ))}
+      </div>
+
+      <p className="mt-3 text-[11px] text-ink-faint">
+        Fresh units run at 100% and lower the failure chance in races. Wear grows every weekend and speeds up as
+        reliability drops — in the turbo-hybrid era every subsystem drags on the whole unit.
+      </p>
+    </Card>
+  );
+}
+
+function PuRow({
+  row,
+  cash,
+  open,
+  onToggle,
+  onSwap,
+}: {
+  row: PartRow;
+  cash: number;
+  open: boolean;
+  onToggle: () => void;
+  onSwap: () => void;
+}) {
+  const worn = row.c.condition < 50;
+  return (
+    <div className={`rounded-md border p-3 ${worn ? "border-caution/60" : "border-hairline"}`}>
+      <button type="button" onClick={onToggle} className="flex w-full items-center justify-between gap-2 text-left">
+        <div className="min-w-0">
+          <div className="truncate font-display font-bold uppercase">{row.name}</div>
+          <div className="text-[10px] text-ink-faint">
+            age {row.c.age} · {row.c.replacements} replaced{open ? "" : " · tap for detail"}
+          </div>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <span className={`num-data text-base ${worn ? "text-caution" : "text-ink-soft"}`}>{row.c.condition.toFixed(1)}%</span>
+          <span className="w-3 text-center text-xs text-ink-faint">{open ? "▾" : "▸"}</span>
+        </div>
+      </button>
+      <Meter value={row.c.condition} tone={ratingTone(row.c.condition)} className="my-2" />
+      {open && (
+        <div className="space-y-2 border-t border-hairline pt-2">
+          <p className="num-data rounded-sm bg-raised/40 px-2 py-1 text-[10px] leading-relaxed text-telemetry">{row.spec}</p>
+          <p className="text-[11px] leading-relaxed text-ink-soft">{row.role}</p>
+          <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
+            {row.stats.map((st) => (
+              <div key={`${st.kind}-${st.label}`} title={st.hint} className="rounded-sm border border-hairline bg-raised/40 px-2 py-1">
+                <div className="text-[9px] uppercase tracking-wider text-ink-faint">{st.label}</div>
+                <div className="num-data text-xs font-bold">{statText(st.kind, row)}</div>
+              </div>
+            ))}
+          </div>
+          <div className="flex items-center justify-between gap-2 pt-1">
+            <span className="text-[11px] text-ink-faint">fresh unit → 100% · age 0</span>
+            <Button small variant="ghost" disabled={cash < row.cost} onClick={onSwap}>
+              Replace ${row.cost}M
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 

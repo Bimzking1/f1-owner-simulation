@@ -3,7 +3,7 @@
 // Each takes a SimulationState and returns a user-facing message.
 // ============================================================================
 
-import type { Driver, DriverBoost, DriverState, SimulationState, TestReport, TestType } from "@/simulation/types";
+import type { ComponentKey, Driver, DriverBoost, DriverState, EraComponentId, SimulationState, TestReport, TestType } from "@/simulation/types";
 import type { DevOption } from "@/simulation/systems";
 import {
   addReputation,
@@ -16,6 +16,7 @@ import {
 import { resolveNewsAction } from "@/simulation/sim";
 import { createRng, clamp } from "@/simulation/rng";
 import { driverById, engineerById, mechanicById, sponsorById } from "@/data";
+import { componentLabel } from "@/data/powerUnits";
 import { difficultyOf, sponsorSlotsOf } from "./state";
 
 export type ActionResult = { ok: boolean; message: string };
@@ -381,6 +382,10 @@ export function replaceEngine(state: SimulationState): ActionResult {
 export function replaceGearbox(state: SimulationState): ActionResult {
   return doReplace(state, "gearbox");
 }
+/** Swap any era-specific power-unit part (KERS in 2013; turbo/MGUs/store/CE/exhaust in 2025). */
+export function replacePuComponent(state: SimulationState, id: EraComponentId): ActionResult {
+  return doReplace(state, id);
+}
 
 // ---------------------------------------------------------------------------
 // Team management — owner interventions on driver morale (spec: owner tools)
@@ -586,15 +591,15 @@ export function manageTeam(state: SimulationState, action: TeamAction): ActionRe
   return msg(result, true, `${info.label}: ${effect}. Lingering: ${boostDesc(tails[action])} each.${trustNote(addTrust(t, teamTrust[action]))}`);
 }
 
-function doReplace(state: SimulationState, component: "engine" | "gearbox"): ActionResult {
+function doReplace(state: SimulationState, component: ComponentKey): ActionResult {
   const result: ActionResult = { ok: false, message: "" };
   const t = state.team!;
-  const before = t.components[component].condition;
   replaceComponent(state, component);
-  if (t.components[component].condition === 100 && t.components[component].age === 0 && t.components[component].replacements > 0) {
-    return msg(result, true, `${component === "engine" ? "Engine" : "Gearbox"} replaced.`);
-  }
-  void before;
+  const fresh =
+    component === "engine" || component === "gearbox"
+      ? t.components[component].age === 0 && t.components[component].replacements > 0
+      : t.components.powerUnit?.[component]?.age === 0 && (t.components.powerUnit?.[component]?.replacements ?? 0) > 0;
+  if (fresh) return msg(result, true, `${componentLabel(component, state.season)} replaced.`);
   return msg(result, false, "Not enough cash.");
 }
 
