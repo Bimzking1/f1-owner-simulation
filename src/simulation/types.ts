@@ -318,6 +318,8 @@ export interface RaceWeekendResult {
   race: RaceEntry[];
   sprint?: RaceEntry[];
   events: RaceEvent[];
+  /** Per-lap running order — index 0 is the starting grid, then one entry per completed lap. */
+  lapOrder?: string[][];
   playerEntries: { driverId: string; position: number; points: number; dnf: boolean }[];
   breakdown: { car: number; driver: number; strategy: number; reliability: number; luck: number };
   chaos: number;
@@ -364,7 +366,41 @@ export interface ComponentState {
   condition: number; // %
   age: number; // races used
   replacements: number;
+  /** True when the part failed outright (busted/crash damage) and must be replaced before the next GP. */
+  damaged?: boolean;
+  /** Short human note about how/where it broke, shown in alerts. */
+  damagedNote?: string;
 }
+
+/**
+ * Era-specific power-unit parts tracked alongside the shared engine/gearbox.
+ * 2013 (V8 era): kers · 2025 (turbo-hybrid era): turbo, mguK, mguH,
+ * energyStore, controlElectronics, exhaust.
+ */
+export type EraComponentId =
+  | "kers"
+  | "turbo"
+  | "mguK"
+  | "mguH"
+  | "energyStore"
+  | "controlElectronics"
+  | "exhaust";
+
+/** Anything in the garage that can be swapped for a fresh unit. */
+export type ComponentKey = "engine" | "gearbox" | EraComponentId;
+
+/** The two car seats — every driver owns their own hardware since v0.10. */
+export type Seat = "car1" | "car2";
+
+/** One car's full hardware set: engine, gearbox and era power-unit parts. */
+export interface CarParts {
+  engine: ComponentState;
+  gearbox: ComponentState;
+  powerUnit: Partial<Record<EraComponentId, ComponentState>>;
+}
+
+/** Which car(s) a development project upgrades. Single-car projects cost ~60%. */
+export type DevSeat = Seat | "both";
 
 export interface UpgradeProject {
   id: string;
@@ -375,8 +411,25 @@ export interface UpgradeProject {
   target: UpgradeTarget;
   effect: number;
   driverId?: string;
+  /** Which car this project upgrades — undefined = both (legacy projects). */
+  seat?: DevSeat;
   risk: number; // % underperformance chance
   underperformed?: boolean;
+}
+
+/** Per-car stat bonuses from seat-targeted development projects. */
+export type SeatBonus = Partial<{
+  aero: number;
+  chassis: number;
+  reliability: number;
+  power: number;
+  gearboxPerf: number;
+}>;
+
+/** A training programme started during a race weekend (round = weekend index). */
+export interface TrainingLog {
+  id: string;
+  round: number;
 }
 
 /** Owner → driver management actions (speech, bonus, fine, rant) for cooldowns. */
@@ -444,12 +497,36 @@ export interface TeamState {
     gearboxPerf: number;
   };
   components: {
-    engine: ComponentState;
-    gearbox: ComponentState;
+    /** @deprecated pre-v0.10 shared hardware — migrated into `cars` on first touch. */
+    engine?: ComponentState;
+    gearbox?: ComponentState;
+    /**
+     * @deprecated Era-specific shared power-unit parts. Optional so pre-era
+     * saves keep loading — parts are initialised lazily on the next race.
+     */
+    powerUnit?: Partial<Record<EraComponentId, ComponentState>>;
+    /** Per-car hardware since v0.10: one full set per driver seat. */
+    cars?: Record<Seat, CarParts>;
   };
   upgrades: UpgradeProject[];
+  /** Accumulated stat gains from single-car development projects. */
+  seatUpgrades?: Record<Seat, SeatBonus>;
   drivers: DriverState[];
   sponsors: SponsorState[];
+  /** Training programmes (pit crew / driver) already run, keyed by round — one per weekend each. */
+  trainings?: TrainingLog[];
+  /** Consecutive pointless weekends — bad streaks amplify morale/confidence drops. */
+  slump?: number;
+  /**
+   * A star driver's ultimatum: "pay me a bonus and I promise a podium within
+   * N races." Accepted challenges are paid up front; failing the promise
+   * frustrates the driver and costs trust.
+   */
+  driverChallenge?: DriverChallenge;
+  /** Grid places lost at the next GP for changing engine (+10) or gearbox (+5). */
+  gridPenalty?: number;
+  /** Per-car grid penalties since v0.10 (single-car part changes). */
+  gridPenaltyBySeat?: Record<Seat, number>;
   pitCrew: number; // 0-100 pit crew level (upgradeable)
   history: FinancialTransaction[];
   mgmt?: MgmtLog[]; // owner interventions per driver (cooldown tracking)
@@ -458,6 +535,16 @@ export interface TeamState {
   podiums: number;
   dnfs: number;
   lastRoundCompleted: number;
+}
+
+/** Driver → owner ultimatum (spec §22b): cash for a promised result. */
+export interface DriverChallenge {
+  driverId: string;
+  /** Up-front bonus in $M the owner pays on acceptance. */
+  amount: number;
+  /** Races remaining to deliver the promised podium. */
+  roundsLeft: number;
+  accepted: boolean;
 }
 
 export type TestType = "performance" | "reliability" | "tire" | "driver";
@@ -533,6 +620,8 @@ export interface DifficultyConfig {
   costMultiplier: number;
   failureMultiplier: number;
   sponsorMultiplier: number;
+  /** How many concurrent sponsor contracts the team may hold. */
+  sponsorSlots: number;
   infoLevel: "high" | "normal" | "low";
   bankruptcyGrace: boolean;
   moraleMultiplier: number;

@@ -15,7 +15,7 @@ import type {
   WeatherId,
 } from "./types";
 import { carRating, driverAbility, qualifyingAbility, ratingToSeconds, trackWeights } from "./perf";
-import type { CarStats } from "./perf";
+import type { CarStats, TrackWeights } from "./perf";
 import type { Driver, DriverState } from "./types";
 import { chance, clamp, noise, rand, randInt, type Rng } from "./rng";
 
@@ -34,6 +34,8 @@ export interface Competitor {
   errorChance: number;
   strategyRating: number;
   isPlayer: boolean;
+  /** Grid places this specific car loses (per-seat engine/gearbox penalties). */
+  gridPenalty?: number;
 }
 
 export interface RaceInput {
@@ -46,6 +48,19 @@ export interface RaceInput {
   playerTeamId: string;
   runSprint?: boolean;
   wetHint?: { start: number; length: number };
+  /** Grid places the player loses at this GP (engine/gearbox change penalties). */
+  gridPenalty?: number;
+}
+
+/** Mid-race owner order for one of the player's drivers. */
+export type StanceKind = "push" | "steady" | "conserve" | "retire" | "motivate";
+export interface RaceCommand {
+  driverId: string;
+  kind: "push" | "steady" | "conserve"; // persistent stance
+}
+export interface InstantCommand {
+  driverId: string;
+  kind: "retire" | "motivate"; // one-shot orders
 }
 
 export interface WetWindow {
@@ -157,6 +172,22 @@ export function simulateQualifying(input: RaceInput): RaceEntry[] {
     e.gridPosition = i + 1;
     e.time = Math.round(e.time * 1000) / 1000;
   });
+
+  // Stewards' grid penalty — engine/gearbox changes add places to the
+  // player's qualifying results, FIA-style, then the grid re-sorts. Since
+  // v0.10 each car carries its own penalty (single-car part changes).
+  for (const comp of competitors) {
+    const pen = comp.gridPenalty ?? (comp.teamId === input.playerTeamId ? (input.gridPenalty ?? 0) : 0);
+    if (pen > 0) {
+      const e = entries.find((x) => x.driverId === comp.driverId)!;
+      e.gridPosition += Math.min(pen, entries.length - 1);
+    }
+  }
+  if (competitors.some((c) => (c.gridPenalty ?? 0) > 0) || (input.gridPenalty ?? 0) > 0) {
+    [...entries]
+      .sort((a, b) => a.gridPosition - b.gridPosition)
+      .forEach((e, i) => (e.gridPosition = i + 1));
+  }
   return entries;
 }
 
@@ -178,32 +209,63 @@ interface RunningCar {
   tireWarned: boolean;
 }
 
-export function simulateRace(
+/** A resumable race — lap-by-lap state lives here so the UI can pause at
+ *  checkpoints, take owner orders and continue. Plain data + closures; keep
+ *  it OUT of SimulationState (it holds an Rng function). */
+export interface RaceSession {
+  input: RaceInput;
+  weather: WeatherId;
+  points: number[];
+  fastestPoint: boolean;
+  grid: RaceEntry[];
+  running: RunningCar[];
+  laps: number;
+  baseLap: number;
+  w: TrackWeights;
+  volatility: number;
+  wetWindow: WetWindow;
+  scAt: number[];
+  failures: { car: RunningCar; lap: number; component: FailComponent }[];
+  currentLap: number; // laps completed so far
+  events: RaceEvent[];
+  lapOrder: string[][];
+  stances: Map<string, "push" | "steady" | "conserve">;
+  motivateUntil: Map<string, number>;
+  /** Drivers who refused a team retirement call — finalizeRound adds frustration. */
+  retireRefusals: string[];
+  finished: boolean;
+}
+
+// ---------------------------------------------------------------------------
+
+/** Owner stance → pace/risk modifiers. Push buys lap time with hardware and
+ *  accident risk; conserve trades positions for reliability and tires. */
+const STANCE = {
+  push: { rating: 3.5, tireFactor: 1.35, failFactor: 1.5, errorFactor: 2.1 },
+  steady: { rating: 0, tireFactor: 1, failFactor: 1, errorFactor: 1 },
+  conserve: { rating: -4.5, tireFactor: 0.55, failFactor: 0.75, errorFactor: 0.55 },
+} as const;
+
+export function beginRace(
   input: RaceInput,
   weather: WeatherId,
   grid: RaceEntry[],
   points: number[],
-  getFastestPoint: boolean,
-  events: RaceEvent[],
-): RaceEntry[] {
+  fastestPoint: boolean,
+): RaceSession {
   const { track, rng, competitors } = input;
   const c = track.characteristics;
   const laps = track.laps;
-  const baseLap = lapTimeBase(track);
-  const w = trackWeights(track);
-  const volatility = WEATHER_META[weather].volatility;
-
   const wetWindow: WetWindow = input.wetHint ?? { start: Math.ceil(laps * 0.3), length: Math.ceil(laps * 0.4) };
 
   const running: RunningCar[] = grid.map((g) => {
     const comp = competitors.find((x) => x.driverId === g.driverId)!;
     const stops = c.tireStress > 70 ? 2 : c.tireStress > 45 ? 1 : chance(rng, 0.5) ? 1 : 2;
-    const stintLen = laps / (stops + 1);
     return {
       comp,
       cum: g.time,
       lapInStint: 1,
-      stintLen,
+      stintLen: laps / (stops + 1),
       out: false,
       fastestLap: Infinity,
       lastPos: g.gridPosition,
@@ -250,29 +312,133 @@ export function simulateRace(
 
   // Safety car deployment
   const scAt: number[] = [];
-  if (chance(rng, clamp(0.32 + c.overtaking / 100 + volatility * 0.6, 0.15, 0.75))) {
-    const when = randInt(rng, Math.ceil(laps * 0.15), Math.max(laps - 5, laps * 0.6));
+  if (chance(rng, clamp(0.32 + c.overtaking / 100 + WEATHER_META[weather].volatility * 0.6, 0.15, 0.75))) {
+    const when = randInt(rng, Math.ceil(laps * 0.15), Math.max(laps - 5, Math.floor(laps * 0.6)));
     for (let i = 0; i < 4; i++) scAt.push(Math.min(laps, when + i));
   }
 
-  const push = (e: RaceEvent) => events.push(e);
-
-  const byPos = (lap: number): RunningCar[] => {
-    const alive = running.filter((r) => !r.out).sort((a, b) => a.cum - b.cum);
-    void lap;
-    return alive;
+  const session: RaceSession = {
+    input,
+    weather,
+    points,
+    fastestPoint,
+    grid,
+    running,
+    laps,
+    baseLap: lapTimeBase(track),
+    w: trackWeights(track),
+    volatility: WEATHER_META[weather].volatility,
+    wetWindow,
+    scAt,
+    failures,
+    currentLap: 0,
+    events: [],
+    lapOrder: [grid.map((g) => g.driverId)],
+    stances: new Map(),
+    motivateUntil: new Map(),
+    retireRefusals: [],
+    finished: false,
   };
+  return session;
+}
 
-  for (let lap = 1; lap <= laps; lap++) {
-    const wet = wetAt(lap, weather, wetWindow);
-    const scActive = scAt.includes(lap);
+/** Advance the race through `toLap` (inclusive), applying any owner orders first. */
+export function advanceRace(session: RaceSession, toLap: number, commands?: (RaceCommand | InstantCommand)[]): void {
+  const { track, rng } = session.input;
+  const c = track.characteristics;
 
-    for (const car of running) {
+  // owner orders — persistent stances replace previous ones; one-shots act now
+  for (const cmd of commands ?? []) {
+    const car = session.running.find((r) => r.comp.driverId === cmd.driverId);
+    if (!car || car.out || session.finished) continue;
+    if (cmd.kind === "push" || cmd.kind === "steady" || cmd.kind === "conserve") {
+      session.stances.set(cmd.driverId, cmd.kind);
+      if (cmd.kind === "push") {
+        session.events.push({
+          lap: session.currentLap,
+          type: "driver",
+          severity: "warning",
+          actor: cmd.driverId,
+          text: `PIT WALL — ${car.comp.driver.shortName} is told to PUSH. More pace, more risk.`,
+          textEnjoyer: `${car.comp.driver.shortName} gets the push order — flat out, hang the consequences.`,
+        });
+      } else if (cmd.kind === "conserve") {
+        session.events.push({
+          lap: session.currentLap,
+          type: "strategy",
+          severity: "info",
+          actor: cmd.driverId,
+          text: `PIT WALL — ${car.comp.driver.shortName} is told to CONSERVE car and tires.`,
+          textEnjoyer: `${car.comp.driver.shortName} is reeled in to save the machinery.`,
+        });
+      } else {
+        session.stances.delete(cmd.driverId);
+      }
+    } else if (cmd.kind === "retire") {
+      // Racing drivers hate being called in. The further up the field they are
+      // fighting, the likelier they refuse — and a refusal frustrates them.
+      const alive = session.running.filter((r) => !r.out);
+      const pos = alive.findIndex((r) => r === car) + 1;
+      const curStance = session.stances.get(cmd.driverId) ?? "steady";
+      const refuseChance = clamp(
+        0.18 + (pos > 0 && pos <= 5 ? 0.42 : pos <= 10 ? 0.15 : 0) - (curStance === "conserve" ? 0.12 : 0),
+        0.05,
+        0.75,
+      );
+      if (chance(session.input.rng, refuseChance)) {
+        session.retireRefusals.push(cmd.driverId);
+        session.stances.set(cmd.driverId, "conserve"); // he'll nurse it home himself
+        session.events.push({
+          lap: session.currentLap,
+          type: "driver",
+          severity: "warning",
+          actor: cmd.driverId,
+          text: `PIT WALL — ${car.comp.driver.shortName} REFUSES the retirement call: "I'm bringing this home!" He runs in conservation mode.`,
+          textEnjoyer: `${car.comp.driver.shortName} ignores the team and carries on, gently.`,
+        });
+      } else {
+        car.out = true;
+        car.dnfReason = "called into the pits by the team";
+        session.events.push({
+          lap: session.currentLap,
+          type: "strategy",
+          severity: "danger",
+          actor: cmd.driverId,
+          text: `PIT WALL — ${car.comp.driver.shortName} is RETIRED from the race.`,
+          textEnjoyer: `${car.comp.driver.shortName} parks it. Team call.`,
+        });
+      }
+    } else if (cmd.kind === "motivate") {
+      if (!session.motivateUntil.has(cmd.driverId)) {
+        session.motivateUntil.set(cmd.driverId, session.currentLap + 5);
+        session.events.push({
+          lap: session.currentLap,
+          type: "driver",
+          severity: "success",
+          actor: cmd.driverId,
+          text: `PIT WALL — ${car.comp.driver.shortName} gets a fired-up pep talk over the radio.`,
+          textEnjoyer: `${car.comp.driver.shortName} roars back a reply — that lit a fire.`,
+        });
+      }
+    }
+  }
+
+  const push = (e: RaceEvent) => session.events.push(e);
+  const startLap = session.currentLap + 1;
+
+  for (let lap = startLap; lap <= Math.min(toLap, session.laps); lap++) {
+    const wet = wetAt(lap, session.weather, session.wetWindow);
+    const scActive = session.scAt.includes(lap);
+
+    for (const car of session.running) {
       if (car.out) continue;
+      const stance = session.stances.get(car.comp.driverId) ?? "steady";
+      const st = STANCE[stance];
+      const motivated = (session.motivateUntil.get(car.comp.driverId) ?? -99) >= lap;
 
       // 1. mechanical failure
-      const fail = failures.find((f) => f.car === car && f.lap === lap);
-      if (fail) {
+      const fail = session.failures.find((f) => f.car === car && f.lap === lap);
+      if (fail && !(st.failFactor < 1 && chance(rng, 1 - st.failFactor))) {
         car.out = true;
         car.dnfReason = failMessage(fail.component);
         push({
@@ -286,20 +452,24 @@ export function simulateRace(
         continue;
       }
 
-      // 2. driver incident (spec §24): aggression up, consistency down, wet, track
+      // 2. driver incident (spec §24): aggression up, consistency down, wet, track,
+      //    frustration and pushing order make mistakes far likelier.
       if (scActive) {
         // neutralised — no driving errors
       } else if (car.comp.isPlayer || chance(rng, 0.35)) {
         const a = car.comp.driver.attributes;
+        const frust = car.comp.driverState?.frustration ?? 40;
         const prob =
           0.004 +
           ((100 - a.consistency) / 100) * 0.014 +
           (a.aggression / 100) * 0.007 +
           wet * 0.02 +
           (c.reliabilityRisk / 100) * 0.012 +
-          (a.pressure / 100) * 0.005;
-        if (chance(rng, prob)) {
-          const crash = chance(rng, car.comp.isPlayer ? 0.18 : 0.12);
+          (a.pressure / 100) * 0.005 +
+          (Math.max(0, frust - 45) / 100) * 0.011;
+        if (chance(rng, prob * st.errorFactor)) {
+          const crashBase = car.comp.isPlayer ? 0.18 : 0.12;
+          const crash = chance(rng, crashBase * (stance === "push" ? 1.8 : stance === "conserve" ? 0.5 : 1));
           if (crash && car.comp.isPlayer) {
             car.out = true;
             car.dnfReason = "contact damages the floor beyond repair";
@@ -321,7 +491,7 @@ export function simulateRace(
               type: "driver",
               severity: "warning",
               actor: car.comp.driverId,
-              text: `${car.comp.driver.shortName} has ${crash ? "contact and loses time" : "an off-track moment"}.`,
+              text: `${car.comp.driver.shortName} has ${crash ? "contact and loses time" : "an off-track moment"}${stance === "push" ? " while pushing hard" : ""}.`,
               textEnjoyer: `${car.comp.driver.shortName} ${crash ? "makes contact and falls back" : "runs wide"}.`,
             });
           }
@@ -330,9 +500,9 @@ export function simulateRace(
 
       // 3. tire wear
       car.lapInStint++;
-      if (car.lapInStint >= car.stintLen && lap < laps - 1 && !scActive) {
+      if (car.lapInStint >= car.stintLen && lap < session.laps - 1 && !scActive) {
         const stopTime = car.comp.pitStop + 1.1;
-        const err = chance(rng, car.comp.errorChance / 100);
+        const err = chance(rng, (car.comp.errorChance / 100) * st.errorFactor);
         car.cum += stopTime + (err ? 3 : 0);
         car.lapInStint = 1;
         if (car.comp.isPlayer) {
@@ -350,7 +520,8 @@ export function simulateRace(
           0.16 *
           (c.tireStress / 100) *
           (1.18 - car.comp.car.tireBehavior / 100) *
-          Math.pow((car.lapInStint / Math.max(1, car.stintLen)) * 1.15, 2.4);
+          Math.pow((car.lapInStint / Math.max(1, car.stintLen)) * 1.15, 2.4) *
+          st.tireFactor;
         if (
           car.lapInStint > car.stintLen * 0.78 &&
           !car.tireWarned &&
@@ -373,7 +544,7 @@ export function simulateRace(
       if (wet > 0) {
         const wetSwing = wet * ((72 - car.comp.driver.attributes.wetSkill) / 60) * 0.55;
         car.cum += wetSwing;
-        if (car.comp.isPlayer && lap === wetWindow.start && weather === "changing") {
+        if (car.comp.isPlayer && lap === session.wetWindow.start && session.weather === "changing") {
           push({
             lap,
             type: "external",
@@ -392,19 +563,21 @@ export function simulateRace(
         }
       }
       const ability =
-        carRating(car.comp.car, w) * (1 - w.driverWeight) +
-        driverAbility(car.comp.driver, car.comp.driverState ?? undefined, w, wet * 30) *
-          w.driverWeight;
-      const paceDelta = ratingToSeconds(ability, baseLap);
+        carRating(car.comp.car, session.w) * (1 - session.w.driverWeight) +
+        driverAbility(car.comp.driver, car.comp.driverState ?? undefined, session.w, wet * 30) *
+          session.w.driverWeight +
+        st.rating +
+        (motivated ? 3 : 0);
+      const paceDelta = ratingToSeconds(ability, session.baseLap);
       const lapTime =
-        baseLap * (scActive ? 1.35 : 1) + paceDelta + car.strategySwing + noise(rng) * volatility * 1.15;
+        session.baseLap * (scActive ? 1.35 : 1) + paceDelta + car.strategySwing + noise(rng) * session.volatility * 1.15;
       if (lapTime < car.fastestLap) car.fastestLap = lapTime;
       car.cum += lapTime;
     }
 
     // safety car packs the field
-    if (scActive && lap === scAt[0]) {
-      const alive = byPos(lap);
+    if (scActive && lap === session.scAt[0]) {
+      const alive = session.running.filter((r) => !r.out).sort((a, b) => a.cum - b.cum);
       alive.forEach((car, idx) => {
         car.cum = alive[0].cum + 2.8 + idx * 0.06;
       });
@@ -417,10 +590,12 @@ export function simulateRace(
       });
     }
 
+    // record running order for the position chart
+    session.lapOrder.push(orderOf(session).map((r) => r.comp.driverId));
+
     // player overtake / loss events
-    const alive = byPos(lap);
-    const posMap = new Map(alive.map((a, i) => [a.comp.driverId, i + 1]));
-    for (const car of running) {
+    const posMap = new Map(orderOf(session).map((r, i) => [r.comp.driverId, i + 1]));
+    for (const car of session.running) {
       if (car.out) continue;
       const pos = posMap.get(car.comp.driverId)!;
       if (car.comp.isPlayer && pos < car.lastPos) {
@@ -446,9 +621,19 @@ export function simulateRace(
     }
   }
 
-  // Classification
-  const classified: RaceEntry[] = running.map((r) => {
-    const gridPos = grid.find((g) => g.driverId === r.comp.driverId)?.gridPosition ?? 0;
+  session.currentLap = Math.min(toLap, session.laps);
+  if (session.currentLap >= session.laps) session.finished = true;
+}
+
+function orderOf(session: RaceSession): RunningCar[] {
+  return session.running.filter((r) => !r.out).sort((a, b) => a.cum - b.cum);
+}
+
+/** Final classification once the session has run every lap. */
+export function completeRace(session: RaceSession): RaceEntry[] {
+  const { competitors, track } = session.input;
+  const classified: RaceEntry[] = session.running.map((r) => {
+    const gridPos = session.grid.find((g) => g.driverId === r.comp.driverId)?.gridPosition ?? 0;
     return {
       driverId: r.comp.driverId,
       teamId: r.comp.teamId,
@@ -465,7 +650,7 @@ export function simulateRace(
 
   let fastestLapDriver: string | undefined;
   let fl = Infinity;
-  for (const r of running) {
+  for (const r of session.running) {
     if (!r.out && r.fastestLap < fl) {
       fl = r.fastestLap;
       fastestLapDriver = r.comp.driverId;
@@ -476,8 +661,8 @@ export function simulateRace(
   const winTime = nonDnf[0]?.time ?? 0;
   nonDnf.forEach((e, i) => {
     e.position = i + 1;
-    e.points = points[i] ?? 0;
-    if (e.driverId === fastestLapDriver && getFastestPoint && e.points > 0) e.points += 1;
+    e.points = session.points[i] ?? 0;
+    if (e.driverId === fastestLapDriver && session.fastestPoint && e.points > 0) e.points += 1;
     e.time = i === 0 ? 0 : Math.round((e.time - winTime) * 100) / 100;
   });
   classified
@@ -495,8 +680,8 @@ export function simulateRace(
       flEntry.fastestLap = true;
       flEntry.bestLapSeconds = Math.round(fl * 1000) / 1000;
     }
-    push({
-      lap: laps,
+    pushEvent(session, {
+      lap: session.laps,
       type: "info",
       severity: "success",
       text: `FASTEST LAP — ${flComp ? flComp.driver.shortName : fastestLapDriver}.`,
@@ -506,8 +691,8 @@ export function simulateRace(
 
   if (nonDnf[0]) {
     const winnerComp = competitors.find((x) => x.driverId === nonDnf[0].driverId);
-    push({
-      lap: laps,
+    pushEvent(session, {
+      lap: session.laps,
       type: "info",
       severity: "success",
       text: `🏁 CHEQUERED FLAG — ${winnerComp ? winnerComp.driver.shortName : nonDnf[0].driverId} wins the ${track.grandPrix}.`,
@@ -516,6 +701,25 @@ export function simulateRace(
   }
 
   return classified;
+}
+
+function pushEvent(session: RaceSession, e: RaceEvent): void {
+  session.events.push(e);
+}
+
+export function simulateRace(
+  input: RaceInput,
+  weather: WeatherId,
+  grid: RaceEntry[],
+  points: number[],
+  getFastestPoint: boolean,
+  events: RaceEvent[],
+): RaceEntry[] {
+  const session = beginRace(input, weather, grid, points, getFastestPoint);
+  advanceRace(session, session.laps);
+  // surface the session's events through the shared weekend event list
+  for (const e of session.events) events.push(e);
+  return completeRace(session);
 }
 
 // ---------------------------------------------------------------------------
@@ -538,49 +742,22 @@ function failMessage(component: FailComponent): string {
 // ---------------------------------------------------------------------------
 // Full weekend orchestration
 
-export function simulateRaceWeekend(input: RaceInput): RaceWeekendResult {
-  const { track, rng, season, playerTeamId } = input;
-  const forecast = generateForecast(track, rng, input.difficulty);
-  const weather = rollWeather(track, forecast, rng);
-  const events: RaceEvent[] = [];
+export interface WeekendParts {
+  track: Track;
+  weather: WeatherId;
+  forecast: { rainProbability: number; confidence: "low" | "medium" | "high"; window?: string };
+  qualifying: RaceEntry[];
+  sprint?: RaceEntry[];
+  race: RaceEntry[];
+  events: RaceEvent[];
+  lapOrder?: string[][];
+}
 
-  const points = [25, 18, 15, 12, 10, 8, 6, 4, 2, 1];
-  const sprintPoints = season === 2013 ? null : [8, 7, 6, 5, 4, 3, 2, 1];
-
-  let grid = simulateQualifying(input);
-  events.push({
-    lap: 0,
-    type: "info",
-    severity: "info",
-    text: `Qualifying complete — ${grid[0].driverId} on pole.`,
-    textEnjoyer: "Qualifying done — the grid is set.",
-  });
-
-  let sprint: RaceEntry[] | undefined;
-  if (input.runSprint && season === 2025 && sprintPoints) {
-    sprint = simulateRace(
-      { ...input, rng, track },
-      weather,
-      grid,
-      sprintPoints,
-      false,
-      events,
-    );
-    grid = sprint.map((s) => ({ ...s, points: 0 })).sort((a, b) => (a.position ?? 99) - (b.position ?? 99));
-    grid.forEach((g, i) => (g.gridPosition = i + 1));
-    events.push({
-      lap: Math.round(track.laps * 0.4),
-      type: "info",
-      severity: "success",
-      text: "SPRINT complete — its order sets tomorrow's grid.",
-      textEnjoyer: "SPRINT done — the grid is set.",
-    });
-  }
-
-  const race = simulateRace(input, weather, grid, points, season === 2025, events);
-
-  const playerEntries = race
-    .filter((e) => e.teamId === playerTeamId)
+/** Expected-result + why-finished analysis shared by instant and live races. */
+export function assembleWeekend(input: RaceInput, parts: WeekendParts): RaceWeekendResult {
+  const { track } = parts;
+  const playerEntries = parts.race
+    .filter((e) => e.teamId === input.playerTeamId)
     .map((e) => ({
       driverId: e.driverId,
       position: e.position ?? 21,
@@ -591,7 +768,7 @@ export function simulateRaceWeekend(input: RaceInput): RaceWeekendResult {
   // expected result from raw abilities (no noise)
   const w = trackWeights(track);
   const playerAbilities = input.competitors
-    .filter((c) => c.teamId === playerTeamId)
+    .filter((c) => c.teamId === input.playerTeamId)
     .map((c) => carRating(c.car, w) * (1 - w.driverWeight) + driverAbility(c.driver, c.driverState ?? undefined, w) * w.driverWeight);
   const allAbilities = input.competitors.map((c) =>
     carRating(c.car, w) * (1 - w.driverWeight) + driverAbility(c.driver, c.driverState ?? undefined, w) * w.driverWeight,
@@ -604,7 +781,7 @@ export function simulateRaceWeekend(input: RaceInput): RaceWeekendResult {
   const expected = { min: Math.max(1, expectedPos - 1), max: Math.min(20, expectedPos + 1) };
 
   // why-finished breakdown (spec §55)
-  const playerCars = input.competitors.filter((c) => c.teamId === playerTeamId);
+  const playerCars = input.competitors.filter((c) => c.teamId === input.playerTeamId);
   const fieldCar = input.competitors.map((c) => carRating(c.car, w));
   const myCar = playerCars.length ? playerCars.reduce((a, c) => a + carRating(c.car, w), 0) / playerCars.length : 80;
   const avgCar = fieldCar.reduce((a, b) => a + b, 0) / fieldCar.length;
@@ -623,6 +800,76 @@ export function simulateRaceWeekend(input: RaceInput): RaceWeekendResult {
   return {
     round: 0,
     trackId: track.id,
+    weather: parts.weather,
+    forecast: {
+      rainProbability: parts.forecast.rainProbability,
+      confidence: parts.forecast.confidence,
+      window: parts.forecast.window,
+    },
+    qualifying: parts.qualifying,
+    sprint: parts.sprint,
+    race: parts.race,
+    events: parts.events,
+    lapOrder: parts.lapOrder,
+    playerEntries,
+    breakdown: {
+      car: Math.round(clamp((myCar - avgCar) * 4.4, -45, 45)),
+      driver: Math.round(clamp((myDriver - avgDriver) * 4.4, -45, 45)),
+      strategy: 0,
+      reliability: hasMechanicalDnf ? -22 : Math.round(clamp((avgCar - myCar) * 1.2, -14, 14)),
+      luck,
+    },
+    chaos: chaosOf(track, parts.weather),
+    expected,
+  };
+}
+
+export function simulateRaceWeekend(input: RaceInput): RaceWeekendResult {
+  const { rng, season } = input;
+  const forecast = generateForecast(input.track, rng, input.difficulty);
+  const weather = rollWeather(input.track, forecast, rng);
+  const events: RaceEvent[] = [];
+
+  const points = [25, 18, 15, 12, 10, 8, 6, 4, 2, 1];
+  const sprintPoints = season === 2013 ? null : [8, 7, 6, 5, 4, 3, 2, 1];
+
+  let grid = simulateQualifying(input);
+  events.push({
+    lap: 0,
+    type: "info",
+    severity: "info",
+    text: `Qualifying complete — ${grid[0].driverId} on pole.`,
+    textEnjoyer: "Qualifying done — the grid is set.",
+  });
+
+  let sprint: RaceEntry[] | undefined;
+  if (input.runSprint && season === 2025 && sprintPoints) {
+    sprint = simulateRace(
+      { ...input, rng, track: input.track },
+      weather,
+      grid,
+      sprintPoints,
+      false,
+      events,
+    );
+    grid = sprint.map((s) => ({ ...s, points: 0 })).sort((a, b) => (a.position ?? 99) - (b.position ?? 99));
+    grid.forEach((g, i) => (g.gridPosition = i + 1));
+    events.push({
+      lap: Math.round(input.track.laps * 0.4),
+      type: "info",
+      severity: "success",
+      text: "SPRINT complete — its order sets tomorrow's grid.",
+      textEnjoyer: "SPRINT done — the grid is set.",
+    });
+  }
+
+  const session = beginRace(input, weather, grid, points, season === 2025);
+  advanceRace(session, session.laps);
+  for (const e of session.events) events.push(e);
+  const race = completeRace(session);
+
+  return assembleWeekend(input, {
+    track: input.track,
     weather,
     forecast: {
       rainProbability: forecast.rainProbability,
@@ -633,15 +880,6 @@ export function simulateRaceWeekend(input: RaceInput): RaceWeekendResult {
     sprint,
     race,
     events,
-    playerEntries,
-    breakdown: {
-      car: Math.round(clamp((myCar - avgCar) * 4.4, -45, 45)),
-      driver: Math.round(clamp((myDriver - avgDriver) * 4.4, -45, 45)),
-      strategy: 0,
-      reliability: hasMechanicalDnf ? -22 : Math.round(clamp((avgCar - myCar) * 1.2, -14, 14)),
-      luck,
-    },
-    chaos: chaosOf(track, weather),
-    expected,
-  };
+    lapOrder: session.lapOrder,
+  });
 }

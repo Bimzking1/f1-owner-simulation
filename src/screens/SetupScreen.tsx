@@ -31,6 +31,8 @@ import { DIFFICULTIES, PHILOSOPHIES } from "@/data/config";
 import { Bar, Button, Card, Img, InfoTip, Money, Ovr, Rating, SeniorityBadge, Tag } from "@/ui/kit";
 import { useHoldOpen } from "@/ui/hooks";
 import { driverImage } from "@/data/assets";
+import { sponsorSlotsOf } from "@/state";
+import { powerUnitForSeason } from "@/data/powerUnits";
 import {
   DEPARTMENT_INFO,
   MECHANIC_TIER_INFO,
@@ -82,6 +84,11 @@ export default function SetupScreen({ cfg, onStart, onBack }: Props) {
   const eng = engines.find((e) => e.id === engineId);
   const gb = gearboxes.find((g) => g.id === gearboxId);
   const tech = techs.find((t) => t.id === techId);
+  const techEra = powerUnitForSeason(cfg.season);
+  const techEraChips = [
+    cfg.season === 2013 ? "2.4L NA V8" : "1.6L V6 turbo ICE",
+    ...techEra.components.map((c) => c.name),
+  ];
 
   const equipmentCost = costOf(eng?.cost ?? 0) + costOf(gb?.cost ?? 0) + costOf(tech?.cost ?? 0);
   const totalRounds = seasonCalendar(cfg.season).length;
@@ -154,7 +161,12 @@ export default function SetupScreen({ cfg, onStart, onBack }: Props) {
       components: {
         engine: { condition: 100, age: 0, replacements: 0 },
         gearbox: { condition: 100, age: 0, replacements: 0 },
+        cars: {
+          car1: { engine: { condition: 100, age: 0, replacements: 0 }, gearbox: { condition: 100, age: 0, replacements: 0 }, powerUnit: {} },
+          car2: { engine: { condition: 100, age: 0, replacements: 0 }, gearbox: { condition: 100, age: 0, replacements: 0 }, powerUnit: {} },
+        },
       },
+      seatUpgrades: { car1: {}, car2: {} },
       upgrades: [],
       drivers: [],
       sponsors: [],
@@ -169,6 +181,7 @@ export default function SetupScreen({ cfg, onStart, onBack }: Props) {
   }
 
   const sponsors = availableSponsors(cfg.season, ctor?.dna.reputation ?? 0);
+  const sponsorLimit = sponsorSlotsOf(cfg.difficulty);
 
   return (
     <div className="mx-auto max-w-5xl px-6 pb-36 lg:pb-36">
@@ -328,35 +341,55 @@ export default function SetupScreen({ cfg, onStart, onBack }: Props) {
 
       {/* TECHNICAL */}
       {step === "Technical" && (
-        <div className="grid gap-4 lg:grid-cols-3">
-          <Card title="Engine" right={<span className="text-[10px] uppercase tracking-wider text-ink-faint">hover / hold ⓘ for details</span>}>
-            <div className="grid gap-2">
-              {engines.map((e) => (
-                <TechPick key={e.id} active={engineId === e.id} onClick={() => setEngineId(e.id)} title={e.name}
-                  stats={[{ label: "Power", value: e.power }, { label: "Rel", value: e.reliability }]} extra={[e.status, e.supplier]} cost={costOf(e.cost)}
-                  tip={engineTip(e)} />
+        <>
+          <Card
+            title={techEra.heading === "Power system" ? "Power system — V8 era" : "Power unit — turbo-hybrid era"}
+            right={<Tag tone="elite">{techEra.title}</Tag>}
+          >
+            <p className="text-xs leading-relaxed text-ink-soft">{techEra.blurb}</p>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {techEraChips.map((chip) => (
+                <span key={chip} className="rounded-sm border border-hairline bg-raised/40 px-2 py-0.5 text-[10px] uppercase tracking-wider text-telemetry">
+                  {chip}
+                </span>
               ))}
             </div>
+            <p className="mt-2 text-[11px] text-ink-faint">
+              {cfg.season === 2013
+                ? "No turbocharger, no MGUs, no battery store — the only electrical help is a 60 kW KERS push you trigger by button. What wears is what breaks: engine, KERS, gearbox."
+                : "Every subsystem below shares oil, heat and telemetry inside one power unit — your Garage tracks each of them individually all season. MGU-H harvest is unlimited; deployment is capped at 4 MJ per lap."}
+            </p>
           </Card>
-          <Card title="Gearbox">
-            <div className="grid gap-2">
-              {gearboxes.map((g) => (
-                <TechPick key={g.id} active={gearboxId === g.id} onClick={() => setGearboxId(g.id)} title={g.name}
-                  stats={[{ label: "Perf", value: g.performance }, { label: "Rel", value: g.reliability }]} cost={costOf(g.cost)}
-                  tip={gearboxTip(g)} />
-              ))}
-            </div>
-          </Card>
-          <Card title="Technical package">
-            <div className="grid gap-2">
-              {techs.map((t) => (
-                <TechPick key={t.id} active={techId === t.id} onClick={() => setTechId(t.id)} title={t.name}
-                  stats={[{ label: "Aero", value: t.aero }, { label: "Chassis", value: t.chassis }, { label: "Rel", value: t.reliability }]} cost={costOf(t.cost)}
-                  tip={techTip(t)} />
-              ))}
-            </div>
-          </Card>
-        </div>
+          <div className="grid gap-4 lg:grid-cols-3">
+            <Card title={cfg.season === 2013 ? "Engine — 2.4L NA V8" : "Power unit — 1.6L V6 turbo"} right={<span className="text-[10px] uppercase tracking-wider text-ink-faint">hover / hold ⓘ for details</span>}>
+              <div className="grid gap-2">
+                {engines.map((e) => (
+                  <TechPick key={e.id} active={engineId === e.id} onClick={() => setEngineId(e.id)} title={e.name}
+                    stats={[{ label: "Pwr", value: e.power }, { label: "Rel", value: e.reliability }, { label: "Eff", value: e.efficiency }]} extra={[e.status, e.supplier]} cost={costOf(e.cost)}
+                    tip={engineTip(e)} />
+                ))}
+              </div>
+            </Card>
+            <Card title={cfg.season === 2013 ? "Gearbox — 7-speed hydraulic" : "Gearbox — 7-speed seamless"}>
+              <div className="grid gap-2">
+                {gearboxes.map((g) => (
+                  <TechPick key={g.id} active={gearboxId === g.id} onClick={() => setGearboxId(g.id)} title={g.name}
+                    stats={[{ label: "Perf", value: g.performance }, { label: "Rel", value: g.reliability }]} cost={costOf(g.cost)}
+                    tip={gearboxTip(g)} />
+                ))}
+              </div>
+            </Card>
+            <Card title="Technical package">
+              <div className="grid gap-2">
+                {techs.map((t) => (
+                  <TechPick key={t.id} active={techId === t.id} onClick={() => setTechId(t.id)} title={t.name}
+                    stats={[{ label: "Aero", value: t.aero }, { label: "Chassis", value: t.chassis }, { label: "Rel", value: t.reliability }]} cost={costOf(t.cost)}
+                    tip={techTip(t)} />
+                ))}
+              </div>
+            </Card>
+          </div>
+        </>
       )}
 
       {/* STAFF */}
@@ -491,22 +524,26 @@ export default function SetupScreen({ cfg, onStart, onBack }: Props) {
 
       {/* SPONSORS */}
       {step === "Sponsors" && (
-        <Card title={`Sponsors (${sponsorIds.length}/5 slots)`}>
+        <Card title={`Sponsors (${sponsorIds.length}/${sponsorLimit} slots)`}>
           {sponsors.length === 0 && (
             <div className="text-xs text-ink-faint">No sponsors are interested in this team right now.</div>
           )}
           <div className="grid gap-2 sm:grid-cols-2">
             {sponsors.map((s) => {
               const signed = sponsorIds.includes(s.id);
+              const full = sponsorIds.length >= sponsorLimit;
               return (
                 <button
                   key={s.id}
                   type="button"
+                  disabled={!signed && full}
                   onClick={() => setSponsorIds(signed ? sponsorIds.filter((x) => x !== s.id) : [...sponsorIds, s.id])}
-                  className={`rounded-md border p-3 text-left transition ${
+                  className={`rounded-md border p-3 text-left transition disabled:cursor-default ${
                     signed
                       ? "border-positive/50 bg-positive/10"
-                      : "border-hairline bg-surface hover:border-ink-faint"
+                      : full
+                        ? "border-hairline bg-surface opacity-50"
+                        : "border-hairline bg-surface hover:border-ink-faint"
                   }`}
                 >
                   <div className="flex items-center justify-between gap-2">
@@ -528,10 +565,12 @@ export default function SetupScreen({ cfg, onStart, onBack }: Props) {
                       className={`inline-flex shrink-0 items-center rounded-sm border px-2 py-1 font-display text-[11px] font-bold uppercase tracking-widest ${
                         signed
                           ? "border-positive/40 bg-positive/15 text-positive"
-                          : "border-hairline bg-raised text-ink-soft"
+                          : full
+                            ? "border-hairline bg-raised text-ink-faint"
+                            : "border-hairline bg-raised text-ink-soft"
                       }`}
                     >
-                      {signed ? "Signed" : s.tier === "title" ? "Sign Title" : "Sign"}
+                      {signed ? "Signed" : full ? "No slot left" : s.tier === "title" ? "Sign Title" : "Sign"}
                     </span>
                   </div>
                 </button>
@@ -539,7 +578,9 @@ export default function SetupScreen({ cfg, onStart, onBack }: Props) {
             })}
           </div>
           <p className="mt-3 text-[11px] text-ink-faint">
-            No up-front fee: sponsors pay their race rate every weekend you keep the contract.
+            No up-front fee: sponsors pay their race rate every weekend you keep the contract. Slot limit scales with
+            difficulty — {diff.label} allows {sponsorLimit} concurrent deals (Rookie 7 · Professional 5 · Expert 4 ·
+            Ruthless 3).
           </p>
         </Card>
       )}
@@ -633,7 +674,7 @@ export default function SetupScreen({ cfg, onStart, onBack }: Props) {
             <div className="mt-3 border-t border-hairline pt-3">
               <div className="mb-2 flex items-center justify-between">
                 <span className="font-display text-sm font-bold uppercase tracking-wider">Sponsors</span>
-                <span className="text-[11px] text-ink-faint">{sponsorIds.length}/5 slots</span>
+                <span className="text-[11px] text-ink-faint">{sponsorIds.length}/{sponsorLimit} slots</span>
               </div>
               {sponsorIds.length === 0 ? (
                 <p className="text-xs text-ink-faint">No sponsors signed yet.</p>
@@ -832,9 +873,28 @@ function StaffCard({
 
 function engineTip(e: EngineSpec): ReactNode {
   const works = e.status === "works";
+  const hybrid = e.season === 2025;
   return (
     <span className="block space-y-2">
       <span className="block">{e.description}</span>
+      <span className="block">
+        <span className="font-semibold uppercase tracking-wider text-elite">{hybrid ? "Power unit anatomy — " : "V8 + KERS anatomy — "}</span>
+        {hybrid
+          ? (
+            <>
+              one oil supply, seven tracked subsystems: this ICE, the turbocharger, MGU-K, MGU-H, energy store,
+              control electronics and exhaust. Your Garage monitors each part's condition all season — a tired MGU-H or
+              cracked exhaust drags the whole unit's failure risk up. Deployment is capped at 4 MJ/lap; MGU-H harvest is unlimited.
+            </>
+          )
+          : (
+            <>
+              a 2.4L naturally aspirated V8 revving to 18,000 rpm, plus a separate 60 kW KERS: braking energy harvested
+              into batteries, deployed by steering-wheel button for up to 6.7s per lap. No turbo, no MGUs — what wears is
+              what breaks, and your Garage tracks engine and KERS individually.
+            </>
+          )}
+      </span>
       <span className="block">
         <span className="font-semibold uppercase tracking-wider text-positive">Works vs customer — </span>
         a <b>works</b> deal makes you the supplier's flagship team: latest-spec hardware, first access to upgrades and
@@ -858,9 +918,16 @@ function engineTip(e: EngineSpec): ReactNode {
 
 function gearboxTip(g: GearboxSpec): ReactNode {
   const kind = g.performance >= 92 ? "performance" : g.performance >= 85 ? "balanced" : "reliability";
+  const hybrid = g.season === 2025;
   return (
     <span className="block space-y-2">
       <span className="block">{g.description}</span>
+      <span className="block">
+        <span className="font-semibold uppercase tracking-wider text-elite">Hardware — </span>
+        {hybrid
+          ? "7-speed seamless-shift box in a carbon-composite case, structurally bolted to the power unit. Ratios are fixed for the season."
+          : "7-speed seamless-shift hydraulic box with a structural titanium casing. Ratios are fixed for the season."}
+      </span>
       <span className="block">
         <span className="font-semibold text-positive">Strengths: </span>
         {kind === "performance"

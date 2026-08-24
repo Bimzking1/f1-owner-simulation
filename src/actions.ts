@@ -3,11 +3,15 @@
 // Each takes a SimulationState and returns a user-facing message.
 // ============================================================================
 
-import type { Driver, DriverBoost, DriverState, SimulationState, TestReport, TestType } from "@/simulation/types";
+import type { ComponentKey, DevSeat, Driver, DriverBoost, DriverState, EraComponentId, Seat, SimulationState, TestReport, TestType } from "@/simulation/types";
 import type { DevOption } from "@/simulation/systems";
 import {
   addReputation,
+  carParts,
+  devCostFor,
   generateDevOptions,
+  isDevWindow,
+  isSeatTarget,
   replaceComponent,
   startProject,
   prizeMoney,
@@ -15,7 +19,8 @@ import {
 import { resolveNewsAction } from "@/simulation/sim";
 import { createRng, clamp } from "@/simulation/rng";
 import { driverById, engineerById, mechanicById, sponsorById } from "@/data";
-import { difficultyOf } from "./state";
+import { componentLabel } from "@/data/powerUnits";
+import { difficultyOf, sponsorSlotsOf } from "./state";
 
 export type ActionResult = { ok: boolean; message: string };
 
@@ -113,9 +118,23 @@ export interface SwapQuote {
   fee: number;
   total: number;
   canAfford: boolean;
+  /** Reputation the team needs before this driver will even talk (0 = none). */
+  requiredReputation: number;
+  /** True when the target refuses to sign at the team's current reputation. */
+  reputationBlocked: boolean;
 }
 
-/** Transfer cost for a seat swap: prorated salary delta + $2M break fee. */
+/** Minimum reputation to attract a driver of a given overall rating.
+ *  A midfield car cannot simply buy a champion — reputation must be earned. */
+export function requiredReputationFor(overall: number): number {
+  return Math.max(0, Math.round((overall - 68) * 2.2));
+}
+
+/**
+ * Transfer cost for a seat swap: prorated salary delta + break fee, with a
+ * star premium — drivers above ~80 overall charge a signing markup that
+ * grows with every point of rating.
+ */
 export function swapQuote(state: SimulationState, slot: 1 | 2, driverId: string): SwapQuote | null {
   const t = state.team!;
   const currentId = slot === 1 ? t.driver1Id : t.driver2Id;
@@ -125,8 +144,19 @@ export function swapQuote(state: SimulationState, slot: 1 | 2, driverId: string)
   const roundsLeft = Math.max(1, state.calendar.length - state.round);
   const prorated = Math.max(0, ((target.salary - (old?.salary ?? 4)) / state.calendar.length) * roundsLeft);
   const fee = 2; // $M break fee
-  const total = Math.round((prorated + fee) * 100) / 100;
-  return { currentId, target, prorated, fee, total, canAfford: t.cash >= total };
+  const starPremium = Math.round(Math.max(0, target.overall - 80) * 0.14 * fee * 10) / 10;
+  const total = Math.round((prorated + fee + starPremium) * 100) / 100;
+  const requiredReputation = requiredReputationFor(target.overall);
+  return {
+    currentId,
+    target,
+    prorated,
+    fee: Math.round((fee + starPremium) * 100) / 100,
+    total,
+    canAfford: t.cash >= total,
+    requiredReputation,
+    reputationBlocked: t.reputation < requiredReputation,
+  };
 }
 
 /** Swap one of the two seats (spec §45 driver market). */
@@ -141,6 +171,13 @@ export function swapDriver(state: SimulationState, slot: 1 | 2, driverId: string
   if (!target) return msg(result, false, "Unknown driver.");
   const old = driverById(currentId, state.season);
   const quote = swapQuote(state, slot, driverId)!;
+  if (quote.reputationBlocked) {
+    return msg(
+      result,
+      false,
+      `${target.shortName} won't join a team with reputation ${t.reputation} — needs ${quote.requiredReputation}.`,
+    );
+  }
   const total = quote.total;
   if (t.cash < total) return msg(result, false, `Need $${total}M for the transfer.`);
   t.cash = Math.round((t.cash - total) * 100) / 100;
@@ -163,7 +200,7 @@ export function swapDriver(state: SimulationState, slot: 1 | 2, driverId: string
     label: `${old?.shortName ?? currentId} out, ${target.shortName} in`,
     amount: -total,
     category: "other",
-    detail: `Seat change.\nBreak fee: $${quote.fee}M\nProrated salary delta (${state.calendar.length - state.completedRounds} remaining rounds): $${quote.prorated}M\nTotal: $${total}M`,
+      detail: `Seat change.\nBreak fee (+star markup if any): $${quote.fee}M\nProrated salary delta (${state.calendar.length - state.completedRounds} remaining rounds): $${quote.prorated}M\nTotal: $${total}M`,
   });
   state.news.unshift({
     id: `swap-${state.completedRounds + 1}-${driverId}`,
@@ -214,7 +251,9 @@ export function signSponsor(state: SimulationState, sponsorId: string): ActionRe
   const result: ActionResult = { ok: false, message: "" };
   const t = state.team!;
   if (t.sponsors.some((s) => s.sponsorId === sponsorId)) return msg(result, false, "Already signed.");
-  if (t.sponsors.filter((s) => s.active).length >= 5) return msg(result, false, "Max 5 sponsor slots.");
+  const maxSlots = sponsorSlotsOf(state.difficulty);
+  if (t.sponsors.filter((s) => s.active).length >= maxSlots)
+    return msg(result, false, `All ${maxSlots} sponsor slots are taken on ${difficultyOf(state).label} — terminate a deal first.`);
   const spec = sponsorById(sponsorId);
   if (!spec) return msg(result, false, "Unknown sponsor.");
   if (t.reputation < (spec.tier === "title" ? 30 : 0)) return msg(result, false, "Reputation too low for a title sponsor.");
@@ -345,17 +384,47 @@ function buildTestReport(state: SimulationState, type: TestType, rng: () => numb
 
 export { generateDevOptions, startProject, replaceComponent, resolveNewsAction };
 
-export function startDev(state: SimulationState, option: DevOption): ActionResult {
-  const result: ActionResult = { ok: false, message: "" };
-  if (!startProject(state, option)) return msg(result, false, "Not enough cash.");
-  return msg(result, true, `${option.name} started ($${option.cost}M).`);
+/** Trainings (pit crew / driver coaching) are weekly programmes, not frozen car upgrades. */
+export function isTrainingOption(option: Pick<DevOption, "target">): boolean {
+  return option.target === "pitCrew" || option.target === "driverTraining";
 }
 
-export function replaceEngine(state: SimulationState): ActionResult {
-  return doReplace(state, "engine");
+/** True when this training programme was already started during the current weekend. */
+export function trainingDoneThisWeekend(state: SimulationState, optionId: string): boolean {
+  return (state.team?.trainings ?? []).some((x) => x.id === optionId && x.round >= state.completedRounds);
 }
-export function replaceGearbox(state: SimulationState): ActionResult {
-  return doReplace(state, "gearbox");
+
+export function startDev(state: SimulationState, option: DevOption, seat?: DevSeat): ActionResult {
+  const result: ActionResult = { ok: false, message: "" };
+  if (isTrainingOption(option)) {
+    if (trainingDoneThisWeekend(state, option.id))
+      return msg(result, false, `${option.name} was already run this weekend — available again next race.`);
+  } else if (!isDevWindow(state)) {
+    return msg(result, false, "Car upgrades can only be started in a development window.");
+  }
+  const cost = devCostFor(option, isSeatTarget(option.target) ? (seat ?? "both") : undefined);
+  if (!startProject(state, option, seat)) return msg(result, false, "Not enough cash.");
+  if (isTrainingOption(option)) {
+    const t = state.team!;
+    t.trainings ??= [];
+    t.trainings.push({ id: option.id, round: state.completedRounds });
+  }
+  const seatNote =
+    seat && seat !== "both" && isSeatTarget(option.target)
+      ? ` — ${driverById(seat === "car1" ? state.team!.driver1Id : state.team!.driver2Id, state.season)?.shortName}'s car only`
+      : "";
+  return msg(result, true, `${option.name}${seatNote} started ($${cost}M).`);
+}
+
+export function replaceEngine(state: SimulationState, seat: Seat): ActionResult {
+  return doReplace(state, "engine", seat);
+}
+export function replaceGearbox(state: SimulationState, seat: Seat): ActionResult {
+  return doReplace(state, "gearbox", seat);
+}
+/** Swap any era-specific power-unit part (KERS in 2013; turbo/MGUs/store/CE/exhaust in 2025). */
+export function replacePuComponent(state: SimulationState, id: EraComponentId, seat: Seat): ActionResult {
+  return doReplace(state, id, seat);
 }
 
 // ---------------------------------------------------------------------------
@@ -562,15 +631,18 @@ export function manageTeam(state: SimulationState, action: TeamAction): ActionRe
   return msg(result, true, `${info.label}: ${effect}. Lingering: ${boostDesc(tails[action])} each.${trustNote(addTrust(t, teamTrust[action]))}`);
 }
 
-function doReplace(state: SimulationState, component: "engine" | "gearbox"): ActionResult {
+function doReplace(state: SimulationState, component: ComponentKey, seat: Seat): ActionResult {
   const result: ActionResult = { ok: false, message: "" };
   const t = state.team!;
-  const before = t.components[component].condition;
-  replaceComponent(state, component);
-  if (t.components[component].condition === 100 && t.components[component].age === 0 && t.components[component].replacements > 0) {
-    return msg(result, true, `${component === "engine" ? "Engine" : "Gearbox"} replaced.`);
-  }
-  void before;
+  const drv = driverById(seat === "car1" ? t.driver1Id : t.driver2Id, state.season);
+  replaceComponent(state, component, seat);
+  const parts = carParts(t, seat);
+  const fresh =
+    component === "engine" || component === "gearbox"
+      ? parts[component].age === 0 && parts[component].replacements > 0
+      : parts.powerUnit[component]?.age === 0 && (parts.powerUnit[component]?.replacements ?? 0) > 0;
+  if (fresh)
+    return msg(result, true, `${componentLabel(component, state.season)} replaced on ${drv?.shortName ?? seat}'s car.`);
   return msg(result, false, "Not enough cash.");
 }
 

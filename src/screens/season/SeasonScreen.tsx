@@ -2,8 +2,9 @@ import { useState } from "react";
 import type { SimulationState } from "@/simulation/types";
 import { constructorById } from "@/data";
 import { difficultyOf, ownerTitle } from "@/state";
+import { urgentRepairs } from "@/simulation/systems";
 import { Button, Img, Modal, Money } from "@/ui/kit";
-import type { Act } from "./parts";
+import type { Act, LiveCommand, LiveView } from "./parts";
 import { OverviewTab } from "./OverviewTab";
 import { RaceTab } from "./RaceTab";
 import { MarketTab } from "./MarketTab";
@@ -11,6 +12,7 @@ import { SponsorsTab } from "./SponsorsTab";
 import { GarageTab } from "./GarageTab";
 import { FinanceTab } from "./FinanceTab";
 import { ManagementTab } from "./ManagementTab";
+import { UpcomingTab } from "./UpcomingTab";
 import { EndScreens } from "./EndScreens";
 
 export type { Act };
@@ -18,21 +20,43 @@ export type { Act };
 interface Props {
   state: SimulationState;
   onRunRound: () => void;
+  /** Start a live desktop race; false → fall back to the instant sim. */
+  onStartLive?: () => boolean;
+  onAutoRun?: () => void;
+  live?: LiveView | null;
+  sendCommand?: (cmd: LiveCommand) => void;
+  onResume?: () => void;
+  onPause?: () => void;
+  onSkipToEnd?: () => void;
   onNewsAction: (newsId: string, action: string) => void;
   act: Act;
   onReset: () => void;
 }
 
-type Tab = "Overview" | "Race" | "Management" | "Market" | "Sponsors" | "Garage" | "Finance";
+type Tab = "Overview" | "Race" | "Management" | "Market" | "Sponsors" | "Garage" | "Upcoming" | "Finance";
 
-const TABS: Tab[] = ["Overview", "Race", "Management", "Market", "Sponsors", "Garage", "Finance"];
+const TABS: Tab[] = ["Overview", "Race", "Management", "Market", "Sponsors", "Garage", "Finance", "Upcoming"];
 
-export default function SeasonScreen({ state, onRunRound, onNewsAction, act, onReset }: Props) {
+export default function SeasonScreen({
+  state,
+  onRunRound,
+  onStartLive,
+  onAutoRun,
+  live,
+  sendCommand,
+  onResume,
+  onPause,
+  onSkipToEnd,
+  onNewsAction,
+  act,
+  onReset,
+}: Props) {
   const t = state.team!;
   const ctor = constructorById(t.constructorId, state.season);
   const wccPos = state.standingsConstructors.findIndex((c) => c.teamId === t.constructorId) + 1;
   const [tab, setTab] = useState<Tab>("Overview");
   const [confirmMenu, setConfirmMenu] = useState(false);
+  const [repairOpen, setRepairOpen] = useState(false);
 
   if (state.phase === "bankrupt" || state.phase === "finished") {
     return <EndScreens state={state} onReset={onReset} />;
@@ -40,6 +64,24 @@ export default function SeasonScreen({ state, onRunRound, onNewsAction, act, onR
 
   const next = state.calendar[state.round];
   const seasonDone = !next;
+  const raceBusy = !!live && !live.done;
+
+  /** Broken hardware blocks the next GP — Run buttons open the repair alert instead. */
+  const repairs = urgentRepairs(state);
+  const handleRunRound = () => {
+    if (repairs.length > 0) {
+      setRepairOpen(true);
+      return;
+    }
+    if (raceBusy) return;
+    // Desktop manual runs go through the live race on the Race tab.
+    setTab("Race");
+    if (!onStartLive?.()) onRunRound();
+  };
+  const handleAutoRound = () => {
+    if (repairs.length > 0 || raceBusy) return;
+    onAutoRun?.();
+  };
 
   /** News actions can navigate ("goto:sponsors") instead of mutating the sim. */
   const handleNewsAction = (newsId: string, action: string) => {
@@ -116,9 +158,28 @@ export default function SeasonScreen({ state, onRunRound, onNewsAction, act, onR
             Menu
           </Button>
           {!seasonDone && (
-            <Button onClick={onRunRound} className="order-last w-full md:order-none md:w-auto md:shrink-0">
-              Run R{state.round + 1} · {next.grandPrix} →
-            </Button>
+            <div className="order-last flex w-full gap-2 md:order-none md:w-auto">
+              <Button
+                variant="ghost"
+                onClick={handleAutoRound}
+                disabled={raceBusy}
+                title="Simulate weekends automatically — stops when parts break, a driver demands a word, or the season ends"
+                className={`flex-1 md:flex-none ${repairs.length > 0 ? "border-signal/60 opacity-90" : ""}`}
+              >
+                {repairs.length > 0 && <span className="mr-1">⚠</span>}Auto
+              </Button>
+              <Button
+                onClick={handleRunRound}
+                disabled={raceBusy}
+                title={live ? "Race in progress" : "Run this weekend"}
+                className="flex-[2] md:flex-none md:shrink-0"
+              >
+                <span className={repairs.length > 0 || raceBusy ? "mr-1" : ""}>
+                  {(repairs.length > 0 && "⚠") || (raceBusy && "🏁")}
+                </span>
+                {raceBusy ? "Race live…" : `Run R${state.round + 1} · ${next.grandPrix} →`}
+              </Button>
+            </div>
           )}
         </div>
       </header>
@@ -131,18 +192,26 @@ export default function SeasonScreen({ state, onRunRound, onNewsAction, act, onR
                 ? { count: openChats, cls: "bg-signal" }
                 : tb === "Sponsors"
                   ? sponsorsBadge
-                  : null;
+                  : tb === "Garage" && repairs.length > 0
+                    ? { count: repairs.length, cls: "bg-signal" }
+                    : null;
+            // Siren: the Race tab pulses while a live race is running so the
+            // owner always knows where the action is.
+            const siren = tb === "Race" && raceBusy;
             return (
               <button
                 key={tb}
                 type="button"
                 onClick={() => setTab(tb)}
                 className={`relative min-w-[4.6rem] flex-1 rounded-sm border px-2 py-2.5 text-xs font-bold uppercase tracking-widest transition sm:min-w-[5.5rem] sm:flex-initial sm:px-3.5 sm:py-2 ${
-                  tab === tb
-                    ? "border-signal bg-signal text-white shadow-md"
-                    : "border-hairline bg-raised/70 text-ink-soft hover:border-ink-faint hover:bg-raised hover:text-ink"
+                  siren
+                    ? `border-signal text-white shadow-lg shadow-signal/30 ${tab === tb ? "bg-signal/70" : "animate-pulse bg-signal"}`
+                    : tab === tb
+                      ? "border-signal bg-signal text-white shadow-md"
+                      : "border-hairline bg-raised/70 text-ink-soft hover:border-ink-faint hover:bg-raised hover:text-ink"
                 }`}
               >
+                {siren && <span className="mr-1">🏁</span>}
                 {tb}
                 {badge && (
                   <span
@@ -157,14 +226,48 @@ export default function SeasonScreen({ state, onRunRound, onNewsAction, act, onR
         </div>
       </nav>
 
-      {tab === "Overview" && (
-        <OverviewTab state={state} onNewsAction={handleNewsAction} onRunRound={onRunRound} onNavigate={(x) => setTab(x)} />
+      {/* Race-in-progress strip — follows you across tabs until the flag falls */}
+      {raceBusy && live && tab !== "Race" && (
+        <button
+          type="button"
+          onClick={() => setTab("Race")}
+          className="mb-4 flex w-full items-center gap-3 rounded-md border border-signal/60 bg-signal/10 px-4 py-2.5 text-left transition hover:bg-signal/15"
+        >
+          <span className="relative flex h-3 w-3 shrink-0">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-signal opacity-60" />
+            <span className="relative inline-flex h-3 w-3 rounded-full bg-signal" />
+          </span>
+          <span className="min-w-0 text-sm leading-snug text-ink-soft">
+            <b className="text-ink">
+              Race in progress — R{live.roundIdx + 1} {live.grandPrix}, lap {live.currentLap}/{live.laps}
+              {live.paused && <span className="text-signal"> · PIT WALL OPEN</span>}
+            </b>
+            {" — head back to the Race tab to follow or intervene."}
+          </span>
+          <span className="ml-auto shrink-0 text-xs font-bold uppercase tracking-widest text-signal">Go →</span>
+        </button>
       )}
-      {tab === "Race" && <RaceTab state={state} onRunRound={onRunRound} />}
+
+      {tab === "Overview" && (
+        <OverviewTab state={state} onNewsAction={handleNewsAction} onRunRound={handleRunRound} onNavigate={(x) => setTab(x)} />
+      )}
+      {tab === "Race" && (
+        <RaceTab
+          state={state}
+          onRunRound={handleRunRound}
+          live={live}
+          sendCommand={sendCommand}
+          onResume={onResume}
+          onPause={onPause}
+          onSkipToEnd={onSkipToEnd}
+          onOpenGarage={() => setTab("Garage")}
+        />
+      )}
       {tab === "Management" && <ManagementTab state={state} act={act} onNewsAction={handleNewsAction} />}
       {tab === "Market" && <MarketTab state={state} act={act} />}
       {tab === "Sponsors" && <SponsorsTab state={state} act={act} />}
       {tab === "Garage" && <GarageTab state={state} act={act} />}
+      {tab === "Upcoming" && <UpcomingTab state={state} />}
       {tab === "Finance" && <FinanceTab state={state} />}
 
       <Modal open={confirmMenu} onClose={() => setConfirmMenu(false)} title="Quit to menu?">
@@ -174,6 +277,38 @@ export default function SeasonScreen({ state, onRunRound, onNewsAction, act, onR
         <div className="mt-4 flex justify-end gap-2">
           <Button small variant="ghost" onClick={() => setConfirmMenu(false)}>Keep playing</Button>
           <Button small onClick={onReset}>Quit to menu</Button>
+        </div>
+      </Modal>
+
+      <Modal open={repairOpen} onClose={() => setRepairOpen(false)} title="Urgent repair required">
+        <div className="space-y-3 text-sm">
+          {repairs.map((r) => (
+            <div key={r.key} className="rounded-md border border-caution/50 bg-caution/10 p-3">
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-display font-bold uppercase">{r.name}</span>
+                <span className="num-data text-caution">{r.condition.toFixed(1)}%</span>
+              </div>
+              <p className="mt-0.5 text-[11px] leading-relaxed text-caution">{r.note}</p>
+              <p className="mt-1 text-[11px] text-ink-faint">Replacement cost: ${r.cost}M</p>
+            </div>
+          ))}
+          <p className="rounded-md border-l-2 border-signal/60 bg-raised/40 p-3 text-xs leading-relaxed text-ink-soft">
+            You cannot start round {state.round + 1} · {next?.grandPrix ?? "GP"} with broken hardware. The car is unsafe
+            and the stewards would never let it out of the pit lane anyway. Head to the Garage and replace every broken
+            part first.
+          </p>
+          <div className="flex justify-end gap-2 pt-1">
+            <Button small variant="ghost" onClick={() => setRepairOpen(false)}>Understood</Button>
+            <Button
+              small
+              onClick={() => {
+                setRepairOpen(false);
+                setTab("Garage");
+              }}
+            >
+              To the garage →
+            </Button>
+          </div>
         </div>
       </Modal>
     </div>

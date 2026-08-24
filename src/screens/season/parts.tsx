@@ -1,10 +1,53 @@
-import type { SimulationState, Track } from "@/simulation/types";
+import { useState } from "react";
+import type {
+  RaceEntry,
+  RaceEvent,
+  SimulationState,
+  Track,
+  WeatherId,
+} from "@/simulation/types";
 import { constructorById, driverById, trackById } from "@/data";
-import { Card, Img, Meter, Tag } from "@/ui/kit";
+import { Card, ImageLightbox, Img, Meter, Tag } from "@/ui/kit";
 import { ratingTone, type KitTone } from "@/ui/ratings";
 import { driverImage } from "@/data/assets";
 
 export type Act = (fn: (s: SimulationState) => string) => void;
+
+/** Serializable snapshot of an in-progress live race (App owns the engine). */
+export interface LiveView {
+  roundIdx: number;
+  grandPrix: string;
+  laps: number;
+  currentLap: number;
+  lapOrder: string[][];
+  events: RaceEvent[];
+  qualifying: RaceEntry[];
+  sprint?: RaceEntry[];
+  weather: WeatherId;
+  forecast: { rainProbability: number; confidence: "low" | "medium" | "high"; window?: string };
+  playerIds: string[];
+  stances: Record<string, "push" | "steady" | "conserve">;
+  motivateUsed: Record<string, boolean>;
+  /** Player drivers whose car is out of the race, with the reason it stopped. */
+  retired: Record<string, boolean>;
+  /** Why each retired car is out ("mechanical failure…", "called into the pits by the team"…). */
+  retireReasons: Record<string, string>;
+  /** Live per-car telemetry for the pit wall. */
+  cars: Record<string, { pos: number; gapS: number; tire: number; health: number; form: number }>;
+  gridPenaltyApplied: number;
+  /** True while the race is held at a checkpoint awaiting owner orders. */
+  paused: boolean;
+  /** True when the pause came from the owner's pause button, not a checkpoint. */
+  manualPaused?: boolean;
+  /** True once every lap has run and the weekend is being finalized. */
+  done: boolean;
+}
+
+/** One pit-wall order from the owner during a live race. */
+export interface LiveCommand {
+  driverId: string;
+  kind: "push" | "steady" | "conserve" | "retire" | "motivate";
+}
 
 export function MiniBar({ label, value, tone }: { label: string; value: number; tone?: KitTone }) {
   return (
@@ -35,7 +78,17 @@ function attendanceFor(track: Track): number {
   return Math.round(raw / 1000) * 1000;
 }
 
-export function NextRaceCard({ track, round }: { track: Track; round?: number }) {
+export function NextRaceCard({
+  track,
+  round,
+  gridPenalty,
+}: {
+  track: Track;
+  round?: number;
+  /** Pending steward grid penalty the team carries into this GP. */
+  gridPenalty?: number;
+}) {
+  const [zoom, setZoom] = useState(false);
   const weatherNote =
     track.characteristics.weatherRisk > 65
       ? "High weather risk — strategy will matter."
@@ -63,6 +116,11 @@ export function NextRaceCard({ track, round }: { track: Track; round?: number })
             </span>
           </div>
           <div className="mt-2 text-xs text-ink-soft">{weatherNote}</div>
+          {!!gridPenalty && (
+            <div className="mt-2 inline-block rounded-sm border border-caution/50 bg-caution/10 px-2 py-1 text-[11px] font-semibold text-caution">
+              −{gridPenalty} grid places (stewards)
+            </div>
+          )}
           <div className="mt-3 grid max-w-sm grid-cols-2 gap-x-4 gap-y-1 text-[11px] text-ink-faint">
             {[
               ["Downforce", track.characteristics.downforce],
@@ -80,19 +138,25 @@ export function NextRaceCard({ track, round }: { track: Track; round?: number })
           </div>
         </div>
         <div className="w-full shrink-0 md:w-auto">
-          <div className="flex aspect-[4/3] w-full items-center justify-center overflow-hidden rounded-sm bg-white p-2 md:h-44 md:w-auto">
+          <button
+            type="button"
+            onClick={() => setZoom(true)}
+            title="Click to enlarge circuit map"
+            className="flex aspect-[4/3] w-full cursor-zoom-in items-center justify-center overflow-hidden rounded-sm bg-white p-2 transition hover:opacity-90 md:h-44 md:w-auto"
+          >
             <Img
               src={track.image}
               alt={`${track.name} circuit layout`}
               fallback={<span className="text-[10px] text-ink-faint">Layout</span>}
               className="max-h-full max-w-full object-contain"
             />
-          </div>
+          </button>
           <div className="mt-1 text-center text-[10px] uppercase tracking-widest text-ink-faint">
             R{round ?? "?"} circuit map
           </div>
         </div>
       </div>
+      {zoom && <ImageLightbox src={track.image} alt={`${track.name} circuit map`} onClose={() => setZoom(false)} light />}
     </Card>
   );
 }

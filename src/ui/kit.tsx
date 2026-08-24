@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ovrClass, ratingTextClass, ratingTone, type KitTone } from "./ratings";
 
 // ---------------------------------------------------------------------------
@@ -121,7 +121,7 @@ export function Card({ title, right, children, className = "", pad = true }: { t
   );
 }
 
-export function Button({ children, onClick, variant = "primary", disabled, className = "", small }: { children: ReactNode; onClick?: () => void; variant?: "primary" | "ghost" | "danger" | "positive" | "signal"; disabled?: boolean; className?: string; small?: boolean }) {
+export function Button({ children, onClick, variant = "primary", disabled, className = "", small, title }: { children: ReactNode; onClick?: () => void; variant?: "primary" | "ghost" | "danger" | "positive" | "signal"; disabled?: boolean; className?: string; small?: boolean; title?: string }) {
   const vars: Record<string, string> = {
     primary: "bg-signal text-white hover:bg-signal/80 border border-signal/60",
     ghost: "bg-raised text-ink-soft hover:text-ink hover:bg-raised/80 border border-hairline",
@@ -134,6 +134,7 @@ export function Button({ children, onClick, variant = "primary", disabled, class
       type="button"
       disabled={disabled}
       onClick={onClick}
+      title={title}
       className={`inline-flex items-center justify-center gap-1.5 ${small ? "px-2 py-1 text-[11px]" : "px-3.5 py-2 text-sm"} rounded-sm font-display font-bold uppercase tracking-widest transition disabled:cursor-not-allowed disabled:opacity-40 ${vars[variant]} ${className}`}
     >
       {children}
@@ -186,6 +187,64 @@ export function Stat({ label, value, sub, tone }: { label: string; value: ReactN
 
 export function Empty({ children }: { children: ReactNode }) {
   return <div className="rounded-md border border-dashed border-hairline p-6 text-center text-sm text-ink-faint">{children}</div>;
+}
+
+// ---------------------------------------------------------------------------
+// ImageLightbox — full-screen image viewer. The image scales up to 80% of the
+// viewport height, capped at 80% of the viewport width; whichever limit binds
+// first wins (object-contain keeps the aspect ratio). Click backdrop / ✕ / Esc
+// to close.
+// ---------------------------------------------------------------------------
+
+export function ImageLightbox({
+  src,
+  alt,
+  onClose,
+  light,
+}: {
+  src: string;
+  alt: string;
+  onClose: () => void;
+  /** White backdrop behind the image — use for transparent PNGs (e.g. circuit maps). */
+  light?: boolean;
+}) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+  return (
+    <div
+      className="fixed inset-0 z-[80] flex items-center justify-center bg-black/85 p-4"
+      onClick={onClose}
+      role="dialog"
+      aria-label={alt}
+    >
+      <button
+        type="button"
+        onClick={onClose}
+        aria-label="Close image"
+        className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-full border border-white/30 bg-black/50 text-lg text-white/80 transition hover:bg-black/70 hover:text-white"
+      >
+        ✕
+      </button>
+      {src ? (
+        <img
+          src={src}
+          alt={alt}
+          onClick={(e) => e.stopPropagation()}
+          className={`max-h-[80vh] max-w-[80vw] rounded-md object-contain shadow-2xl ${light ? "bg-white p-4" : ""}`}
+        />
+      ) : (
+        <span className="text-sm text-ink-faint">No image available.</span>
+      )}
+      <div className="pointer-events-none absolute bottom-4 left-1/2 -translate-x-1/2 text-[10px] uppercase tracking-widest text-white/50">
+        {alt} · click anywhere to close
+      </div>
+    </div>
+  );
 }
 
 // ---------------------------------------------------------------------------
