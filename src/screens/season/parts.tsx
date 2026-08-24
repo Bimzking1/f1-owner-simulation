@@ -30,6 +30,8 @@ export interface LiveView {
   motivateUsed: Record<string, boolean>;
   /** Player drivers whose car is out of the race (retired/DNF). */
   retired: Record<string, boolean>;
+  /** Live per-car telemetry for the pit wall. */
+  cars: Record<string, { pos: number; gapS: number; tire: number; health: number; form: number }>;
   gridPenaltyApplied: number;
   /** True while the race is held at a checkpoint awaiting owner orders. */
   paused: boolean;

@@ -161,7 +161,12 @@ export default function SetupScreen({ cfg, onStart, onBack }: Props) {
       components: {
         engine: { condition: 100, age: 0, replacements: 0 },
         gearbox: { condition: 100, age: 0, replacements: 0 },
+        cars: {
+          car1: { engine: { condition: 100, age: 0, replacements: 0 }, gearbox: { condition: 100, age: 0, replacements: 0 }, powerUnit: {} },
+          car2: { engine: { condition: 100, age: 0, replacements: 0 }, gearbox: { condition: 100, age: 0, replacements: 0 }, powerUnit: {} },
+        },
       },
+      seatUpgrades: { car1: {}, car2: {} },
       upgrades: [],
       drivers: [],
       sponsors: [],

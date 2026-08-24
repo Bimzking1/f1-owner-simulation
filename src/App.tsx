@@ -85,6 +85,24 @@ export default function App() {
       retired: Object.fromEntries(
         s.running.filter((r) => r.out).map((r) => [r.comp.driverId, true]),
       ) as Record<string, boolean>,
+      cars: Object.fromEntries(
+        s.running.map((r) => {
+          const alive = s.running.filter((x) => !x.out);
+          const pos = r.out ? alive.length + 1 : alive.indexOf(r) + 1;
+          const leader = alive[0];
+          const tireLife = Math.round(100 * Math.max(0, Math.min(1, 1 - r.lapInStint / (r.stintLen * 1.15))));
+          return [
+            r.comp.driverId,
+            {
+              pos,
+              gapS: leader && !r.out ? Math.round((r.cum - leader.cum) * 10) / 10 : 0,
+              tire: tireLife,
+              health: Math.round(Math.min(r.comp.engineCond, r.comp.gearboxCond)),
+              form: Math.round(r.comp.driverState?.form ?? 0),
+            },
+          ];
+        }),
+      ) as LiveView["cars"],
       gridPenaltyApplied: eng.prep.gridPenaltyApplied,
       paused: eng.paused,
       done: false,
@@ -231,6 +249,11 @@ export default function App() {
     setLive(snapshotOf(eng));
     // Immediate, visible confirmation — orders must never feel like a dead click.
     const who = car.comp.driver.shortName;
+    const last = s.events[s.events.length - 1];
+    if (cmd.kind === "retire" && last && last.actor === cmd.driverId && last.text.includes("REFUSES")) {
+      setToast(`Radio: ${who} refuses the retirement call — he'll nurse it home. Frustration will rise.`);
+      return;
+    }
     setToast(
       cmd.kind === "push"
         ? `Pit wall: ${who} told to PUSH.`

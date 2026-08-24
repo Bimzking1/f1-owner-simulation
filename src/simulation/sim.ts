@@ -11,6 +11,7 @@ import type {
   RaceEntry,
   RaceEvent,
   RaceWeekendResult,
+  Seat,
   SimulationState,
   SponsorSpec,
   TeamState,
@@ -41,6 +42,8 @@ import {
   applyReputation,
   applyStandings,
   bankruptcyCheck,
+  carParts,
+  effectiveCarStats,
   effectivePuHealth,
   evaluateSponsors,
   generateDriverChallenge,
@@ -200,7 +203,8 @@ export function prepareRound(state: SimulationState): PreparedRound | null {
   const rng = createRng(`${state.seed}:r${idx}`);
   const competitors = buildCompetitors(state, rng);
 
-  const gridPenalty = t.gridPenalty ?? 0;
+  // per-car stewards' penalties ride on each player Competitor (v0.10)
+  const gridPenalty = Math.max(t.gridPenaltyBySeat?.car1 ?? t.gridPenalty ?? 0, t.gridPenaltyBySeat?.car2 ?? 0);
   const input: RaceInput = {
     season: state.season,
     difficulty: state.difficulty,
@@ -287,6 +291,24 @@ export function finalizeRound(state: SimulationState, prep: PreparedRound): Roun
   void finance;
   evaluateSponsors(state);
   resolveDriverChallenge(state, weekend);
+  // drivers who refused a team retirement call take it out on the garage
+  const team = state.team!;
+  for (const id of prep.session.retireRefusals) {
+    const ds = team.drivers.find((x) => x.driverId === id);
+    if (!ds) continue;
+    ds.frustration = clamp(ds.frustration + 7, 0, 100);
+    team.trust = clamp((team.trust ?? 50) - 1, 0, 100);
+    const d = driverById(id, state.season);
+    state.news.unshift({
+      id: `refuse-${prep.roundIdx}-${id}`,
+      round: prep.roundIdx + 1,
+      tag: "info",
+      priority: "warning",
+      title: `${d?.shortName ?? id} ignored a team order`,
+      body: `The pit wall called him in and ${d?.shortName ?? id} refused, bringing the car home at his own pace. Frustration +7 — he believes he was throwing away a result.`,
+      bodyEnjoyer: `Team orders? Not today. The driver knows better — apparently.`,
+    });
+  }
   advanceDevelopment(state);
   generatePaddockNews(state, createRng(`${state.seed}:news:r${prep.roundIdx}`));
   generateDriverChat(state, createRng(`${state.seed}:chat:r${prep.roundIdx}`));
@@ -295,7 +317,8 @@ export function finalizeRound(state: SimulationState, prep: PreparedRound): Roun
   pushRaceNews(state, weekend);
 
   const t = state.team!;
-  t.gridPenalty = undefined; // penalty served at this GP
+  t.gridPenalty = undefined; // penalties served at this GP
+  t.gridPenaltyBySeat = { car1: 0, car2: 0 };
   state.lastWeekend = weekend;
   state.completedRounds = prep.roundIdx + 1;
   state.round = state.completedRounds;
@@ -347,24 +370,27 @@ function buildCompetitors(state: SimulationState, rng: Rng): Competitor[] {
     ? Math.round(70 + (players.reduce((a, e) => a + e.expertise, 0) / players.length - 70) * 0.3)
     : 70;
 
-  for (const did of [t.driver1Id, t.driver2Id]) {
+  for (const [seatIdx, did] of [t.driver1Id, t.driver2Id].entries()) {
     const driver = driverById(did, season);
     if (!driver) continue;
+    const seat: Seat = seatIdx === 0 ? "car1" : "car2";
     list.push({
       driverId: did,
       teamId: t.constructorId,
       driver,
       driverState: t.drivers.find((ds) => ds.driverId === did),
-      car: t.car,
-      reliability: t.car.reliability,
-      // Whole installed power system (2013: V8+KERS · 2025: all 7 PU parts) —
-      // a tired MGU-H or cracked exhaust raises mechanical-failure risk too.
-      engineCond: effectivePuHealth(state),
-      gearboxCond: t.components.gearbox.condition,
+      // seat-targeted development projects give each car its own stats
+      car: effectiveCarStats(t, season, seat),
+      reliability: effectiveCarStats(t, season, seat).reliability,
+      // Whole installed power system (2013: V8+KERS · 2025: all 7 PU parts),
+      // now PER CAR — a tired MGU-H on one car doesn't drag the other down.
+      engineCond: effectivePuHealth(state, seat),
+      gearboxCond: carParts(t, seat).gearbox.condition,
       pitStop: Math.round(mechPit * (1 - pitBonus) * 100) / 100,
       errorChance: mechErr * (1 - pitBonus),
       strategyRating: Math.round(strategy),
       isPlayer: true,
+      gridPenalty: t.gridPenaltyBySeat?.[seat] ?? t.gridPenalty ?? 0,
     });
   }
 

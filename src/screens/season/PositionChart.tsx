@@ -11,6 +11,8 @@ interface Props {
   /** Full race distance of this GP. While a race streams in, the x-axis spans
    *  the whole distance so the chart visibly fills up instead of rescaling. */
   raceLaps?: number;
+  /** The owner's two drivers — their lines end in a ★ marker + bold legend. */
+  playerIds?: string[];
   className?: string;
 }
 
@@ -18,7 +20,7 @@ const EMPTY_ORDER: string[][] = [];
 
 /** Lap-by-lap position movement chart — one polyline per driver from grid to
  *  chequered flag (or to the current lap while a race is live). */
-export function PositionChart({ weekend, season, liveLap, raceLaps, className }: Props) {
+export function PositionChart({ weekend, season, liveLap, raceLaps, playerIds, className }: Props) {
   const lapOrder = weekend.lapOrder ?? EMPTY_ORDER;
   const dataLaps = Math.max(0, lapOrder.length - 1);
   const totalLaps = Math.max(raceLaps ?? 0, dataLaps);
@@ -46,6 +48,7 @@ export function PositionChart({ weekend, season, liveLap, raceLaps, className }:
     const teamOf: Record<string, string> = {};
     for (const e of weekend.race) teamOf[e.driverId] = e.teamId;
     for (const e of weekend.qualifying) teamOf[e.driverId] ??= e.teamId;
+    const mine = new Set(playerIds ?? []);
     const drivers: {
       id: string;
       name: string;
@@ -65,6 +68,7 @@ export function PositionChart({ weekend, season, liveLap, raceLaps, className }:
             id,
             name: drv?.shortName ?? id,
             color: ctor?.colors.primary ?? "#888",
+            isPlayerSeat: mine.has(id),
             pts: [],
           };
           drivers.push(d);
@@ -73,7 +77,7 @@ export function PositionChart({ weekend, season, liveLap, raceLaps, className }:
       });
     }
     return { drivers: drivers.filter((d) => seen.has(d.id)), maxPos: Math.max(2, lapOrder[0]?.length ?? 20) };
-  }, [lapOrder, season, weekend.race, weekend.qualifying]);
+  }, [lapOrder, season, weekend.race, weekend.qualifying, playerIds]);
 
   if (lapOrder.length < 2) {
     return (
@@ -137,21 +141,36 @@ export function PositionChart({ weekend, season, liveLap, raceLaps, className }:
           const visible = d.pts.filter((p) => p.lap <= viewLap);
           if (visible.length < 2) return null;
           const dim = focus !== null && focus !== d.id;
+          const lastPt = visible[visible.length - 1]!;
           return (
-            <polyline
-              key={d.id}
-              fill="none"
-              stroke={d.color}
-              strokeWidth={focus === d.id ? 3.5 : 2}
-              opacity={dim ? 0.15 : 1}
-              strokeLinejoin="round"
-              strokeLinecap="round"
-              points={visible.map((p) => `${x(p.lap)},${y(p.pos)}`).join(" ")}
-              style={{ cursor: "pointer" }}
-              onClick={() => setFocus(focus === d.id ? null : d.id)}
-            >
-              <title>{`${d.name} — click to highlight`}</title>
-            </polyline>
+            <g key={d.id} style={{ cursor: "pointer" }} onClick={() => setFocus(focus === d.id ? null : d.id)}>
+              <polyline
+                fill="none"
+                stroke={d.color}
+                strokeWidth={focus === d.id ? 3.5 : d.isPlayerSeat ? 2.8 : 2}
+                opacity={dim ? 0.15 : 1}
+                strokeLinejoin="round"
+                strokeLinecap="round"
+                points={visible.map((p) => `${x(p.lap)},${y(p.pos)}`).join(" ")}
+              >
+                <title>{`${d.name} — click to highlight`}</title>
+              </polyline>
+              {/* the owner's cars get a ★ at the head of their line */}
+              {d.isPlayerSeat && !dim && (
+                <text
+                  x={x(lastPt.lap) + (lastPt.lap >= totalLaps * 0.94 ? -10 : 7)}
+                  y={y(lastPt.pos) + 4}
+                  fontSize="13"
+                  textAnchor="middle"
+                  stroke="#fff"
+                  strokeWidth="0.6"
+                  paintOrder="stroke"
+                  fill={d.color}
+                >
+                  ★
+                </text>
+              )}
+            </g>
           );
         })}
       </svg>
@@ -185,6 +204,7 @@ export function PositionChart({ weekend, season, liveLap, raceLaps, className }:
               <span className="pos-num text-[10px] text-ink-faint">P{i + 1}</span>
               <span className="inline-block h-2 w-2 rounded-full" style={{ background: d.color }} />
               {d.name}
+              {d.isPlayerSeat && <span className="text-[10px]" style={{ color: d.color }}>★</span>}
             </button>
           );
         })}

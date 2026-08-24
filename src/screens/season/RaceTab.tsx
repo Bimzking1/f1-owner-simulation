@@ -5,7 +5,7 @@ import { powerUnitForSeason } from "@/data/powerUnits";
 import { Button, Card, Empty, ImageLightbox, Img, Meter, Modal, Tag } from "@/ui/kit";
 import { ratingTone } from "@/ui/ratings";
 import { driverImage } from "@/data/assets";
-import { urgentRepairs } from "@/simulation/systems";
+import { carParts, urgentRepairs } from "@/simulation/systems";
 import { type LiveCommand, type LiveView } from "./parts";
 import { PositionChart } from "./PositionChart";
 
@@ -38,10 +38,19 @@ export function RaceTab({ state, onRunRound, live, sendCommand, onResume, onSkip
               <p className="text-sm text-ink-soft">
                 {next ? `Next: ${next.grandPrix} (Round ${state.round + 1})` : "Calendar complete."}
               </p>
-              {!!t.gridPenalty && (
-                <div className="mt-2 rounded-md border-l-2 border-caution bg-caution/10 p-2 text-xs text-caution">
-                  Stewards' ruling: both cars carry a −{t.gridPenalty} grid penalty at this GP for power-unit/gearbox
-                  changes.
+              {!!(t.gridPenaltyBySeat?.car1 || t.gridPenaltyBySeat?.car2) && (
+                <div className="mt-2 space-y-1 rounded-md border-l-2 border-caution bg-caution/10 p-2 text-xs text-caution">
+                  <div className="font-bold uppercase tracking-wider">Stewards' rulings at this GP</div>
+                  {(["car1", "car2"] as const).map((seat) => {
+                    const pen = t.gridPenaltyBySeat?.[seat] ?? 0;
+                    if (!pen) return null;
+                    const d = driverById(seat === "car1" ? t.driver1Id : t.driver2Id, state.season);
+                    return (
+                      <div key={seat}>
+                        {d?.shortName ?? seat}: −{pen} grid places (power-unit/gearbox changes)
+                      </div>
+                    );
+                  })}
                 </div>
               )}
               <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -66,7 +75,7 @@ export function RaceTab({ state, onRunRound, live, sendCommand, onResume, onSkip
 
         {!live && last?.lapOrder && last.lapOrder.length > 1 && (
           <Card title="Position chart" className="hidden lg:block">
-            <PositionChart key={`wk-${last.round}`} weekend={last} season={state.season} />
+            <PositionChart key={`wk-${last.round}`} weekend={last} season={state.season} playerIds={[t.driver1Id, t.driver2Id]} />
           </Card>
         )}
         {!live && last && last.events.length > 0 && (
@@ -80,20 +89,29 @@ export function RaceTab({ state, onRunRound, live, sendCommand, onResume, onSkip
 
       {/* --------------------------------------------- RIGHT — the paddock */}
       <div className="space-y-4 lg:col-span-2">
-        {last && <ResultCard weekend={last} season={state.season} />}
+        {last && !busy && <ResultCard weekend={last} season={state.season} />}
         <ComponentsCard state={state} />
         {t.upgrades.length > 0 && (
           <Card title="Development in progress">
             <div className="space-y-2">
-              {t.upgrades.map((u) => (
-                <div key={u.id}>
-                  <div className="flex items-center justify-between text-sm">
-                    <span>{u.name}</span>
-                    <span className="num-data text-ink-faint">{u.remainingRaces}/{u.totalRaces} races left</span>
+              {t.upgrades.map((u) => {
+                const seatTag =
+                  u.seat === "car1" || u.seat === "car2"
+                    ? driverById(u.seat === "car1" ? t.driver1Id : t.driver2Id, state.season)?.shortName
+                    : null;
+                return (
+                  <div key={u.id}>
+                    <div className="flex items-center justify-between text-sm">
+                      <span>
+                        {u.name}
+                        {seatTag && <Tag tone="telemetry">{seatTag}</Tag>}
+                      </span>
+                      <span className="num-data text-ink-faint">{u.remainingRaces}/{u.totalRaces} races left</span>
+                    </div>
+                    <Meter value={((u.totalRaces - u.remainingRaces) / u.totalRaces) * 100} tone="elite" />
                   </div>
-                  <Meter value={((u.totalRaces - u.remainingRaces) / u.totalRaces) * 100} tone="elite" />
-                </div>
-              ))}
+                );
+              })}
             </div>
           </Card>
         )}
@@ -132,6 +150,7 @@ function PitWallPanel({
       </div>
       <p className="mt-1 text-xs leading-relaxed text-ink-soft">
         Set each driver's orders, then throw the green flag. Push buys lap time but risks hardware, tires and accidents.
+        Beware: drivers fighting up front may refuse a retirement call — and refusing frustrates them.
       </p>
       <div className="mt-3 space-y-2">
         {live.playerIds.map((id) => (
@@ -139,6 +158,7 @@ function PitWallPanel({
             key={id}
             driverId={id}
             season={state.season}
+            live={live}
             stance={live.stances[id] ?? "steady"}
             motivateUsed={!!live.motivateUsed[id]}
             retired={!!live.retired[id]}
@@ -149,6 +169,39 @@ function PitWallPanel({
       <Button className="mt-3 w-full py-3! text-base!" onClick={onResume}>
         🟢 Green flag — resume race ▶
       </Button>
+    </div>
+  );
+}
+
+/** Compact telemetry strip shown under each pit-wall driver row. */
+function CarTelemetry({ car, lap }: { car: NonNullable<LiveView["cars"][string]>; lap: number }) {
+  const tireTone = car.tire > 55 ? "text-positive" : car.tire > 25 ? "text-caution" : "text-signal";
+  const healthTone = car.health > 70 ? "text-positive" : car.health > 40 ? "text-caution" : "text-signal";
+  return (
+    <div className="mt-2 grid grid-cols-2 gap-1.5 rounded-md border border-hairline bg-raised/40 p-2 text-[11px] sm:grid-cols-5">
+      <div title="Current race position">
+        <div className="text-[9px] uppercase tracking-wider text-ink-faint">Position</div>
+        <div className="pos-num font-bold">P{car.pos}</div>
+      </div>
+      <div title={`Race lap ${lap} — gap to the leader in seconds`}>
+        <div className="text-[9px] uppercase tracking-wider text-ink-faint">Gap</div>
+        <div className="num-data font-bold">+{car.gapS.toFixed(1)}s</div>
+      </div>
+      <div title="Estimated tire life remaining on the current set">
+        <div className="text-[9px] uppercase tracking-wider text-ink-faint">Tire life</div>
+        <div className={`num-data font-bold ${tireTone}`}>{car.tire}%</div>
+      </div>
+      <div title="Worst component on this car right now (engine vs gearbox)">
+        <div className="text-[9px] uppercase tracking-wider text-ink-faint">Car health</div>
+        <div className={`num-data font-bold ${healthTone}`}>{car.health}%</div>
+      </div>
+      <div title="Driver form from training and recent results (-10..+10)">
+        <div className="text-[9px] uppercase tracking-wider text-ink-faint">Form</div>
+        <div className={`num-data font-bold ${car.form >= 0 ? "text-positive" : "text-signal"}`}>
+          {car.form >= 0 ? "+" : ""}
+          {car.form}
+        </div>
+      </div>
     </div>
   );
 }
@@ -192,6 +245,7 @@ function LiveRacePanel({
         season={state.season}
         liveLap={live.currentLap}
         raceLaps={live.laps}
+        playerIds={live.playerIds}
       />
 
       <div className="mt-3 max-h-52 space-y-1 overflow-y-auto rounded-md border border-hairline bg-void p-2">
@@ -215,6 +269,7 @@ function LiveRacePanel({
 function DriverOrderRow({
   driverId,
   season,
+  live,
   stance,
   motivateUsed,
   retired,
@@ -222,12 +277,14 @@ function DriverOrderRow({
 }: {
   driverId: string;
   season: number;
+  live: LiveView;
   stance: "push" | "steady" | "conserve";
   motivateUsed: boolean;
   retired: boolean;
   sendCommand: (cmd: LiveCommand) => void;
 }) {
   const d = driverById(driverId, season);
+  const car = live.cars[driverId];
   const btn = (kind: "push" | "steady" | "conserve", label: string, hint: string, cls: string) => (
     <button
       type="button"
@@ -267,10 +324,12 @@ function DriverOrderRow({
       <div className="mb-2 flex items-center gap-2">
         <Img src={driverImage(driverId, season)} alt={d?.shortName ?? driverId} className="h-6 w-6 rounded-sm object-cover" />
         <span className="font-display text-sm font-bold uppercase tracking-wide">{d?.shortName ?? driverId}</span>
+        {car && <span className="pos-num num-data text-xs text-ink-faint">P{car.pos}</span>}
         <span className="num-data ml-auto text-[11px] text-ink-faint">
           {stance === "push" ? "attacking" : stance === "conserve" ? "saving the car" : "steady pace"}
         </span>
       </div>
+      {car && <CarTelemetry car={car} lap={live.currentLap} />}
       <div className="flex gap-2">
         {btn("push", "Push", "+pace, higher failure & crash risk", "border-caution/70 bg-caution/20 text-caution")}
         {btn("steady", "Steady", "balanced pace and risk", "border-signal/60 bg-signal/20 text-signal")}
@@ -292,7 +351,7 @@ function DriverOrderRow({
         </button>
         <button
           type="button"
-          title="Call the car into the pits and retire from the race"
+          title="Call the car into the pits and retire from the race. Drivers fighting near the front may refuse — a refusal frustrates them (+7)."
           onClick={() => sendCommand({ driverId, kind: "retire" })}
           className="flex-1 rounded-md border border-signal/60 px-3 py-2 text-xs font-bold uppercase tracking-wider text-signal transition hover:bg-signal/15"
         >
@@ -304,101 +363,96 @@ function DriverOrderRow({
 }
 
 // ---------------------------------------------------------------------------
-// Components — same detail level as the Garage: every era part with condition,
-// age, mileage and damage status.
+// Components — same detail level as the Garage, split PER CAR: each driver
+// runs their own engine/gearbox/era parts since v0.10.
 
 function ComponentsCard({ state }: { state: SimulationState }) {
   const t = state.team!;
   const pu = powerUnitForSeason(state.season);
-  const broken = urgentRepairs(state).length;
-
-  const rows: { label: string; spec?: string; c?: ComponentState; note?: string; crew?: number }[] = [
-    {
-      label: pu.engineName,
-      spec: pu.engineSpec,
-      c: t.components.engine,
-    },
-    ...pu.components.map((cfg) => ({
-      label: cfg.name,
-      spec: cfg.spec,
-      c:
-        t.components.powerUnit?.[cfg.id] ??
-        ({ condition: 100, age: 0, replacements: 0 } as ComponentState),
-    })),
-    {
-      label: "Gearbox",
-      spec: pu.gearboxSpec,
-      c: t.components.gearbox,
-    },
-    { label: "Pit crew", crew: t.pitCrew },
-  ];
+  const repairs = urgentRepairs(state);
 
   return (
     <Card
       title={pu.heading}
       right={
-        broken > 0 ? (
-          <Tag tone="signal">{broken} repair{broken > 1 ? "s" : ""} needed</Tag>
+        repairs.length > 0 ? (
+          <Tag tone="signal">{repairs.length} repair{repairs.length > 1 ? "s" : ""} needed</Tag>
         ) : undefined
       }
     >
-      <div className="space-y-3">
-        {rows.map((r) => {
-          if (r.crew !== undefined) {
-            return (
-              <div key="crew" className="rounded-md border border-hairline bg-raised/40 p-2.5">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-sm font-semibold">Pit crew</span>
-                  <span className={`num-data text-sm ${ratingTextClass(t.pitCrew)}`}>{r.crew}</span>
-                </div>
-                <Meter value={r.crew} tone={ratingTone(r.crew)} className="mt-1.5" />
-                <div className="mt-1 text-[10px] uppercase tracking-widest text-ink-faint">Stops & pit-lane performance</div>
-              </div>
-            );
-          }
-          const c = r.c!;
-          const damaged = c.damaged === true;
-          const worn = !damaged && c.condition < 40;
+      <div className="grid gap-3 sm:grid-cols-2">
+        {(["car1", "car2"] as const).map((seat) => {
+          const parts = carParts(t, seat);
+          const drv = driverById(seat === "car1" ? t.driver1Id : t.driver2Id, state.season);
+          const seatRepairs = repairs.filter((r) => r.seat === seat).length;
           return (
-            <div
-              key={r.label}
-              className={`rounded-md border p-2.5 ${damaged ? "border-signal/50 bg-signal/10" : "border-hairline bg-raised/40"}`}
-            >
-              <div className="flex items-center gap-2">
-                <span className="min-w-0 truncate text-sm font-semibold">{r.label}</span>
-                {damaged ? (
-                  <Tag tone="signal">Broken</Tag>
-                ) : worn ? (
-                  <Tag tone="caution">Worn</Tag>
-                ) : c.condition >= 90 ? (
-                  <Tag tone="positive">Fresh</Tag>
-                ) : null}
-                <span className={`num-data ml-auto text-sm ${damaged ? "text-signal" : ratingTextClass(c.condition)}`}>
-                  {c.condition.toFixed(1)}%
-                </span>
+            <div key={seat} className={`rounded-md border p-2.5 ${seatRepairs > 0 ? "border-signal/50" : "border-hairline"}`}>
+              <div className="mb-2 flex items-center gap-2">
+                <Img src={driverImage(drv?.id ?? "", state.season)} alt={drv?.shortName ?? seat} className="h-6 w-6 rounded-sm object-cover" />
+                <span className="font-display text-sm font-bold uppercase tracking-wide">{drv?.shortName ?? seat}</span>
+                <span className="text-[10px] uppercase tracking-widest text-ink-faint">Car {seat === "car1" ? 1 : 2}</span>
+                {seatRepairs > 0 && <Tag tone="signal">{seatRepairs} broken</Tag>}
               </div>
-              <Meter value={c.condition} tone={damaged ? "signal" : ratingTone(c.condition)} className="mt-1.5" />
-              <div className="mt-1 flex flex-wrap gap-x-3 text-[10px] uppercase tracking-widest text-ink-faint">
-                <span>Age {c.age} race{c.age === 1 ? "" : "s"}</span>
-                <span>≈{(c.age * 305).toLocaleString()} km</span>
-                <span>{c.replacements} replacement{c.replacements === 1 ? "" : "s"}</span>
+              <div className="space-y-2">
+                {([
+                  { label: pu.engineName, spec: pu.engineSpec, c: parts.engine },
+                  ...pu.components.map((cfg) => ({
+                    label: cfg.name,
+                    spec: cfg.spec,
+                    c: parts.powerUnit[cfg.id] ?? ({ condition: 100, age: 0, replacements: 0 } as ComponentState),
+                  })),
+                  { label: "Gearbox", spec: pu.gearboxSpec, c: parts.gearbox },
+                ] as { label: string; spec?: string; c: ComponentState }[]).map((r) => {
+                  const c = r.c;
+                  const damaged = c.damaged === true;
+                  const worn = !damaged && c.condition < 40;
+                  return (
+                    <div
+                      key={r.label}
+                      className={`rounded-md border p-2 ${damaged ? "border-signal/50 bg-signal/10" : "border-hairline bg-raised/40"}`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="min-w-0 truncate text-xs font-semibold">{r.label}</span>
+                        {damaged ? (
+                          <Tag tone="signal">Broken</Tag>
+                        ) : worn ? (
+                          <Tag tone="caution">Worn</Tag>
+                        ) : c.condition >= 90 ? (
+                          <Tag tone="positive">Fresh</Tag>
+                        ) : null}
+                        <span className={`num-data ml-auto text-xs ${damaged ? "text-signal" : ratingTextClass(c.condition)}`}>
+                          {c.condition.toFixed(1)}%
+                        </span>
+                      </div>
+                      <Meter value={c.condition} tone={damaged ? "signal" : ratingTone(c.condition)} className="mt-1" />
+                      <div className="mt-0.5 flex flex-wrap gap-x-3 text-[9px] uppercase tracking-widest text-ink-faint">
+                        <span>Age {c.age}</span>
+                        <span>≈{(c.age * 305).toLocaleString()} km</span>
+                        <span>{c.replacements} repl.</span>
+                      </div>
+                      {damaged && c.damagedNote && (
+                        <div className="mt-1 rounded-sm border-l-2 border-signal bg-void/60 px-1.5 py-0.5 text-[10px] leading-relaxed text-signal">
+                          {c.damagedNote}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
-              {damaged && c.damagedNote && (
-                <div className="mt-1.5 rounded-sm border-l-2 border-signal bg-void/60 px-2 py-1 text-[11px] leading-relaxed text-signal">
-                  {c.damagedNote}
-                </div>
-              )}
-              {!damaged && r.spec && (
-                <div className="mt-1 truncate text-[10px] text-ink-faint" title={r.spec}>
-                  {r.spec}
-                </div>
-              )}
             </div>
           );
         })}
       </div>
+      <div className="mt-3 rounded-md border border-hairline bg-raised/40 p-2.5">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-sm font-semibold">Pit crew (shared)</span>
+          <span className={`num-data text-sm ${ratingTextClass(t.pitCrew)}`}>{t.pitCrew}</span>
+        </div>
+        <Meter value={t.pitCrew} tone={ratingTone(t.pitCrew)} className="mt-1.5" />
+      </div>
       <p className="mt-2 text-[10px] leading-relaxed text-ink-faint">
-        Full specs, wear profiles and replacements live in the Garage tab.
+        Every car runs its own hardware — wear, failures and grid penalties are per driver. Full specs and replacements
+        live in the Garage tab.
       </p>
     </Card>
   );

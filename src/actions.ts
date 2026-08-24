@@ -3,12 +3,15 @@
 // Each takes a SimulationState and returns a user-facing message.
 // ============================================================================
 
-import type { ComponentKey, Driver, DriverBoost, DriverState, EraComponentId, SimulationState, TestReport, TestType } from "@/simulation/types";
+import type { ComponentKey, DevSeat, Driver, DriverBoost, DriverState, EraComponentId, Seat, SimulationState, TestReport, TestType } from "@/simulation/types";
 import type { DevOption } from "@/simulation/systems";
 import {
   addReputation,
+  carParts,
+  devCostFor,
   generateDevOptions,
   isDevWindow,
+  isSeatTarget,
   replaceComponent,
   startProject,
   prizeMoney,
@@ -391,7 +394,7 @@ export function trainingDoneThisWeekend(state: SimulationState, optionId: string
   return (state.team?.trainings ?? []).some((x) => x.id === optionId && x.round >= state.completedRounds);
 }
 
-export function startDev(state: SimulationState, option: DevOption): ActionResult {
+export function startDev(state: SimulationState, option: DevOption, seat?: DevSeat): ActionResult {
   const result: ActionResult = { ok: false, message: "" };
   if (isTrainingOption(option)) {
     if (trainingDoneThisWeekend(state, option.id))
@@ -399,24 +402,29 @@ export function startDev(state: SimulationState, option: DevOption): ActionResul
   } else if (!isDevWindow(state)) {
     return msg(result, false, "Car upgrades can only be started in a development window.");
   }
-  if (!startProject(state, option)) return msg(result, false, "Not enough cash.");
+  const cost = devCostFor(option, isSeatTarget(option.target) ? (seat ?? "both") : undefined);
+  if (!startProject(state, option, seat)) return msg(result, false, "Not enough cash.");
   if (isTrainingOption(option)) {
     const t = state.team!;
     t.trainings ??= [];
     t.trainings.push({ id: option.id, round: state.completedRounds });
   }
-  return msg(result, true, `${option.name} started ($${option.cost}M).`);
+  const seatNote =
+    seat && seat !== "both" && isSeatTarget(option.target)
+      ? ` — ${driverById(seat === "car1" ? state.team!.driver1Id : state.team!.driver2Id, state.season)?.shortName}'s car only`
+      : "";
+  return msg(result, true, `${option.name}${seatNote} started ($${cost}M).`);
 }
 
-export function replaceEngine(state: SimulationState): ActionResult {
-  return doReplace(state, "engine");
+export function replaceEngine(state: SimulationState, seat: Seat): ActionResult {
+  return doReplace(state, "engine", seat);
 }
-export function replaceGearbox(state: SimulationState): ActionResult {
-  return doReplace(state, "gearbox");
+export function replaceGearbox(state: SimulationState, seat: Seat): ActionResult {
+  return doReplace(state, "gearbox", seat);
 }
 /** Swap any era-specific power-unit part (KERS in 2013; turbo/MGUs/store/CE/exhaust in 2025). */
-export function replacePuComponent(state: SimulationState, id: EraComponentId): ActionResult {
-  return doReplace(state, id);
+export function replacePuComponent(state: SimulationState, id: EraComponentId, seat: Seat): ActionResult {
+  return doReplace(state, id, seat);
 }
 
 // ---------------------------------------------------------------------------
@@ -623,15 +631,18 @@ export function manageTeam(state: SimulationState, action: TeamAction): ActionRe
   return msg(result, true, `${info.label}: ${effect}. Lingering: ${boostDesc(tails[action])} each.${trustNote(addTrust(t, teamTrust[action]))}`);
 }
 
-function doReplace(state: SimulationState, component: ComponentKey): ActionResult {
+function doReplace(state: SimulationState, component: ComponentKey, seat: Seat): ActionResult {
   const result: ActionResult = { ok: false, message: "" };
   const t = state.team!;
-  replaceComponent(state, component);
+  const drv = driverById(seat === "car1" ? t.driver1Id : t.driver2Id, state.season);
+  replaceComponent(state, component, seat);
+  const parts = carParts(t, seat);
   const fresh =
     component === "engine" || component === "gearbox"
-      ? t.components[component].age === 0 && t.components[component].replacements > 0
-      : t.components.powerUnit?.[component]?.age === 0 && (t.components.powerUnit?.[component]?.replacements ?? 0) > 0;
-  if (fresh) return msg(result, true, `${componentLabel(component, state.season)} replaced.`);
+      ? parts[component].age === 0 && parts[component].replacements > 0
+      : parts.powerUnit[component]?.age === 0 && (parts.powerUnit[component]?.replacements ?? 0) > 0;
+  if (fresh)
+    return msg(result, true, `${componentLabel(component, state.season)} replaced on ${drv?.shortName ?? seat}'s car.`);
   return msg(result, false, "Not enough cash.");
 }
 

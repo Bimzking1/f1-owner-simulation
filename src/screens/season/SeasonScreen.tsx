@@ -34,7 +34,7 @@ interface Props {
 
 type Tab = "Overview" | "Race" | "Management" | "Market" | "Sponsors" | "Garage" | "Upcoming" | "Finance";
 
-const TABS: Tab[] = ["Overview", "Race", "Management", "Market", "Sponsors", "Garage", "Upcoming", "Finance"];
+const TABS: Tab[] = ["Overview", "Race", "Management", "Market", "Sponsors", "Garage", "Finance", "Upcoming"];
 
 export default function SeasonScreen({
   state,

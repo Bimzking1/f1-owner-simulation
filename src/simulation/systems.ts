@@ -5,12 +5,15 @@
 // ============================================================================
 
 import type {
+  CarParts,
   ComponentKey,
   ComponentState,
+  DevSeat,
   DriverChallenge,
   EraComponentId,
   NewsPriority,
   RaceWeekendResult,
+  Seat,
   SimulationState,
   TeamState,
 } from "./types";
@@ -147,11 +150,46 @@ export function applyStandings(state: SimulationState, weekend: RaceWeekendResul
 }
 
 // ---------------------------------------------------------------------------
-// Component wear (spec §42) — era-aware power-unit parts included
+// Component wear (spec §42) — era-aware power-unit parts included, one full
+// hardware set PER CAR since v0.10 (each driver runs their own parts).
+
+export const SEATS: readonly Seat[] = ["car1", "car2"];
+
+/** Which seat a driver occupies. */
+export function seatOf(t: TeamState, driverId: string): Seat {
+  return driverId === t.driver1Id ? "car2" : "car1";
+}
 
 /**
- * Make sure every power-unit component of the current era is tracked.
- * Fresh saves start everything at 100%; saves resumed mid-season inherit
+ * Migrate + return the per-car hardware map. Old saves stored ONE shared set —
+ * both seats inherit a copy of it on first touch.
+ */
+export function ensureCarParts(t: TeamState): Record<Seat, CarParts> {
+  if (!t.components.cars) {
+    const fresh: () => ComponentState = () => ({ condition: 100, age: 0, replacements: 0 });
+    const eng = t.components.engine ?? fresh();
+    const gb = t.components.gearbox ?? fresh();
+    const pu = t.components.powerUnit ?? {};
+    t.components.cars = {
+      car1: { engine: { ...eng }, gearbox: { ...gb }, powerUnit: structuredClone(pu) },
+      car2: { engine: { ...eng }, gearbox: { ...gb }, powerUnit: structuredClone(pu) },
+    };
+  }
+  return t.components.cars;
+}
+
+/** Hardware of one specific car. */
+export function carParts(t: TeamState, seat: Seat): CarParts {
+  return ensureCarParts(t)[seat];
+}
+
+function freshPart(): ComponentState {
+  return { condition: 100, age: 0, replacements: 0 };
+}
+
+/**
+ * Make sure every power-unit component of the current era is tracked on BOTH
+ * cars. Fresh saves start everything at 100%; saves resumed mid-season inherit
  * plausible wear from the engine's mileage so the garage never shows a
  * brand-new MGU-H inside a 10-race-old car.
  */
@@ -159,33 +197,34 @@ export function ensurePuComponents(state: SimulationState): void {
   const t = state.team;
   if (!t) return;
   const cfg = powerUnitForSeason(state.season);
-  t.components.powerUnit ??= {};
-  const pu = t.components.powerUnit;
-  for (const part of cfg.components) {
-    if (!pu[part.id]) {
-      pu[part.id] =
-        t.components.engine.age === 0
-          ? { condition: 100, age: 0, replacements: 0 }
-          : {
-              condition: Math.max(70, Math.round(96 - t.components.engine.age * 1.2)),
-              age: t.components.engine.age,
-              replacements: 0,
-            };
+  for (const seat of SEATS) {
+    const parts = carParts(t, seat);
+    for (const part of cfg.components) {
+      if (!parts.powerUnit[part.id]) {
+        parts.powerUnit[part.id] =
+          parts.engine.age === 0
+            ? { condition: 100, age: 0, replacements: 0 }
+            : {
+                condition: Math.max(70, Math.round(96 - parts.engine.age * 1.2)),
+                age: parts.engine.age,
+                replacements: 0,
+              };
+      }
     }
   }
 }
 
 /**
- * Single health number for the whole installed power system, used by the race
+ * Single health number for one car's installed power system, used by the race
  * engine wherever it used to read raw engine condition. 2013 blends V8 + KERS;
  * 2025 weights all seven subsystems by how hard each failure hits the unit.
  */
-export function effectivePuHealth(state: SimulationState): number {
+export function effectivePuHealth(state: SimulationState, seat: Seat): number {
   const t = state.team;
   if (!t) return 100;
-  const eng = t.components.engine.condition;
-  const pu = t.components.powerUnit ?? {};
-  const val = (id: EraComponentId): number => pu[id]?.condition ?? eng;
+  const parts = carParts(t, seat);
+  const eng = parts.engine.condition;
+  const val = (id: EraComponentId): number => parts.powerUnit[id]?.condition ?? eng;
   return state.season === 2013
     ? clamp(eng * 0.8 + val("kers") * 0.2, 1, 100)
     : clamp(
@@ -217,6 +256,8 @@ export interface UrgentRepair {
   note?: string;
   condition: number;
   cost: number;
+  /** Which car needs the part. */
+  seat: Seat;
 }
 
 function bustPart(c: ComponentState, note: string, rng: Rng): void {
@@ -225,26 +266,30 @@ function bustPart(c: ComponentState, note: string, rng: Rng): void {
   c.damagedNote = note;
 }
 
-/** All parts currently flagged as broken and blocking the next race. */
+/** All parts currently flagged as broken and blocking the next race, per car. */
 export function urgentRepairs(state: SimulationState): UrgentRepair[] {
   const t = state.team;
   if (!t) return [];
   ensurePuComponents(state);
   const list: UrgentRepair[] = [];
-  const check = (key: ComponentKey, c: ComponentState | undefined) => {
+  const check = (seat: Seat, key: ComponentKey, c: ComponentState | undefined) => {
     if (!c?.damaged) return;
     list.push({
       key,
+      seat,
       name: componentLabel(key, state.season),
       note: c.damagedNote,
       condition: c.condition,
       cost: replacementCost(key, state) ?? 0,
     });
   };
-  check("engine", t.components.engine);
-  check("gearbox", t.components.gearbox);
-  for (const p of powerUnitForSeason(state.season).components) {
-    check(p.id, t.components.powerUnit?.[p.id]);
+  for (const seat of SEATS) {
+    const parts = carParts(t, seat);
+    check(seat, "engine", parts.engine);
+    check(seat, "gearbox", parts.gearbox);
+    for (const p of powerUnitForSeason(state.season).components) {
+      check(seat, p.id, parts.powerUnit[p.id]);
+    }
   }
   return list;
 }
@@ -270,52 +315,61 @@ export function applyPartDamage(state: SimulationState, weekend: RaceWeekendResu
     c: ComponentState;
     base: number;
   }
-  const parts: Damageable[] = [
-    { key: "engine", c: t.components.engine, base: 0.006 },
-    { key: "gearbox", c: t.components.gearbox, base: 0.005 },
-    ...powerUnitForSeason(state.season).components.map(
-      (p): Damageable => ({ key: p.id, c: t.components.powerUnit![p.id]!, base: p.failRisk }),
-    ),
-  ];
-  const byKey = new Map(parts.map((p) => [p.key, p]));
+  // one damageable list per car
+  const partsOf = (seat: Seat): Damageable[] => {
+    const parts = carParts(t, seat);
+    return [
+      { key: "engine", c: parts.engine, base: 0.006 },
+      { key: "gearbox", c: parts.gearbox, base: 0.005 },
+      ...powerUnitForSeason(state.season).components.map(
+        (p): Damageable => ({ key: p.id, c: parts.powerUnit[p.id]!, base: p.failRisk }),
+      ),
+    ];
+  };
+  const allSeats = SEATS.map((seat) => ({ seat, parts: partsOf(seat) }));
   const eraElectronics = (): EraComponentId => (state.season === 2013 ? "kers" : "controlElectronics");
 
   // 1. independent random failures — worn parts are far more likely to let go
-  for (const p of parts) {
-    if (p.c.damaged) continue;
-    const wearFactor = 1 + Math.max(0, 100 - p.c.condition) / 70; // up to ≈2.6×
-    if (rng() < p.base * failMult * wearFactor) {
-      bustPart(p.c, `Busted at ${gp} — mechanical failure`, rng);
+  for (const { parts } of allSeats) {
+    for (const p of parts) {
+      if (p.c.damaged) continue;
+      const wearFactor = 1 + Math.max(0, 100 - p.c.condition) / 70; // up to ≈2.6×
+      if (rng() < p.base * failMult * wearFactor) {
+        bustPart(p.c, `Busted at ${gp} — mechanical failure`, rng);
+      }
     }
   }
 
   // 2. DNF reason feedback (full race entries carry the failure description)
-  const bust = (key: ComponentKey, note: string) => {
-    const p = byKey.get(key);
+  const bust = (seat: Seat, key: ComponentKey, note: string) => {
+    const group = allSeats.find((s) => s.seat === seat)!;
+    const p = group.parts.find((x) => x.key === key);
     if (p && !p.c.damaged && rng() < 0.9) bustPart(p.c, note, rng);
   };
-  const impact = (minLoss: number, maxLoss: number, note: string) => {
-    const intact = parts.filter((p) => !p.c.damaged);
+  const impact = (seat: Seat, minLoss: number, maxLoss: number, note: string) => {
+    const group = allSeats.find((s) => s.seat === seat)!;
+    const intact = group.parts.filter((p) => !p.c.damaged);
     if (!intact.length || rng() > Math.min(failMult, 1.3)) return;
     const target = intact[Math.floor(rng() * intact.length)]!;
     target.c.condition = Math.round(clamp(target.c.condition - (minLoss + rng() * (maxLoss - minLoss)), 5, 100) * 10) / 10;
     if (target.c.condition < 22) bustPart(target.c, note, rng);
   };
 
-  const playerIds = new Set(t.drivers.map((d) => d.driverId));
   for (const entry of [...(weekend.sprint ?? []), ...weekend.race]) {
-    if (!entry.dnf || !entry.dnfReason || !playerIds.has(entry.driverId)) continue;
+    if (!entry.dnf || !entry.dnfReason || !entry.driverId) continue;
+    if (entry.driverId !== t.driver1Id && entry.driverId !== t.driver2Id) continue;
+    const seat = seatOf(t, entry.driverId);
     const r = entry.dnfReason.toLowerCase();
-    if (/power unit|engine/.test(r)) bust("engine", `Engine failure at ${gp}`);
-    else if (/gearbox|transmission/.test(r)) bust("gearbox", `Gearbox failure at ${gp}`);
-    else if (/electr/.test(r)) bust(eraElectronics(), `Electrical failure at ${gp}`);
-    else if (/hydraulic/.test(r)) impact(28, 46, `Hydraulic failure damaged it at ${gp}`);
-    else if (/brake/.test(r)) impact(12, 26, `Brake failure shook it up at ${gp}`);
+    if (/power unit|engine/.test(r)) bust(seat, "engine", `Engine failure at ${gp}`);
+    else if (/gearbox|transmission/.test(r)) bust(seat, "gearbox", `Gearbox failure at ${gp}`);
+    else if (/electr/.test(r)) bust(seat, eraElectronics(), `Electrical failure at ${gp}`);
+    else if (/hydraulic/.test(r)) impact(seat, 28, 46, `Hydraulic failure damaged it at ${gp}`);
+    else if (/brake/.test(r)) impact(seat, 12, 26, `Brake failure shook it up at ${gp}`);
     else if (/contact|crash|collision|accident|damage/.test(r)) {
-      if (rng() < 0.75) impact(30, 55, `Crash damage at ${gp}`);
+      if (rng() < 0.75) impact(seat, 30, 55, `Crash damage at ${gp}`);
     } else {
       // unknown retirement cause — something took a hit
-      impact(15, 35, `Damaged before retirement at ${gp}`);
+      impact(seat, 15, 35, `Damaged before retirement at ${gp}`);
     }
   }
 }
@@ -323,7 +377,6 @@ export function applyPartDamage(state: SimulationState, weekend: RaceWeekendResu
 export function advanceWear(state: SimulationState, weekend: RaceWeekendResult, rng: Rng) {
   const t = state.team;
   if (!t) return;
-  void weekend;
   const rel = t.car.reliability;
   const wearMult = 1.15 - rel / 150;
   const stress = t.car.reliability < 60 ? 1.35 : 1.0;
@@ -331,19 +384,30 @@ export function advanceWear(state: SimulationState, weekend: RaceWeekendResult, 
   ensurePuComponents(state);
   const cfg = powerUnitForSeason(state.season);
 
-  const eLoss = (2.4 + rng() * 1.6) * wearMult * stress;
-  const gLoss = (1.9 + rng() * 1.2) * wearMult * stress;
-  t.components.engine.condition = Math.round(clamp(t.components.engine.condition - eLoss, 5, 100) * 10) / 10;
-  t.components.gearbox.condition = Math.round(clamp(t.components.gearbox.condition - gLoss, 5, 100) * 10) / 10;
-  t.components.engine.age++;
-  t.components.gearbox.age++;
+  // how far each driver actually went — a lap-12 retirement hammers its own
+  // hardware far less than a full race distance
+  const distanceOf = (driverId: string): number => {
+    const e = weekend.race.find((r) => r.driverId === driverId);
+    if (!e || !e.dnf) return 1;
+    return 0.55; // retired mid-race — partial distance
+  };
 
-  const pu = t.components.powerUnit!;
-  for (const part of cfg.components) {
-    const c = pu[part.id];
-    if (c) {
-      wearPuPart(part, c, rng, wearMult, stress);
-      c.age++;
+  for (const seat of SEATS) {
+    const dist = distanceOf(seat === "car1" ? t.driver1Id : t.driver2Id);
+    const parts = carParts(t, seat);
+    const eLoss = (2.4 + rng() * 1.6) * wearMult * stress * dist;
+    const gLoss = (1.9 + rng() * 1.2) * wearMult * stress * dist;
+    parts.engine.condition = Math.round(clamp(parts.engine.condition - eLoss, 5, 100) * 10) / 10;
+    parts.gearbox.condition = Math.round(clamp(parts.gearbox.condition - gLoss, 5, 100) * 10) / 10;
+    parts.engine.age++;
+    parts.gearbox.age++;
+
+    for (const part of cfg.components) {
+      const c = parts.powerUnit[part.id];
+      if (c) {
+        wearPuPart(part, c, rng, wearMult * dist, stress);
+        c.age++;
+      }
     }
   }
 
@@ -359,41 +423,49 @@ export function replacementCost(component: ComponentKey, state: SimulationState)
   return puComponentConfig(state.season, component)?.replaceCost ?? null;
 }
 
-export function replaceComponent(draft: SimulationState, component: ComponentKey) {
+export function replaceComponent(draft: SimulationState, component: ComponentKey, seat: Seat): void {
   const t = draft.team;
   if (!t) return;
   const cost = replacementCost(component, draft);
   if (cost === null) return;
+  const parts = carParts(t, seat);
   // A busted part can be bought on supplier credit even without cash —
   // going into debt feeds the normal bankruptcy watch instead of soft-locking.
-  const isUrgent =
+  const cur: ComponentState =
     component === "engine" || component === "gearbox"
-      ? t.components[component].damaged === true
-      : t.components.powerUnit?.[component]?.damaged === true;
+      ? parts[component]
+      : (parts.powerUnit[component] ?? freshPart());
+  const isUrgent = cur.damaged === true;
   if (t.cash < cost && !isUrgent) return;
   const onCredit = t.cash < cost;
 
   // FIA-style grid penalty: changing the internal combustion engine costs
   // 10 places at the next GP, a gearbox 5. Broken hardware is no excuse —
-  // the stewards only see a new unit going in.
+  // the stewards only see a new unit going in. The penalty hits the car
+  // whose part changed.
   let penalty = 0;
   if (component === "engine") penalty = 10;
   else if (component === "gearbox") penalty = 5;
-  if (penalty > 0) t.gridPenalty = Math.min(20, (t.gridPenalty ?? 0) + penalty);
+  if (penalty > 0) {
+    t.gridPenaltyBySeat ??= { car1: 0, car2: 0 };
+    t.gridPenaltyBySeat[seat] = Math.min(20, (t.gridPenaltyBySeat[seat] ?? 0) + penalty);
+    t.gridPenalty = Math.max(t.gridPenaltyBySeat.car1, t.gridPenaltyBySeat.car2);
+  }
 
   t.cash = Math.round((t.cash - cost) * 100) / 100;
+  const drv = driverById(seat === "car1" ? t.driver1Id : t.driver2Id, draft.season);
   const label = componentLabel(component, draft.season);
 
   if (component === "engine" || component === "gearbox") {
-    t.components[component] = {
+    parts[component] = {
       condition: 100,
       age: 0,
-      replacements: t.components[component].replacements + 1,
+      replacements: parts[component].replacements + 1,
     };
   } else {
     ensurePuComponents(draft);
-    const prev = t.components.powerUnit![component]!;
-    t.components.powerUnit![component] = {
+    const prev = parts.powerUnit[component]!;
+    parts.powerUnit[component] = {
       condition: 100,
       age: 0,
       replacements: prev.replacements + 1,
@@ -402,14 +474,14 @@ export function replaceComponent(draft: SimulationState, component: ComponentKey
 
   t.history.push({
     round: draft.completedRounds + 1,
-    label: `${label} replacement`,
+    label: `${label} replacement — ${drv?.shortName ?? seat}`,
     amount: -cost,
     category: "other",
     detail:
       (onCredit
-        ? `${label} unit purchased on supplier credit — cash went negative.\nOne-time part purchase. The team's account is now in the red; the bank is watching.`
-        : `${label} unit purchased.\nPaid in full up front — one-time part purchase, not a recurring fee.`) +
-      (penalty > 0 ? `\nStewards' ruling: −${penalty} grid places at the next Grand Prix.` : ""),
+        ? `${label} unit purchased on supplier credit for ${drv?.shortName ?? "one car"} — cash went negative.\nOne-time part purchase. The team's account is now in the red; the bank is watching.`
+        : `${label} unit purchased for ${drv?.shortName ?? "one car"}.\nPaid in full up front — one-time part purchase, not a recurring fee.`) +
+      (penalty > 0 ? `\nStewards' ruling: −${penalty} grid places at the next Grand Prix (${drv?.shortName ?? "that car"}).` : ""),
   });
 }
 
@@ -972,6 +1044,18 @@ export interface DevOption {
   risk: number;
   description: string;
   driverId?: string;
+  /** Car-stat projects can target one car (cheaper) or both. */
+  seat?: DevSeat;
+}
+
+/** Car-stat targets can be aimed at a single car. */
+export const isSeatTarget = (target: DevOption["target"]): boolean =>
+  target === "aero" || target === "chassis" || target === "reliability" || target === "gearbox";
+
+/** Price of a dev option for a given car allocation — single-car work costs ~60%. */
+export function devCostFor(option: DevOption, seat: DevSeat | undefined): number {
+  if (!isSeatTarget(option.target) || !seat || seat === "both") return option.cost;
+  return Math.round(option.cost * 0.6 * 100) / 100;
 }
 
 export function generateDevOptions(state: SimulationState): DevOption[] {
@@ -1016,29 +1100,50 @@ export function generateDevOptions(state: SimulationState): DevOption[] {
   return opts;
 }
 
-export function startProject(draft: SimulationState, option: DevOption): boolean {
+export function startProject(draft: SimulationState, option: DevOption, seat?: DevSeat): boolean {
   const t = draft.team;
-  if (!t || t.cash < option.cost) return false;
-  t.cash = Math.round((t.cash - option.cost) * 100) / 100;
+  if (!t) return false;
+  const seatChoice: DevSeat | undefined = isSeatTarget(option.target) ? (seat ?? "both") : undefined;
+  const cost = devCostFor(option, seatChoice);
+  if (t.cash < cost) return false;
+  t.cash = Math.round((t.cash - cost) * 100) / 100;
   t.upgrades.push({
     id: option.id,
     name: option.name,
-    cost: option.cost,
+    cost,
     remainingRaces: option.duration,
     totalRaces: option.duration,
     target: option.target,
     effect: option.effect,
     driverId: option.driverId,
+    seat: seatChoice === "both" ? undefined : seatChoice,
     risk: option.risk,
   });
+  const drvName = seatChoice && seatChoice !== "both" ? driverById(seatChoice === "car1" ? t.driver1Id : t.driver2Id, draft.season)?.shortName : null;
   t.history.push({
     round: draft.completedRounds + 1,
-    label: option.name,
-    amount: -option.cost,
+    label: option.name + (drvName ? ` — ${drvName} only` : ""),
+    amount: -cost,
     category: "development",
-    detail: `${option.name} — development project.\nCost $${option.cost}M paid up front.\nUpgrades land in ${option.duration} race(s).`,
+    detail:
+      `${option.name}${drvName ? ` (fitted to ${drvName}'s car only)` : ""} — development project.\n` +
+      `Cost $${cost}M paid up front.\nUpgrades land in ${option.duration} race(s).`,
   });
   return true;
+}
+
+/** Base car stats plus the accumulated single-car upgrade bonuses for a seat. */
+export function effectiveCarStats(t: TeamState, season: number, seat: Seat) {
+  void season;
+  const bonus = t.seatUpgrades?.[seat] ?? {};
+  return {
+    aero: clamp(t.car.aero + (bonus.aero ?? 0), 30, 100),
+    chassis: clamp(t.car.chassis + (bonus.chassis ?? 0), 30, 100),
+    reliability: clamp(t.car.reliability + (bonus.reliability ?? 0), 30, 100),
+    tireBehavior: t.car.tireBehavior,
+    power: clamp(t.car.power + (bonus.power ?? 0), 30, 100),
+    gearboxPerf: clamp(t.car.gearboxPerf + (bonus.gearboxPerf ?? 0), 30, 100),
+  };
 }
 
 export function advanceDevelopment(state: SimulationState) {
@@ -1050,6 +1155,17 @@ export function advanceDevelopment(state: SimulationState) {
     if (p.remainingRaces > 0) continue;
     const under = Math.random() < p.risk;
     const gain = under ? Math.round(p.effect * 0.35) : p.effect;
+    const seatOnly = p.seat != null;
+    const statKey =
+      p.target === "aero" || p.target === "chassis" || p.target === "reliability" || p.target === "gearbox"
+        ? (p.target === "gearbox" ? "gearboxPerf" : p.target)
+        : null;
+    if (seatOnly && statKey) {
+      t.seatUpgrades ??= { car1: {}, car2: {} };
+      const bucket = t.seatUpgrades[p.seat as Seat] ?? {};
+      bucket[statKey] = Math.round(((bucket[statKey] ?? 0) + gain) * 10) / 10;
+      t.seatUpgrades[p.seat as Seat] = bucket;
+    } else
     switch (p.target) {
       case "aero": t.car.aero = clamp(t.car.aero + gain, 30, 100); break;
       case "chassis": t.car.chassis = clamp(t.car.chassis + gain, 30, 100); break;
@@ -1062,6 +1178,7 @@ export function advanceDevelopment(state: SimulationState) {
         break;
       }
     }
+    const where = p.seat ? ` (${p.seat === "car1" ? driverById(t.driver1Id, state.season)?.shortName : driverById(t.driver2Id, state.season)?.shortName}'s car only)` : "";
     state.news.unshift({
       id: `dev-${round}-${p.id}`,
       round,
@@ -1069,8 +1186,8 @@ export function advanceDevelopment(state: SimulationState) {
       priority: (under ? "warning" : "info") satisfies NewsPriority,
       title: `${p.name} complete${under ? " — underperformed" : ""}`,
       body: under
-        ? `Poor correlation in the wind tunnel/sim: the ${p.name} delivered only +${gain} of the expected +${p.effect}. The rest of the budget didn't translate.`
-        : `${p.name} is on the car and working: +${gain} to ${p.target === "pitCrew" ? "pit crew" : p.target === "driverTraining" ? "driver form" : p.target}.`,
+        ? `Poor correlation in the wind tunnel/sim: the ${p.name}${where} delivered only +${gain} of the expected +${p.effect}. The rest of the budget didn't translate.`
+        : `${p.name}${where} is on the car and working: +${gain} to ${p.target === "pitCrew" ? "pit crew" : p.target === "driverTraining" ? "driver form" : p.target}.`,
       bodyEnjoyer: under
         ? `The upgrade arrived but it's not quite right. Partial gains only.`
         : `The upgrade is on the car and it's real.`,

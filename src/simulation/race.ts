@@ -34,6 +34,8 @@ export interface Competitor {
   errorChance: number;
   strategyRating: number;
   isPlayer: boolean;
+  /** Grid places this specific car loses (per-seat engine/gearbox penalties). */
+  gridPenalty?: number;
 }
 
 export interface RaceInput {
@@ -172,12 +174,16 @@ export function simulateQualifying(input: RaceInput): RaceEntry[] {
   });
 
   // Stewards' grid penalty — engine/gearbox changes add places to the
-  // player's qualifying results, FIA-style, then the grid re-sorts.
-  if (input.gridPenalty && input.gridPenalty > 0) {
-    const pen = Math.min(input.gridPenalty, entries.length - 1);
-    for (const e of entries) {
-      if (e.teamId === input.playerTeamId) e.gridPosition += pen;
+  // player's qualifying results, FIA-style, then the grid re-sorts. Since
+  // v0.10 each car carries its own penalty (single-car part changes).
+  for (const comp of competitors) {
+    const pen = comp.gridPenalty ?? (comp.teamId === input.playerTeamId ? (input.gridPenalty ?? 0) : 0);
+    if (pen > 0) {
+      const e = entries.find((x) => x.driverId === comp.driverId)!;
+      e.gridPosition += Math.min(pen, entries.length - 1);
     }
+  }
+  if (competitors.some((c) => (c.gridPenalty ?? 0) > 0) || (input.gridPenalty ?? 0) > 0) {
     [...entries]
       .sort((a, b) => a.gridPosition - b.gridPosition)
       .forEach((e, i) => (e.gridPosition = i + 1));
@@ -225,6 +231,8 @@ export interface RaceSession {
   lapOrder: string[][];
   stances: Map<string, "push" | "steady" | "conserve">;
   motivateUntil: Map<string, number>;
+  /** Drivers who refused a team retirement call — finalizeRound adds frustration. */
+  retireRefusals: string[];
   finished: boolean;
 }
 
@@ -328,6 +336,7 @@ export function beginRace(
     lapOrder: [grid.map((g) => g.driverId)],
     stances: new Map(),
     motivateUntil: new Map(),
+    retireRefusals: [],
     finished: false,
   };
   return session;
@@ -366,16 +375,39 @@ export function advanceRace(session: RaceSession, toLap: number, commands?: (Rac
         session.stances.delete(cmd.driverId);
       }
     } else if (cmd.kind === "retire") {
-      car.out = true;
-      car.dnfReason = "called into the pits by the team";
-      session.events.push({
-        lap: session.currentLap,
-        type: "strategy",
-        severity: "danger",
-        actor: cmd.driverId,
-        text: `PIT WALL — ${car.comp.driver.shortName} is RETIRED from the race.`,
-        textEnjoyer: `${car.comp.driver.shortName} parks it. Team call.`,
-      });
+      // Racing drivers hate being called in. The further up the field they are
+      // fighting, the likelier they refuse — and a refusal frustrates them.
+      const alive = session.running.filter((r) => !r.out);
+      const pos = alive.findIndex((r) => r === car) + 1;
+      const curStance = session.stances.get(cmd.driverId) ?? "steady";
+      const refuseChance = clamp(
+        0.18 + (pos > 0 && pos <= 5 ? 0.42 : pos <= 10 ? 0.15 : 0) - (curStance === "conserve" ? 0.12 : 0),
+        0.05,
+        0.75,
+      );
+      if (chance(session.input.rng, refuseChance)) {
+        session.retireRefusals.push(cmd.driverId);
+        session.stances.set(cmd.driverId, "conserve"); // he'll nurse it home himself
+        session.events.push({
+          lap: session.currentLap,
+          type: "driver",
+          severity: "warning",
+          actor: cmd.driverId,
+          text: `PIT WALL — ${car.comp.driver.shortName} REFUSES the retirement call: "I'm bringing this home!" He runs in conservation mode.`,
+          textEnjoyer: `${car.comp.driver.shortName} ignores the team and carries on, gently.`,
+        });
+      } else {
+        car.out = true;
+        car.dnfReason = "called into the pits by the team";
+        session.events.push({
+          lap: session.currentLap,
+          type: "strategy",
+          severity: "danger",
+          actor: cmd.driverId,
+          text: `PIT WALL — ${car.comp.driver.shortName} is RETIRED from the race.`,
+          textEnjoyer: `${car.comp.driver.shortName} parks it. Team call.`,
+        });
+      }
     } else if (cmd.kind === "motivate") {
       if (!session.motivateUntil.has(cmd.driverId)) {
         session.motivateUntil.set(cmd.driverId, session.currentLap + 5);

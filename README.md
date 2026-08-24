@@ -21,9 +21,9 @@ Built with **React 19 + TypeScript + Vite**, styled with **Tailwind CSS 4**. No 
 
 ### Race weekends
 - Practice forecast → qualifying → race (with sprint sessions in 2025), weather and track chaos.
-- **Live racing on desktop**: RUN GP streams the race on the Race tab — the position chart builds lap by lap while the race-control log scrolls. At two checkpoints the pit wall is yours: a loud decision panel takes over with big order buttons per driver (**Push** for pace at real mechanical/accident risk, **Steady**, **Conserve** to save car and tires, a one-shot **Motivate** pep talk, or **Retire** the car), then throw the green flag. Retired cars dim into a RETIRED card and every order answers with a toast confirmation. Skip to the result any time; mobile keeps instant simulation.
+- **Live racing on desktop**: RUN GP streams the race on the Race tab — the position chart builds lap by lap while the race-control log scrolls. At two checkpoints the pit wall is yours: a loud decision panel takes over with big order buttons per driver (**Push** for pace at real mechanical/accident risk, **Steady**, **Conserve** to save car and tires, a one-shot **Motivate** pep talk, or **Retire** the car), then throw the green flag. Retired cars dim into a RETIRED card, every order answers with a toast confirmation, and each live car shows its own telemetry strip (position, gap, tyre life, car health, form). Retire isn't guaranteed either — a proud driver near the front may **refuse the call**, nurse it home on conserve and take his frustration out on you (+7 per refusal). Skip to the result any time; mobile keeps instant simulation.
 - While the race runs, the **Race tab button pulses like a siren** and every other tab shows a race-in-progress strip (live lap counter, pause alerts) — one click jumps you back to the action.
-- After the flag, the desktop Race tab keeps the **position-movement chart** (playback + scrubber, click a line to isolate a driver) and the full race log without opening Replay. During the race the chart spans the full GP distance and fills in lap by lap.
+- After the flag, the desktop Race tab keeps the **position-movement chart** (playback + scrubber, click a line to isolate a driver) and the full race log without opening Replay. During the race the chart spans the full GP distance and fills in lap by lap, with a **★ marking each of your drivers' lines**. The result card only appears once the GP is actually finished, and the weekend classification hides while a race runs.
 - **AUTO** simulates weekends until something needs its owner — broken parts, a driver demanding a meeting, bankruptcy or the flag.
 - Points, podiums, fastest laps, sprint points and prize money all feed the championship and your accounts.
 
@@ -32,13 +32,13 @@ Built with **React 19 + TypeScript + Vite**, styled with **Tailwind CSS 4**. No 
 - **Management** — driver chats that need answers (support or tough love), interventions (speech, bonus, fine, rant) with lingering morale boosts and cooldowns, plus garage-wide actions (team building, training camp, psychologist). Team orders live here too: equal treatment or a designated lead driver. Everything moves driver morale, confidence and frustration — and now the team's public reputation too.
 - **Market** — mid-season driver swaps (prorated salaries, break fee + star markup, one undo) plus hiring/firing engineers per department and pit crews. The market has a **reputation gate**: drivers above OVR ~68 demand team reputation before they'll sign (Verstappen needs 68+), so champions must be earned, not just bought.
 - **Sponsors** — live objectives with deadlines and patience; meet them for bonuses or lose them for good. The tab badge shows green when an objective is met, yellow when you're close. Slot count depends on difficulty, and terminating a contract mid-season asks for confirmation with the full cost breakdown.
-- **Garage** — era-aware power technology: 2013 shows a **2.4L V8 + KERS** power system (engine, KERS, gearbox); 2025 shows the full **1.6L V6 Turbo Hybrid** power unit (ICE, turbocharger, MGU-K, MGU-H, energy store, control electronics, exhaust). Every part has live condition, wear rate, reliability estimates and mileage, and can be swapped for a fresh unit. Parts can **break outright**: a busted component is flagged with a damage note and **blocks the next Grand Prix** until you replace it — an urgent-repair banner sits at the top of the tab and the RUN GP buttons route you there (broke teams get emergency supplier credit that can push the account into the red). Engine changes cost **−10 grid places** at the next GP and gearbox **−5** (stacking to −20); broken-part replacements count too. Plus paid circuit testing, weekly pit-crew/driver training programmes, and development projects between rounds shaped by your engineers (upgrades wait for the dev window; trainings don't).
-- **Upcoming** — the next Grand Prix briefing beside Finance: circuit map, characteristics, weather odds and any stewards' grid penalty.
+- **Garage** — era-aware power technology, tracked **per car**: each driver owns his own engine, gearbox and every subsystem (2013: **2.4L V8 + KERS**; 2025: the full **1.6L V6 Turbo Hybrid** — ICE, turbocharger, MGU-K, MGU-H, energy store, control electronics, exhaust). The tab shows both cars side by side with independent condition, wear rate, reliability estimates and mileage, and any unit can be swapped for a fresh one on that car alone. Parts can **break outright**: a busted component is flagged with a damage note and **blocks the next Grand Prix** until you replace it — an urgent-repair banner names the affected driver and the RUN GP buttons route you there (broke teams get emergency supplier credit that can push the account into the red). Engine changes cost that driver **−10 grid places** at the next GP and gearbox **−5** (stacking to −20 per car); broken-part replacements count too. Development projects between rounds (shaped by your engineers) can be fitted to **both cars or one car for 60% of the price**, so a tight budget can prioritise your star. Plus paid circuit testing, weekly pit-crew/driver training programmes, and trainings that never wait for a dev window.
+- **Upcoming** — the next Grand Prix briefing beside Finance: circuit map, characteristics, weather odds and any stewards' grid penalties listed per driver.
 - **Finance** — round-by-round cash flow, a categorized ledger with drill-down detail modals, season totals and bankruptcy watch. Sponsor income swings weekend to weekend (wider bands on higher difficulties) and random operating incidents bite the budget. Promoter share pays $0.45M per point ±gate noise — with an **upset premium up to ×1.7** when a low-rated team or driver lands a podium, because promoters pay for a story.
 
 Car and circuit images anywhere in the season open in a lightbox — click the image, then click away / ✕ / Esc to dismiss.
 
-The Race tab's components panel mirrors the Garage at a glance: every era part (V8/KERS or the seven-piece turbo-hybrid) with condition, Fresh/Worn/Broken status, age, mileage and damage notes — full specs and replacements stay in the Garage.
+The Race tab's components panel mirrors the Garage at a glance, per car: every era part (V8/KERS or the seven-piece turbo-hybrid) with condition, Fresh/Worn/Broken status, age, mileage and damage notes — full specs and replacements stay in the Garage.
 
 ### Living systems
 - **Reputation (0–100)** moves every weekend: wins, podiums and points raise it; scoreless weekends and double DNFs cost it. Driver moods, garage trust, your management conduct and leading the championship all add drift — and reputation gates title sponsors **and star drivers**.
@@ -96,7 +96,7 @@ src/
 │   ├── ExpectationsScreen # pre-season projections report
 │   ├── TestingScreen      # pre-season test programme
 │   └── season/            # SeasonScreen + tabs (Overview, Race, Management,
-│                         #   Market, Sponsors, Garage, Finance) & end screens
+│                         #   Market, Sponsors, Garage, Finance, Upcoming) & end screens
 ├── ui/              # design kit (cards, modals, tags, meters), hooks, formatters
 ├── actions.ts       # player actions on top of the sim layer
 ├── state.ts         # draft factory, buildSimulation, save/load
@@ -106,7 +106,7 @@ public/assets/       # images (drivers, cars, sponsors, tracks…)
 
 ## Changelog
 
-See the in-game **Change log** button on the landing page — it renders `src/data/changelog.ts`. Current build: **v0.3** (23 August 2026 · 18:41).
+See the in-game **Change log** button on the landing page — it renders `src/data/changelog.ts`. Current build: **v0.10** (24 August 2026 · 15:13).
 
 ---
 

@@ -389,6 +389,19 @@ export type EraComponentId =
 /** Anything in the garage that can be swapped for a fresh unit. */
 export type ComponentKey = "engine" | "gearbox" | EraComponentId;
 
+/** The two car seats — every driver owns their own hardware since v0.10. */
+export type Seat = "car1" | "car2";
+
+/** One car's full hardware set: engine, gearbox and era power-unit parts. */
+export interface CarParts {
+  engine: ComponentState;
+  gearbox: ComponentState;
+  powerUnit: Partial<Record<EraComponentId, ComponentState>>;
+}
+
+/** Which car(s) a development project upgrades. Single-car projects cost ~60%. */
+export type DevSeat = Seat | "both";
+
 export interface UpgradeProject {
   id: string;
   name: string;
@@ -398,9 +411,20 @@ export interface UpgradeProject {
   target: UpgradeTarget;
   effect: number;
   driverId?: string;
+  /** Which car this project upgrades — undefined = both (legacy projects). */
+  seat?: DevSeat;
   risk: number; // % underperformance chance
   underperformed?: boolean;
 }
+
+/** Per-car stat bonuses from seat-targeted development projects. */
+export type SeatBonus = Partial<{
+  aero: number;
+  chassis: number;
+  reliability: number;
+  power: number;
+  gearboxPerf: number;
+}>;
 
 /** A training programme started during a race weekend (round = weekend index). */
 export interface TrainingLog {
@@ -473,16 +497,20 @@ export interface TeamState {
     gearboxPerf: number;
   };
   components: {
-    engine: ComponentState;
-    gearbox: ComponentState;
+    /** @deprecated pre-v0.10 shared hardware — migrated into `cars` on first touch. */
+    engine?: ComponentState;
+    gearbox?: ComponentState;
     /**
-     * Era-specific power-unit parts (2013: kers · 2025: turbo, mguK, mguH,
-     * energyStore, controlElectronics, exhaust). Optional so pre-era saves
-     * keep loading — parts are initialised lazily on the next race weekend.
+     * @deprecated Era-specific shared power-unit parts. Optional so pre-era
+     * saves keep loading — parts are initialised lazily on the next race.
      */
     powerUnit?: Partial<Record<EraComponentId, ComponentState>>;
+    /** Per-car hardware since v0.10: one full set per driver seat. */
+    cars?: Record<Seat, CarParts>;
   };
   upgrades: UpgradeProject[];
+  /** Accumulated stat gains from single-car development projects. */
+  seatUpgrades?: Record<Seat, SeatBonus>;
   drivers: DriverState[];
   sponsors: SponsorState[];
   /** Training programmes (pit crew / driver) already run, keyed by round — one per weekend each. */
@@ -497,6 +525,8 @@ export interface TeamState {
   driverChallenge?: DriverChallenge;
   /** Grid places lost at the next GP for changing engine (+10) or gearbox (+5). */
   gridPenalty?: number;
+  /** Per-car grid penalties since v0.10 (single-car part changes). */
+  gridPenaltyBySeat?: Record<Seat, number>;
   pitCrew: number; // 0-100 pit crew level (upgradeable)
   history: FinancialTransaction[];
   mgmt?: MgmtLog[]; // owner interventions per driver (cooldown tracking)

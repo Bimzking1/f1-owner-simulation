@@ -89,15 +89,30 @@ export function loadState(): SimulationState | null {
     if (!s || s.version !== 1 || !s.team) return null;
     sanitizeRoster(s);
     backfillLineups(s);
+    migrateTeamHardware(s.team);
     return s;
   } catch {
     return null;
   }
 }
 
+/** Pre-v0.10 saves: give each car its own copy of the shared hardware set. */
+function migrateTeamHardware(t: NonNullable<SimulationState["team"]>): void {
+  if (!t.components.cars) {
+    const fresh = () => ({ condition: 100, age: 0, replacements: 0 });
+    const eng = t.components.engine ?? fresh();
+    const gb = t.components.gearbox ?? fresh();
+    const pu = t.components.powerUnit ?? {};
+    t.components.cars = {
+      car1: { engine: { ...eng }, gearbox: { ...gb }, powerUnit: structuredClone(pu) },
+      car2: { engine: { ...eng }, gearbox: { ...gb }, powerUnit: structuredClone(pu) },
+    };
+  }
+  t.gridPenaltyBySeat ??= { car1: t.gridPenalty ?? 0, car2: t.gridPenalty ?? 0 };
+}
+
 /** Repair old saves where the driver roster drifted from the two seats. */
-function sanitizeRoster(s: SimulationState): void {
-  const t = s.team;
+function sanitizeRoster(s: SimulationState): void {  const t = s.team;
   if (!t) return;
   const seats = [t.driver1Id, t.driver2Id];
   const seen = new Set<string>();

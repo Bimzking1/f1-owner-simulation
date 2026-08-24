@@ -22,6 +22,22 @@ export interface ChangeLogEntry {
 
 export const CHANGE_LOG: ChangeLogEntry[] = [
   {
+    version: "v0.10",
+    title: "Two cars, two sets of hardware — and drivers who talk back",
+    when: "24 August 2026 · 15:13",
+    summary:
+      "The big one: hardware is now tracked per car. Each driver owns his own engine, gearbox and every turbo-hybrid subsystem — condition, wear, failures, replacements and grid penalties are all per seat (old saves migrate automatically). The Garage shows both cars side by side with independent system-health meters, urgent repairs name the affected driver, and chassis/aero/reliability/gearbox development projects can be fitted to ONE car for 60% of the price so a tight budget can prioritise your star. The pit wall gets real telemetry — position, gap, tyre life, car health and form per car — and Retire is no longer guaranteed: a proud driver near the front may refuse the call, nurse the car home on conserve, and take +7 frustration for being ordered aside. Owner cars get ★ markers on the live position chart, the result card only appears once the GP actually finishes (no more peeking mid-race), weekend classification hides while the race runs, and Upcoming now sits beside Finance in the tab strip.",
+    items: [
+      { kind: "new", text: "Per-car hardware: engine, gearbox and every era power-unit component are owned per driver. Wear scales with each car's race distance (a DNF's parts suffer less), random failures hit one car at a time, and replacement grid penalties stack per seat — only that driver drops places." },
+      { kind: "new", text: "Garage rebuilt around the split: two car columns with portraits and per-car system health, urgent-repair banners naming the driver, and 'Fit to' pickers (Both / Car 1 / Car 2) on chassis-class upgrades with single-car projects priced at 60%." },
+      { kind: "new", text: "Pit-wall telemetry strip under each live car: P#, gap to leader, tyre life %, car health % and current form, colour-coded as they degrade. The retire order can now be REFUSED — refusal chance grows near the front, the driver switches himself to conserve, and every refusal costs +7 frustration and −1 trust with a news story." },
+      { kind: "improve", text: "Owner drivers wear a ★ at the head of their position-chart line (and in the legend), with a slightly heavier stroke so you can track your pair at a glance; lines are clickable." },
+      { kind: "improve", text: "Race tab discipline: the result card appears only after the GP finishes, the weekend classification hides while a race is running, and the UPCOMING tab swapped beside FINANCE in the tab order. Steward penalty banners list penalties per driver." },
+      { kind: "fix", text: "Old saves keep working: shared pre-v0.10 hardware migrates into both cars on load, and setup seeds fresh per-car components." },
+      { kind: "docs", text: "README updated for per-car hardware, dev targeting, refusals and the new tab order." },
+    ],
+  },
+  {
     version: "v0.9",
     title: "Pit-wall clarity, an Upcoming tab & a chart that fills the distance",
     when: "24 August 2026 · 14:07",
