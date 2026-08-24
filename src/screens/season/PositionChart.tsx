@@ -8,6 +8,9 @@ interface Props {
   season: number;
   /** Controlled playback head (live race). Undefined → free playback UI. */
   liveLap?: number;
+  /** Full race distance of this GP. While a race streams in, the x-axis spans
+   *  the whole distance so the chart visibly fills up instead of rescaling. */
+  raceLaps?: number;
   className?: string;
 }
 
@@ -15,10 +18,11 @@ const EMPTY_ORDER: string[][] = [];
 
 /** Lap-by-lap position movement chart — one polyline per driver from grid to
  *  chequered flag (or to the current lap while a race is live). */
-export function PositionChart({ weekend, season, liveLap, className }: Props) {
+export function PositionChart({ weekend, season, liveLap, raceLaps, className }: Props) {
   const lapOrder = weekend.lapOrder ?? EMPTY_ORDER;
-  const totalLaps = Math.max(0, lapOrder.length - 1);
-  const [head, setHead] = useState(totalLaps);
+  const dataLaps = Math.max(0, lapOrder.length - 1);
+  const totalLaps = Math.max(raceLaps ?? 0, dataLaps);
+  const [head, setHead] = useState(dataLaps);
   const [playing, setPlaying] = useState(false);
   const [focus, setFocus] = useState<string | null>(null);
 
@@ -26,7 +30,7 @@ export function PositionChart({ weekend, season, liveLap, className }: Props) {
     if (!playing || liveLap !== undefined) return;
     const id = setInterval(() => {
       setHead((h) => {
-        if (h >= totalLaps) {
+        if (h >= dataLaps) {
           setPlaying(false);
           return h;
         }
@@ -34,9 +38,9 @@ export function PositionChart({ weekend, season, liveLap, className }: Props) {
       });
     }, 90);
     return () => clearInterval(id);
-  }, [playing, totalLaps, liveLap]);
+  }, [playing, dataLaps, liveLap]);
 
-  const viewLap = liveLap ?? Math.min(head, totalLaps);
+  const viewLap = liveLap ?? Math.min(head, dataLaps);
 
   const meta = useMemo(() => {
     const teamOf: Record<string, string> = {};
@@ -82,7 +86,7 @@ export function PositionChart({ weekend, season, liveLap, className }: Props) {
   const W = 600;
   const H = 240;
   const pad = { l: 26, r: 10, t: 10, b: 18 };
-  const x = (lap: number) => pad.l + (lap / totalLaps) * (W - pad.l - pad.r);
+  const x = (lap: number) => pad.l + (lap / Math.max(1, totalLaps)) * (W - pad.l - pad.r);
   const y = (pos: number) => pad.t + ((pos - 1) / (meta.maxPos - 1)) * (H - pad.t - pad.b);
 
   const orderAt = (lap: number): string[] => lapOrder[Math.min(lap, lapOrder.length - 1)] ?? [];
@@ -152,11 +156,11 @@ export function PositionChart({ weekend, season, liveLap, className }: Props) {
         })}
       </svg>
 
-      {liveLap === undefined && totalLaps > 0 && (
+      {liveLap === undefined && dataLaps > 0 && (
         <input
           type="range"
           min={0}
-          max={totalLaps}
+          max={dataLaps}
           value={viewLap}
           onChange={(e) => {
             setPlaying(false);

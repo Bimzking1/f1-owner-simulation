@@ -82,6 +82,9 @@ export default function App() {
       playerIds: [t.driver1Id, t.driver2Id],
       stances: Object.fromEntries(s.stances) as LiveView["stances"],
       motivateUsed: Object.fromEntries([...s.motivateUntil.keys()].map((k) => [k, true])),
+      retired: Object.fromEntries(
+        s.running.filter((r) => r.out).map((r) => [r.comp.driverId, true]),
+      ) as Record<string, boolean>,
       gridPenaltyApplied: eng.prep.gridPenaltyApplied,
       paused: eng.paused,
       done: false,
@@ -213,12 +216,32 @@ export default function App() {
     const eng = engineRef.current;
     if (!eng) return;
     const s = eng.prep.session;
+    if (s.finished) return;
+    const car = s.running.find((r) => r.comp.driverId === cmd.driverId);
+    if (!car) return;
+    if (car.out) {
+      setToast(`${car.comp.driver.shortName} is already out of the race.`);
+      return;
+    }
     const command: RaceCommand | InstantCommand =
       cmd.kind === "push" || cmd.kind === "steady" || cmd.kind === "conserve"
         ? (cmd as RaceCommand)
         : (cmd as InstantCommand);
     advanceRace(s, s.currentLap, [command]);
     setLive(snapshotOf(eng));
+    // Immediate, visible confirmation — orders must never feel like a dead click.
+    const who = car.comp.driver.shortName;
+    setToast(
+      cmd.kind === "push"
+        ? `Pit wall: ${who} told to PUSH.`
+        : cmd.kind === "steady"
+          ? `Pit wall: ${who} told to hold STEADY.`
+          : cmd.kind === "conserve"
+            ? `Pit wall: ${who} told to CONSERVE.`
+            : cmd.kind === "motivate"
+              ? `Radio: ${who} fired up by the pep talk.`
+              : `Pit wall: ${who} RETIRED from the race.`,
+    );
   };
 
   // -- season flow ----------------------------------------------------------

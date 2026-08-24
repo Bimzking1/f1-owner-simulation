@@ -28,6 +28,8 @@ export interface LiveView {
   playerIds: string[];
   stances: Record<string, "push" | "steady" | "conserve">;
   motivateUsed: Record<string, boolean>;
+  /** Player drivers whose car is out of the race (retired/DNF). */
+  retired: Record<string, boolean>;
   gridPenaltyApplied: number;
   /** True while the race is held at a checkpoint awaiting owner orders. */
   paused: boolean;

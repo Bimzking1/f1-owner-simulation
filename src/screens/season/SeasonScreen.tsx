@@ -12,6 +12,7 @@ import { SponsorsTab } from "./SponsorsTab";
 import { GarageTab } from "./GarageTab";
 import { FinanceTab } from "./FinanceTab";
 import { ManagementTab } from "./ManagementTab";
+import { UpcomingTab } from "./UpcomingTab";
 import { EndScreens } from "./EndScreens";
 
 export type { Act };
@@ -31,9 +32,9 @@ interface Props {
   onReset: () => void;
 }
 
-type Tab = "Overview" | "Race" | "Management" | "Market" | "Sponsors" | "Garage" | "Finance";
+type Tab = "Overview" | "Race" | "Management" | "Market" | "Sponsors" | "Garage" | "Upcoming" | "Finance";
 
-const TABS: Tab[] = ["Overview", "Race", "Management", "Market", "Sponsors", "Garage", "Finance"];
+const TABS: Tab[] = ["Overview", "Race", "Management", "Market", "Sponsors", "Garage", "Upcoming", "Finance"];
 
 export default function SeasonScreen({
   state,
@@ -262,6 +263,7 @@ export default function SeasonScreen({
       {tab === "Market" && <MarketTab state={state} act={act} />}
       {tab === "Sponsors" && <SponsorsTab state={state} act={act} />}
       {tab === "Garage" && <GarageTab state={state} act={act} />}
+      {tab === "Upcoming" && <UpcomingTab state={state} />}
       {tab === "Finance" && <FinanceTab state={state} />}
 
       <Modal open={confirmMenu} onClose={() => setConfirmMenu(false)} title="Quit to menu?">

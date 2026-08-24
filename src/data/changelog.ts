@@ -22,6 +22,21 @@ export interface ChangeLogEntry {
 
 export const CHANGE_LOG: ChangeLogEntry[] = [
   {
+    version: "v0.9",
+    title: "Pit-wall clarity, an Upcoming tab & a chart that fills the distance",
+    when: "24 August 2026 · 14:07",
+    summary:
+      "Second feedback pass on race control: retired cars now leave the pit wall properly — their row dims to a RETIRED card with every order button disabled, so a DNF can never look like a stuck button. Every pit-wall order now answers immediately with a toast confirmation (\"PIT WALL: VER told to PUSH.\", \"VER RETIRED from the race.\"), and Motivate explains its once-per-race rule right on the button. The NEXT UP track card moved out of the Race tab into its own UPCOMING section beside Finance, the result card no longer fights itself on wide screens (vertical stack, circuit map centred below, highlights in a clean 2×2), and the live position chart now spans the full GP distance — the lines grow into empty track instead of rescaling every lap.",
+    items: [
+      { kind: "fix", text: "Retired drivers on the pit wall: a car that's out of the race shows as a dimmed RETIRED card (grayscale portrait, 'out of the race') with Push/Steady/Conserve/Motivate/Retire all disabled — no more dead-looking buttons after a retirement." },
+      { kind: "new", text: "Order confirmations: every pit-wall command pops an immediate toast (push/steady/conserve/motivate/retire), and clicking Retire on an already-out car says so instead of doing nothing. Motivate's disabled state is labelled '✓ used (1 per race)' with a tooltip explaining the rule." },
+      { kind: "new", text: "New UPCOMING tab beside Finance: home of the next-Grand Prix briefing (circuit map, characteristics, weather odds, grid-penalty chip) plus the stewards' penalty banner — decluttering the Race tab for pure race action." },
+      { kind: "improve", text: "Race result layout fixed for desktop: player entries stack full-width above a centred circuit map instead of squeezing side-by-side; Fastest lap / Driver of the day / Most gained / Most lost sit in a tidy 2×2 grid (single column on mobile)." },
+      { kind: "improve", text: "Live position chart axis now covers the full race distance of the GP — the field spreads across the whole width from the start and the drawing fills toward the flag, rather than stretching to always look complete." },
+      { kind: "docs", text: "README updated for the Upcoming tab and the distance-aware chart." },
+    ],
+  },
+  {
     version: "v0.8",
     title: "Race tab rework, siren alerts & a bulletproof pit wall",
     when: "24 August 2026 · 11:52",

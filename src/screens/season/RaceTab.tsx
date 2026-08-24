@@ -6,7 +6,7 @@ import { Button, Card, Empty, ImageLightbox, Img, Meter, Modal, Tag } from "@/ui
 import { ratingTone } from "@/ui/ratings";
 import { driverImage } from "@/data/assets";
 import { urgentRepairs } from "@/simulation/systems";
-import { NextRaceCard, type LiveCommand, type LiveView } from "./parts";
+import { type LiveCommand, type LiveView } from "./parts";
 import { PositionChart } from "./PositionChart";
 
 interface Props {
@@ -60,7 +60,6 @@ export function RaceTab({ state, onRunRound, live, sendCommand, onResume, onSkip
         {live && live.paused && !live.done && sendCommand && (
           <PitWallPanel live={live} state={state} sendCommand={sendCommand} onResume={onResume} />
         )}
-
         {live && (
           <LiveRacePanel live={live} state={state} onSkipToEnd={onSkipToEnd} />
         )}
@@ -81,7 +80,6 @@ export function RaceTab({ state, onRunRound, live, sendCommand, onResume, onSkip
 
       {/* --------------------------------------------- RIGHT — the paddock */}
       <div className="space-y-4 lg:col-span-2">
-        {next && <NextRaceCard track={next} round={state.round + 1} gridPenalty={t.gridPenalty} />}
         {last && <ResultCard weekend={last} season={state.season} />}
         <ComponentsCard state={state} />
         {t.upgrades.length > 0 && (
@@ -143,6 +141,7 @@ function PitWallPanel({
             season={state.season}
             stance={live.stances[id] ?? "steady"}
             motivateUsed={!!live.motivateUsed[id]}
+            retired={!!live.retired[id]}
             sendCommand={sendCommand}
           />
         ))}
@@ -192,6 +191,7 @@ function LiveRacePanel({
         }}
         season={state.season}
         liveLap={live.currentLap}
+        raceLaps={live.laps}
       />
 
       <div className="mt-3 max-h-52 space-y-1 overflow-y-auto rounded-md border border-hairline bg-void p-2">
@@ -217,28 +217,51 @@ function DriverOrderRow({
   season,
   stance,
   motivateUsed,
+  retired,
   sendCommand,
 }: {
   driverId: string;
   season: number;
   stance: "push" | "steady" | "conserve";
   motivateUsed: boolean;
+  retired: boolean;
   sendCommand: (cmd: LiveCommand) => void;
 }) {
   const d = driverById(driverId, season);
   const btn = (kind: "push" | "steady" | "conserve", label: string, hint: string, cls: string) => (
     <button
       type="button"
+      disabled={retired}
       title={hint}
       onClick={() => sendCommand({ driverId, kind })}
       className={`flex-1 rounded-md border px-3 py-2.5 text-xs font-bold uppercase tracking-wider transition ${
-        stance === kind ? `${cls} ring-2 ring-current/40` : "border-hairline bg-raised/60 text-ink-soft hover:bg-raised hover:text-ink"
+        retired
+          ? "cursor-not-allowed border-transparent bg-raised/30 text-ink-faint opacity-50"
+          : stance === kind
+            ? `${cls} ring-2 ring-current/40`
+            : "border-hairline bg-raised/60 text-ink-soft hover:bg-raised hover:text-ink"
       }`}
     >
       {label}
-      {stance === kind && <span className="ml-1">✓</span>}
+      {!retired && stance === kind && <span className="ml-1">✓</span>}
     </button>
   );
+
+  if (retired) {
+    return (
+      <div className="rounded-md border border-hairline bg-surface/60 p-3 opacity-70">
+        <div className="flex items-center gap-2">
+          <Img src={driverImage(driverId, season)} alt={d?.shortName ?? driverId} className="h-6 w-6 rounded-sm object-cover grayscale" />
+          <span className="font-display text-sm font-bold uppercase tracking-wide text-ink-faint">
+            {d?.shortName ?? driverId}
+          </span>
+          <Tag tone="signal">Retired</Tag>
+          <span className="num-data ml-auto text-[11px] text-ink-faint">out of the race</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="rounded-md border border-hairline bg-surface/80 p-3">
       <div className="mb-2 flex items-center gap-2">
@@ -257,7 +280,7 @@ function DriverOrderRow({
         <button
           type="button"
           disabled={motivateUsed}
-          title="One pep talk per race: short pace boost"
+          title={motivateUsed ? "One pep talk per driver per race — already used" : "One pep talk per race: short pace boost"}
           onClick={() => sendCommand({ driverId, kind: "motivate" })}
           className={`flex-1 rounded-md border px-3 py-2 text-xs font-bold uppercase tracking-wider transition ${
             motivateUsed
@@ -265,7 +288,7 @@ function DriverOrderRow({
               : "border-elite/60 bg-elite/10 text-elite hover:bg-elite/25"
           }`}
         >
-          Motivate {motivateUsed ? "✓ used" : ""}
+          Motivate {motivateUsed ? "✓ used (1 per race)" : ""}
         </button>
         <button
           type="button"
@@ -495,8 +518,8 @@ function ResultCard({ weekend, season }: { weekend: RaceWeekendResult; season: n
       title={`Round ${weekend.round} — ${track?.grandPrix ?? weekend.trackId} result`}
       right={<Button small variant="ghost" onClick={() => setOpen(true)}>Replay</Button>}
     >
-      <div className="flex flex-col gap-3 lg:flex-row">
-        <div className="grid flex-1 gap-2 text-sm sm:grid-cols-2">
+      <div className="space-y-3">
+        <div className="grid gap-2 text-sm sm:grid-cols-2">
           {weekend.playerEntries.map((p) => {
             const d = driverById(p.driverId, season);
             const grid = gridOf(p.driverId);
@@ -517,7 +540,7 @@ function ResultCard({ weekend, season }: { weekend: RaceWeekendResult; season: n
           })}
         </div>
         {track && (
-          <div className="shrink-0 lg:w-44">
+          <div className="mx-auto w-full max-w-64">
             <button
               type="button"
               onClick={() => setZoom({ src: track.image, alt: `${track.name} circuit map` })}
@@ -537,7 +560,7 @@ function ResultCard({ weekend, season }: { weekend: RaceWeekendResult; season: n
           </div>
         )}
       </div>
-      <div className="mt-3 mb-3 grid grid-cols-2 gap-2 text-xs lg:grid-cols-4">
+      <div className="mb-3 mt-3 grid grid-cols-1 gap-2 text-xs sm:grid-cols-2">
           <div className="rounded-md border border-hairline bg-raised/40 p-2">
             <div className="label-tech text-[10px] text-ink-faint">Fastest lap</div>
             {hl.fastest ? (
