@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { SimulationState, TestType, TeamState } from "@/simulation/types";
 import {
   finalizeRound,
@@ -32,6 +32,8 @@ interface LiveEngine {
   paused: boolean;
 }
 
+const STEP_MS = 620;
+
 const isDesktop = () =>
   typeof window !== "undefined" && window.matchMedia("(min-width: 1024px)").matches;
 
@@ -43,7 +45,13 @@ export default function App() {
   const [toast, setToast] = useState<string>("");
   const [hasSave, setHasSave] = useState(() => !!loadState());
   const [live, setLive] = useState<LiveView | null>(null);
+
+  // Mutable live-race machinery lives entirely outside React state so renders
+  // can never tear it apart: one engine object + one self-rescheduling timer.
   const engineRef = useRef<LiveEngine | null>(null);
+  const timerRef = useRef<number | null>(null);
+  // Latest stepper for the pending timeout to call (updated every render).
+  const stepRef = useRef<() => void>(() => {});
 
   useEffect(() => {
     saveState(sim);
@@ -54,6 +62,8 @@ export default function App() {
     const id = setTimeout(() => setToast(""), 2600);
     return () => clearTimeout(id);
   }, [toast]);
+
+  // -- live race engine -----------------------------------------------------
 
   const snapshotOf = (eng: LiveEngine): LiveView => {
     const s = eng.prep.session;
@@ -78,11 +88,27 @@ export default function App() {
     };
   };
 
-  // -- live race engine -----------------------------------------------------
+  const clearTimer = () => {
+    if (timerRef.current !== null) {
+      window.clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+  };
 
-  const finishLive = useCallback(() => {
+  /** Self-rescheduling tick: one segment, then queue the next unless the race
+   *  paused or ended. The chain only ever dies through an explicit disarm. */
+  const scheduleNext = () => {
+    clearTimer();
+    timerRef.current = window.setTimeout(() => {
+      timerRef.current = null;
+      stepRef.current();
+    }, STEP_MS);
+  };
+
+  const finishLive = () => {
     const eng = engineRef.current;
     if (!eng) return;
+    clearTimer();
     engineRef.current = null;
     const outcome = finalizeRound(eng.draft, eng.prep);
     if (outcome.phase === "finished") settleSeason(eng.draft);
@@ -97,14 +123,14 @@ export default function App() {
         ? `${outcome.weekend.trackId} GP done — best finish P${best.position}${best.points ? ` (${best.points} pts)` : ""}.`
         : `${outcome.weekend.trackId} GP done.`,
     );
-  }, []);
+  };
 
-  const stepLive = useCallback(() => {
+  const stepLive = () => {
     const eng = engineRef.current;
     if (!eng || eng.paused) return;
     const s = eng.prep.session;
-    const stop = eng.stops.length > 0 ? eng.stops[0] : s.laps;
-    advanceRace(s, Math.min(s.currentLap + 2, stop));
+    const target = eng.stops.length > 0 ? Math.min(eng.stops[0], s.laps) : s.laps;
+    advanceRace(s, Math.min(s.currentLap + 2, target));
     if (s.finished) {
       finishLive();
       return;
@@ -112,23 +138,42 @@ export default function App() {
     if (eng.stops.length > 0 && s.currentLap >= eng.stops[0]) {
       eng.stops.shift();
       eng.paused = true;
+      setToast(`Checkpoint — lap ${s.currentLap}/${s.laps}: pit wall orders open.`);
     }
     setLive(snapshotOf(eng));
-  }, [finishLive]);
-
-  const racing = !!live && !live.paused && !live.done;
+    if (!eng.paused) scheduleNext();
+  };
   useEffect(() => {
-    if (!racing) return;
-    const id = setInterval(stepLive, 620);
-    return () => clearInterval(id);
-  }, [racing, stepLive]);
+    stepRef.current = stepLive;
+  });
+
+  /** Heal any desync between the mutable engine and the rendered snapshot
+   *  (error-boundary recovery, fast-refresh, etc.) instead of freezing. */
+  useEffect(() => {
+    const eng = engineRef.current;
+    if (eng && !live) {
+      setLive(snapshotOf(eng));
+      if (!eng.paused) scheduleNext();
+    } else if (!eng && live) {
+      setLive(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [live]);
+
+  // Stop the race clock when leaving the app entirely.
+  useEffect(() => () => clearTimer(), []);
 
   /** Try to start a live desktop race. Returns false when the platform or
    *  game state doesn't allow it (caller should fall back to instant sim). */
   const startLiveRound = (): boolean => {
     if (!isDesktop()) return false;
-    if (engineRef.current) return true;
     if (!sim || sim.phase !== "season") return false;
+    // A healthy engine for THIS round means a race is already running.
+    const existing = engineRef.current;
+    if (existing && existing.prep.roundIdx === sim.round) return true;
+    // Otherwise discard anything stale and start clean.
+    clearTimer();
+    engineRef.current = null;
     const draft = structuredClone(sim);
     const prep = prepareRound(draft);
     if (!prep) return false;
@@ -140,27 +185,31 @@ export default function App() {
       paused: false,
     };
     setLive(snapshotOf(engineRef.current));
+    scheduleNext();
     return true;
   };
 
-  const resumeLive = useCallback(() => {
+  const resumeLive = () => {
     const eng = engineRef.current;
     if (!eng) return;
+    clearTimer();
     eng.paused = false;
     setLive(snapshotOf(eng));
-  }, []);
+    scheduleNext();
+  };
 
-  const skipLiveToEnd = useCallback(() => {
+  const skipLiveToEnd = () => {
     const eng = engineRef.current;
     if (!eng) return;
+    clearTimer();
     const s = eng.prep.session;
     eng.stops = [];
     eng.paused = false;
     advanceRace(s, s.laps);
     finishLive();
-  }, [finishLive]);
+  };
 
-  const sendLiveCommand = useCallback((cmd: LiveCommand) => {
+  const sendLiveCommand = (cmd: LiveCommand) => {
     const eng = engineRef.current;
     if (!eng) return;
     const s = eng.prep.session;
@@ -170,7 +219,7 @@ export default function App() {
         : (cmd as InstantCommand);
     advanceRace(s, s.currentLap, [command]);
     setLive(snapshotOf(eng));
-  }, []);
+  };
 
   // -- season flow ----------------------------------------------------------
 
@@ -286,6 +335,7 @@ export default function App() {
   };
 
   const reset = () => {
+    clearTimer();
     engineRef.current = null;
     setLive(null);
     setSim(null);
@@ -293,6 +343,18 @@ export default function App() {
     setScreen("landing");
     setHasSave(false);
   };
+
+  // Warn before an accidental refresh wipes an in-flight race weekend
+  // (the season itself is autosaved; only the live race would be lost).
+  useEffect(() => {
+    if (screen !== "season" || !sim) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [screen, sim]);
 
   const body = useMemo(() => {
     switch (screen) {

@@ -21,7 +21,8 @@ Built with **React 19 + TypeScript + Vite**, styled with **Tailwind CSS 4**. No 
 
 ### Race weekends
 - Practice forecast → qualifying → race (with sprint sessions in 2025), weather and track chaos.
-- **Live racing on desktop**: RUN GP streams the race on the Race tab — the position chart builds lap by lap while the race-control log scrolls. At two checkpoints the pit wall is yours: set each driver's stance (**Push** for pace at real mechanical/accident risk, **Steady**, **Conserve** to save car and tires, a one-shot **Motivate** pep talk, or **Retire** the car), then throw the green flag. Skip to the result any time; mobile keeps instant simulation.
+- **Live racing on desktop**: RUN GP streams the race on the Race tab — the position chart builds lap by lap while the race-control log scrolls. At two checkpoints the pit wall is yours: a loud decision panel takes over with big order buttons per driver (**Push** for pace at real mechanical/accident risk, **Steady**, **Conserve** to save car and tires, a one-shot **Motivate** pep talk, or **Retire** the car), then throw the green flag. Skip to the result any time; mobile keeps instant simulation.
+- While the race runs, the **Race tab button pulses like a siren** and every other tab shows a race-in-progress strip (live lap counter, pause alerts) — one click jumps you back to the action.
 - After the flag, the desktop Race tab keeps the **position-movement chart** (playback + scrubber, click a line to isolate a driver) and the full race log without opening Replay.
 - **AUTO** simulates weekends until something needs its owner — broken parts, a driver demanding a meeting, bankruptcy or the flag.
 - Points, podiums, fastest laps, sprint points and prize money all feed the championship and your accounts.
@@ -36,6 +37,8 @@ Built with **React 19 + TypeScript + Vite**, styled with **Tailwind CSS 4**. No 
 
 Car and circuit images anywhere in the season open in a lightbox — click the image, then click away / ✕ / Esc to dismiss.
 
+The Race tab's components panel mirrors the Garage at a glance: every era part (V8/KERS or the seven-piece turbo-hybrid) with condition, Fresh/Worn/Broken status, age, mileage and damage notes — full specs and replacements stay in the Garage.
+
 ### Living systems
 - **Reputation (0–100)** moves every weekend: wins, podiums and points raise it; scoreless weekends and double DNFs cost it. Driver moods, garage trust, your management conduct and leading the championship all add drift — and reputation gates title sponsors **and star drivers**.
 - **Frustration has teeth**: angry drivers bleed lap time (up to ~0.5s), invite incidents, and at 72+ may publicly slam the team. Slumping stars can confront you with **podium-bonus demands** — accept and deliver for big mood gains, miss the window and trust detonates.
@@ -43,7 +46,7 @@ Car and circuit images anywhere in the season open in a lightbox — click the i
 - Component reliability, tire behavior and power interact with each circuit's characteristics and the weather.
 - A news feed with driver messages, paddock stories and sponsor events; some require decisions.
 - End-of-season settlement: final standings review, prize money and your report card.
-- Autosave to `localStorage` — close the tab, come back, continue.
+- Autosave to `localStorage` — close the tab, come back, continue. (During a season the browser also asks before an accidental refresh so an in-flight race weekend is never silently lost.)
 
 ### In-game change log
 The landing page has a **Change log** button (top-right) opening `/change-log`: a timeline of every update shipped to the game, color-coded by change type, newest entry stamped with date and time.

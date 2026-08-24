@@ -192,17 +192,23 @@ export default function SeasonScreen({
                   : tb === "Garage" && repairs.length > 0
                     ? { count: repairs.length, cls: "bg-signal" }
                     : null;
+            // Siren: the Race tab pulses while a live race is running so the
+            // owner always knows where the action is.
+            const siren = tb === "Race" && raceBusy;
             return (
               <button
                 key={tb}
                 type="button"
                 onClick={() => setTab(tb)}
                 className={`relative min-w-[4.6rem] flex-1 rounded-sm border px-2 py-2.5 text-xs font-bold uppercase tracking-widest transition sm:min-w-[5.5rem] sm:flex-initial sm:px-3.5 sm:py-2 ${
-                  tab === tb
-                    ? "border-signal bg-signal text-white shadow-md"
-                    : "border-hairline bg-raised/70 text-ink-soft hover:border-ink-faint hover:bg-raised hover:text-ink"
+                  siren
+                    ? `border-signal text-white shadow-lg shadow-signal/30 ${tab === tb ? "bg-signal/70" : "animate-pulse bg-signal"}`
+                    : tab === tb
+                      ? "border-signal bg-signal text-white shadow-md"
+                      : "border-hairline bg-raised/70 text-ink-soft hover:border-ink-faint hover:bg-raised hover:text-ink"
                 }`}
               >
+                {siren && <span className="mr-1">🏁</span>}
                 {tb}
                 {badge && (
                   <span
@@ -216,6 +222,28 @@ export default function SeasonScreen({
           })}
         </div>
       </nav>
+
+      {/* Race-in-progress strip — follows you across tabs until the flag falls */}
+      {raceBusy && live && tab !== "Race" && (
+        <button
+          type="button"
+          onClick={() => setTab("Race")}
+          className="mb-4 flex w-full items-center gap-3 rounded-md border border-signal/60 bg-signal/10 px-4 py-2.5 text-left transition hover:bg-signal/15"
+        >
+          <span className="relative flex h-3 w-3 shrink-0">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-signal opacity-60" />
+            <span className="relative inline-flex h-3 w-3 rounded-full bg-signal" />
+          </span>
+          <span className="min-w-0 text-sm leading-snug text-ink-soft">
+            <b className="text-ink">
+              Race in progress — R{live.roundIdx + 1} {live.grandPrix}, lap {live.currentLap}/{live.laps}
+              {live.paused && <span className="text-signal"> · PIT WALL DECISION REQUIRED</span>}
+            </b>
+            {" — head back to the Race tab to follow or intervene."}
+          </span>
+          <span className="ml-auto shrink-0 text-xs font-bold uppercase tracking-widest text-signal">Go →</span>
+        </button>
+      )}
 
       {tab === "Overview" && (
         <OverviewTab state={state} onNewsAction={handleNewsAction} onRunRound={handleRunRound} onNavigate={(x) => setTab(x)} />

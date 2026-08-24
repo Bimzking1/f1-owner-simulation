@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import type { RaceWeekendResult, SimulationState } from "@/simulation/types";
+import type { ComponentState, RaceWeekendResult, SimulationState } from "@/simulation/types";
 import { driverById, trackById } from "@/data";
+import { powerUnitForSeason } from "@/data/powerUnits";
 import { Button, Card, Empty, ImageLightbox, Img, Meter, Modal, Tag } from "@/ui/kit";
 import { ratingTone } from "@/ui/ratings";
 import { driverImage } from "@/data/assets";
+import { urgentRepairs } from "@/simulation/systems";
 import { NextRaceCard, type LiveCommand, type LiveView } from "./parts";
 import { PositionChart } from "./PositionChart";
 
@@ -23,10 +25,12 @@ export function RaceTab({ state, onRunRound, live, sendCommand, onResume, onSkip
   const next = state.calendar[state.round];
   const last = state.lastWeekend;
   const busy = !!live && !live.done;
+
   return (
-    <div className="grid gap-4 lg:grid-cols-3">
-      <div className="space-y-4 lg:col-span-2">
-        <Card title="Race Weekend">
+    <div className="grid gap-4 lg:grid-cols-5">
+      {/* ------------------------------------------------ LEFT — the action */}
+      <div className="space-y-4 lg:col-span-3">
+        <Card title="Race weekend">
           {done ? (
             <Empty>Season complete — see the final report.</Empty>
           ) : (
@@ -42,43 +46,25 @@ export function RaceTab({ state, onRunRound, live, sendCommand, onResume, onSkip
               )}
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 <Button onClick={onRunRound} disabled={busy}>
-                  {busy ? "Race in progress…" : `Run the ${next?.grandPrix ?? ""} →`}
+                  {busy ? "🏁 Race in progress…" : `Run the ${next?.grandPrix ?? ""} →`}
                 </Button>
               </div>
-              <p className="mt-4 text-xs text-ink-faint">
-                The weekend simulates qualifying{next?.sprint && state.gameLength !== "short" ? ", a sprint" : ""} and the race with
-                lap-level events, weather and mechanical risk. On desktop you can follow the race live at checkpoints and issue pit-wall orders.
+              <p className="mt-3 text-xs text-ink-faint">
+                The weekend simulates qualifying{next?.sprint && state.gameLength !== "short" ? ", a sprint" : ""} and the race
+                lap by lap. On desktop you follow it live here and issue pit-wall orders at two checkpoints.
               </p>
             </div>
           )}
         </Card>
-        {last && <ResultCard weekend={last} season={state.season} />}
-        {last && <WeekendClassification state={state} weekend={last} />}
-        {next && <NextRaceCard track={next} round={state.round + 1} gridPenalty={t.gridPenalty} />}
-      </div>
-      <div className="space-y-4">
-        {live && (
-          <LiveRacePanel live={live} state={state} sendCommand={sendCommand} onResume={onResume} onSkipToEnd={onSkipToEnd} />
+
+        {live && live.paused && !live.done && sendCommand && (
+          <PitWallPanel live={live} state={state} sendCommand={sendCommand} onResume={onResume} />
         )}
-        <Card title="Components">
-          <div className="space-y-3 text-sm">
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-ink-faint">Engine</span>
-              <span className="num-data">{t.components.engine.condition.toFixed(1)}% · age {t.components.engine.age}</span>
-            </div>
-            <Meter value={t.components.engine.condition} tone={ratingTone(t.components.engine.condition)} />
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-ink-faint">Gearbox</span>
-              <span className="num-data">{t.components.gearbox.condition.toFixed(1)}% · age {t.components.gearbox.age}</span>
-            </div>
-            <Meter value={t.components.gearbox.condition} tone={ratingTone(t.components.gearbox.condition)} />
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-ink-faint">Pit crew</span>
-              <span className="num-data">{t.pitCrew}</span>
-            </div>
-            <Meter value={t.pitCrew} tone={ratingTone(t.pitCrew)} />
-          </div>
-        </Card>
+
+        {live && (
+          <LiveRacePanel live={live} state={state} onSkipToEnd={onSkipToEnd} />
+        )}
+
         {!live && last?.lapOrder && last.lapOrder.length > 1 && (
           <Card title="Position chart" className="hidden lg:block">
             <PositionChart key={`wk-${last.round}`} weekend={last} season={state.season} />
@@ -89,6 +75,15 @@ export function RaceTab({ state, onRunRound, live, sendCommand, onResume, onSkip
             <RaceLogFeed events={[...last.events].sort((a, b) => a.lap - b.lap)} />
           </Card>
         )}
+
+        {last && <WeekendClassification state={state} weekend={last} />}
+      </div>
+
+      {/* --------------------------------------------- RIGHT — the paddock */}
+      <div className="space-y-4 lg:col-span-2">
+        {next && <NextRaceCard track={next} round={state.round + 1} gridPenalty={t.gridPenalty} />}
+        {last && <ResultCard weekend={last} season={state.season} />}
+        <ComponentsCard state={state} />
         {t.upgrades.length > 0 && (
           <Card title="Development in progress">
             <div className="space-y-2">
@@ -110,20 +105,65 @@ export function RaceTab({ state, onRunRound, live, sendCommand, onResume, onSkip
 }
 
 // ---------------------------------------------------------------------------
-// Live race panel (desktop) — chart builds lap by lap, log streams, and at
-// checkpoints the owner issues pit-wall orders.
+// Pit wall — shown big and loud whenever the race pauses for owner orders.
 
-function LiveRacePanel({
+function PitWallPanel({
   live,
   state,
   sendCommand,
   onResume,
+}: {
+  live: LiveView;
+  state: SimulationState;
+  sendCommand: (cmd: LiveCommand) => void;
+  onResume?: () => void;
+}) {
+  return (
+    <div className="rounded-lg border-2 border-signal bg-signal/10 p-4 shadow-lg shadow-signal/20">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <span className="relative flex h-3.5 w-3.5 shrink-0">
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-signal opacity-60" />
+          <span className="relative inline-flex h-3.5 w-3.5 rounded-full bg-signal" />
+        </span>
+        <h3 className="font-display text-base font-bold uppercase tracking-widest text-signal">
+          Pit wall — decision required
+        </h3>
+        <span className="num-data text-sm text-ink-faint">
+          Lap {live.currentLap}/{live.laps} · {live.grandPrix}
+        </span>
+      </div>
+      <p className="mt-1 text-xs leading-relaxed text-ink-soft">
+        Set each driver's orders, then throw the green flag. Push buys lap time but risks hardware, tires and accidents.
+      </p>
+      <div className="mt-3 space-y-2">
+        {live.playerIds.map((id) => (
+          <DriverOrderRow
+            key={id}
+            driverId={id}
+            season={state.season}
+            stance={live.stances[id] ?? "steady"}
+            motivateUsed={!!live.motivateUsed[id]}
+            sendCommand={sendCommand}
+          />
+        ))}
+      </div>
+      <Button className="mt-3 w-full py-3! text-base!" onClick={onResume}>
+        🟢 Green flag — resume race ▶
+      </Button>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Live race panel — chart builds lap by lap while the log streams.
+
+function LiveRacePanel({
+  live,
+  state,
   onSkipToEnd,
 }: {
   live: LiveView;
   state: SimulationState;
-  sendCommand?: (cmd: LiveCommand) => void;
-  onResume?: () => void;
   onSkipToEnd?: () => void;
 }) {
   return (
@@ -131,17 +171,18 @@ function LiveRacePanel({
       title={
         <span className="flex items-center gap-2">
           R{live.roundIdx + 1} · {live.grandPrix}
-          {live.done ? <Tag tone="positive">Finished</Tag> : <Tag tone="signal">LIVE</Tag>}
+          {live.paused ? (
+            <Tag tone="caution">Paused</Tag>
+          ) : (
+            <Tag tone="signal">LIVE</Tag>
+          )}
         </span>
       }
       right={
-        !live.done ? (
-          <Button small variant="ghost" onClick={onSkipToEnd}>
-            Skip to result ⏭
-          </Button>
-        ) : undefined
+        <Button small variant="ghost" onClick={onSkipToEnd}>
+          Skip to result ⏭
+        </Button>
       }
-      className="hidden lg:block"
     >
       <PositionChart
         weekend={{
@@ -162,27 +203,7 @@ function LiveRacePanel({
         {live.events.length === 0 && <p className="text-xs text-ink-faint">Formation lap…</p>}
       </div>
 
-      {live.paused && !live.done && sendCommand && (
-        <div className="mt-3 space-y-2 rounded-md border border-signal/40 bg-signal/5 p-3">
-          <div className="text-[11px] font-bold uppercase tracking-widest text-signal">
-            Checkpoint — pit wall is yours
-          </div>
-          {live.playerIds.map((id) => (
-            <DriverOrderRow
-              key={id}
-              driverId={id}
-              season={state.season}
-              stance={live.stances[id] ?? "steady"}
-              motivateUsed={!!live.motivateUsed[id]}
-              sendCommand={sendCommand}
-            />
-          ))}
-          <Button small className="w-full" onClick={onResume}>
-            Green flag — resume ▶
-          </Button>
-        </div>
-      )}
-      {!live.paused && !live.done && (
+      {!live.paused && (
         <p className="mt-3 text-[11px] leading-relaxed text-ink-faint">
           Orders open automatically at the lap ~33% and ~66% checkpoints.
         </p>
@@ -205,47 +226,166 @@ function DriverOrderRow({
   sendCommand: (cmd: LiveCommand) => void;
 }) {
   const d = driverById(driverId, season);
-  const btn = (kind: "push" | "steady" | "conserve", label: string, cls: string) => (
+  const btn = (kind: "push" | "steady" | "conserve", label: string, hint: string, cls: string) => (
     <button
       type="button"
+      title={hint}
       onClick={() => sendCommand({ driverId, kind })}
-      className={`rounded-sm border px-2 py-1 text-[10px] font-bold uppercase tracking-wider transition ${
-        stance === kind ? `${cls}` : "border-hairline bg-raised/40 text-ink-soft hover:bg-raised"
+      className={`flex-1 rounded-md border px-3 py-2.5 text-xs font-bold uppercase tracking-wider transition ${
+        stance === kind ? `${cls} ring-2 ring-current/40` : "border-hairline bg-raised/60 text-ink-soft hover:bg-raised hover:text-ink"
       }`}
     >
       {label}
+      {stance === kind && <span className="ml-1">✓</span>}
     </button>
   );
   return (
-    <div className="rounded-md border border-hairline bg-raised/40 p-2">
-      <div className="mb-1 flex items-center gap-2">
-        <Img src={driverImage(driverId, season)} alt={d?.shortName ?? driverId} className="h-5 w-5 rounded-sm object-cover" />
-        <span className="text-sm font-semibold">{d?.shortName ?? driverId}</span>
+    <div className="rounded-md border border-hairline bg-surface/80 p-3">
+      <div className="mb-2 flex items-center gap-2">
+        <Img src={driverImage(driverId, season)} alt={d?.shortName ?? driverId} className="h-6 w-6 rounded-sm object-cover" />
+        <span className="font-display text-sm font-bold uppercase tracking-wide">{d?.shortName ?? driverId}</span>
+        <span className="num-data ml-auto text-[11px] text-ink-faint">
+          {stance === "push" ? "attacking" : stance === "conserve" ? "saving the car" : "steady pace"}
+        </span>
       </div>
-      <div className="flex flex-wrap items-center gap-1.5">
-        {btn("push", "Push", "border-caution/60 bg-caution/15 text-caution")}
-        {btn("steady", "Steady", "border-signal/50 bg-signal/15 text-signal")}
-        {btn("conserve", "Conserve", "border-positive/60 bg-positive/15 text-positive")}
+      <div className="flex gap-2">
+        {btn("push", "Push", "+pace, higher failure & crash risk", "border-caution/70 bg-caution/20 text-caution")}
+        {btn("steady", "Steady", "balanced pace and risk", "border-signal/60 bg-signal/20 text-signal")}
+        {btn("conserve", "Conserve", "slower, kind to car and tires", "border-positive/70 bg-positive/20 text-positive")}
+      </div>
+      <div className="mt-2 flex gap-2">
         <button
           type="button"
           disabled={motivateUsed}
+          title="One pep talk per race: short pace boost"
           onClick={() => sendCommand({ driverId, kind: "motivate" })}
-          className={`rounded-sm border px-2 py-1 text-[10px] font-bold uppercase tracking-wider transition ${
-            motivateUsed ? "cursor-not-allowed border-transparent text-ink-faint opacity-50" : "border-elite/60 bg-elite/10 text-elite hover:bg-elite/20"
+          className={`flex-1 rounded-md border px-3 py-2 text-xs font-bold uppercase tracking-wider transition ${
+            motivateUsed
+              ? "cursor-not-allowed border-transparent text-ink-faint opacity-50"
+              : "border-elite/60 bg-elite/10 text-elite hover:bg-elite/25"
           }`}
         >
-          Motivate {motivateUsed ? "✓" : ""}
+          Motivate {motivateUsed ? "✓ used" : ""}
         </button>
         <button
           type="button"
+          title="Call the car into the pits and retire from the race"
           onClick={() => sendCommand({ driverId, kind: "retire" })}
-          className="ml-auto rounded-sm border border-signal/60 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-signal transition hover:bg-signal/10"
+          className="flex-1 rounded-md border border-signal/60 px-3 py-2 text-xs font-bold uppercase tracking-wider text-signal transition hover:bg-signal/15"
         >
           Retire car
         </button>
       </div>
     </div>
   );
+}
+
+// ---------------------------------------------------------------------------
+// Components — same detail level as the Garage: every era part with condition,
+// age, mileage and damage status.
+
+function ComponentsCard({ state }: { state: SimulationState }) {
+  const t = state.team!;
+  const pu = powerUnitForSeason(state.season);
+  const broken = urgentRepairs(state).length;
+
+  const rows: { label: string; spec?: string; c?: ComponentState; note?: string; crew?: number }[] = [
+    {
+      label: pu.engineName,
+      spec: pu.engineSpec,
+      c: t.components.engine,
+    },
+    ...pu.components.map((cfg) => ({
+      label: cfg.name,
+      spec: cfg.spec,
+      c:
+        t.components.powerUnit?.[cfg.id] ??
+        ({ condition: 100, age: 0, replacements: 0 } as ComponentState),
+    })),
+    {
+      label: "Gearbox",
+      spec: pu.gearboxSpec,
+      c: t.components.gearbox,
+    },
+    { label: "Pit crew", crew: t.pitCrew },
+  ];
+
+  return (
+    <Card
+      title={pu.heading}
+      right={
+        broken > 0 ? (
+          <Tag tone="signal">{broken} repair{broken > 1 ? "s" : ""} needed</Tag>
+        ) : undefined
+      }
+    >
+      <div className="space-y-3">
+        {rows.map((r) => {
+          if (r.crew !== undefined) {
+            return (
+              <div key="crew" className="rounded-md border border-hairline bg-raised/40 p-2.5">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-sm font-semibold">Pit crew</span>
+                  <span className={`num-data text-sm ${ratingTextClass(t.pitCrew)}`}>{r.crew}</span>
+                </div>
+                <Meter value={r.crew} tone={ratingTone(r.crew)} className="mt-1.5" />
+                <div className="mt-1 text-[10px] uppercase tracking-widest text-ink-faint">Stops & pit-lane performance</div>
+              </div>
+            );
+          }
+          const c = r.c!;
+          const damaged = c.damaged === true;
+          const worn = !damaged && c.condition < 40;
+          return (
+            <div
+              key={r.label}
+              className={`rounded-md border p-2.5 ${damaged ? "border-signal/50 bg-signal/10" : "border-hairline bg-raised/40"}`}
+            >
+              <div className="flex items-center gap-2">
+                <span className="min-w-0 truncate text-sm font-semibold">{r.label}</span>
+                {damaged ? (
+                  <Tag tone="signal">Broken</Tag>
+                ) : worn ? (
+                  <Tag tone="caution">Worn</Tag>
+                ) : c.condition >= 90 ? (
+                  <Tag tone="positive">Fresh</Tag>
+                ) : null}
+                <span className={`num-data ml-auto text-sm ${damaged ? "text-signal" : ratingTextClass(c.condition)}`}>
+                  {c.condition.toFixed(1)}%
+                </span>
+              </div>
+              <Meter value={c.condition} tone={damaged ? "signal" : ratingTone(c.condition)} className="mt-1.5" />
+              <div className="mt-1 flex flex-wrap gap-x-3 text-[10px] uppercase tracking-widest text-ink-faint">
+                <span>Age {c.age} race{c.age === 1 ? "" : "s"}</span>
+                <span>≈{(c.age * 305).toLocaleString()} km</span>
+                <span>{c.replacements} replacement{c.replacements === 1 ? "" : "s"}</span>
+              </div>
+              {damaged && c.damagedNote && (
+                <div className="mt-1.5 rounded-sm border-l-2 border-signal bg-void/60 px-2 py-1 text-[11px] leading-relaxed text-signal">
+                  {c.damagedNote}
+                </div>
+              )}
+              {!damaged && r.spec && (
+                <div className="mt-1 truncate text-[10px] text-ink-faint" title={r.spec}>
+                  {r.spec}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      <p className="mt-2 text-[10px] leading-relaxed text-ink-faint">
+        Full specs, wear profiles and replacements live in the Garage tab.
+      </p>
+    </Card>
+  );
+}
+
+function ratingTextClass(v: number): string {
+  if (v >= 80) return "text-azure";
+  if (v >= 60) return "text-positive";
+  if (v >= 40) return "text-caution";
+  return "text-signal";
 }
 
 /** Auto-scrolling race log used by the desktop "Race control log" card. */

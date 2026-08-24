@@ -22,6 +22,22 @@ export interface ChangeLogEntry {
 
 export const CHANGE_LOG: ChangeLogEntry[] = [
   {
+    version: "v0.8",
+    title: "Race tab rework, siren alerts & a bulletproof pit wall",
+    when: "24 August 2026 · 11:52",
+    summary:
+      "Feedback round on the live-race experience: the Race tab button pulses with a siren and every other tab shows a race-in-progress strip (lap counter, pause alerts) so you always know the team is on track. The Race section is rebuilt — chart, pit wall and classification now own the wide left column while track profile, result highlights and a Garage-grade components panel sit on the right. The pit-wall checkpoint is impossible to miss: a full-width decision panel with big Push/Steady/Conserve/Motivate/Retire buttons, tooltips explaining each order, plus a toast nudge. Under the hood the live-race clock was rewritten around an explicit timer chain with stale-engine guards and state healing, fixing reported stuck command buttons; and closing the browser mid-race now warns before discarding the weekend.",
+    items: [
+      { kind: "new", text: "Siren navigation. While a live race runs, the Race tab button pulses red with a 🏁 marker, and a dismiss-free strip under the tabs follows you across Overview/Management/etc. showing \"Race in progress — lap X/Y\" (plus \"PIT WALL DECISION REQUIRED\" when paused). Click it to jump straight back." },
+      { kind: "improve", text: "Race tab layout rework: left column = run control, live position chart + streaming log, post-race chart/log, weekend classification; right column = next-GP track profile, full result card (fastest lap, driver of the day, most gained/lost, replay), detailed components and development projects." },
+      { kind: "improve", text: "Components panel upgraded to Garage detail: every era part (2013 V8/KERS or 2025 ICE, turbo, MGU-K/H, energy store, control electronics, exhaust) with condition meter, Fresh/Worn/Broken status, age in races, approximate mileage, replacement count, damage notes and hardware spec lines, plus the pit-crew rating and an urgent-repairs chip." },
+      { kind: "improve", text: "Pit-wall decisions are unmissable: when the race pauses at a checkpoint a large bordered panel takes over the top of the left column — pulsing indicator, lap counter, per-driver rows of big labelled order buttons with hover hints (Push = pace for risk, Conserve = save the car…), current stance echo, one-per-race Motivate, Retire car, and a full-width Green Flag resume button. A toast also announces the checkpoint." },
+      { kind: "fix", text: "Live-race engine hardening (stuck buttons): the stepping interval was rebuilt as an explicit self-rescheduling timer chain owned by refs — immune to render/effect races — with stale-engine detection (an abandoned engine from a previous round is discarded instead of blocking new races), snapshot healing if view state ever desyncs, guaranteed timer cleanup on finish/skip/reset/unmount, and command handlers that no-op safely instead of wedging. Verified headlessly across consecutive rounds including retire-mid-race and abandoned-race recovery." },
+      { kind: "new", text: "Refresh guard: during a season, closing/reloading the browser pops the native confirmation so an accidental F5 never silently throws away an in-flight race weekend (the season itself stays autosaved)." },
+      { kind: "docs", text: "README updated with the siren/race-progress indicators, the reworked Race tab anatomy and the refresh warning." },
+    ],
+  },
+  {
     version: "v0.7",
     title: "Live races, owner orders & a paddock that talks back",
     when: "24 August 2026 · 11:19",
