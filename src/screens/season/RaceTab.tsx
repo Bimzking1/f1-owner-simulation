@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { ComponentState, RaceWeekendResult, Seat, SimulationState, TeamState } from "@/simulation/types";
 import { driverById, trackById } from "@/data";
 import { powerUnitForSeason } from "@/data/powerUnits";
-import { Button, Card, Empty, ImageLightbox, Img, Meter, Modal, Tag } from "@/ui/kit";
+import { Button, Card, Empty, ImageLightbox, Img, Meter, Modal, ScrollText, Tag } from "@/ui/kit";
 import { ratingTone } from "@/ui/ratings";
 import { driverImage } from "@/data/assets";
 import { carParts, effectiveCarStats, urgentRepairs } from "@/simulation/systems";
@@ -195,8 +195,9 @@ function PitWallPanel({
 function CarTelemetry({ car, lap }: { car: NonNullable<LiveView["cars"][string]>; lap: number }) {
   const tireTone = car.tire > 55 ? "text-positive" : car.tire > 25 ? "text-caution" : "text-signal";
   const healthTone = car.health > 70 ? "text-positive" : car.health > 40 ? "text-caution" : "text-signal";
+  const frsTone = car.frs >= 65 ? "text-signal" : car.frs >= 40 ? "text-caution" : "text-positive";
   return (
-    <div className="mt-2 grid grid-cols-2 gap-1.5 rounded-md border border-hairline bg-raised/40 p-2 text-[11px] sm:grid-cols-5">
+    <div className="mt-2 grid grid-cols-2 gap-1.5 rounded-md border border-hairline bg-raised/40 p-2 text-[11px] sm:grid-cols-6">
       <div title="Current race position">
         <div className="text-[9px] uppercase tracking-wider text-ink-faint">Position</div>
         <div className="pos-num font-bold">P{car.pos}</div>
@@ -219,6 +220,10 @@ function CarTelemetry({ car, lap }: { car: NonNullable<LiveView["cars"][string]>
           {car.form >= 0 ? "+" : ""}
           {car.form}
         </div>
+      </div>
+      <div title="Frustration — updates the moment he answers a team order">
+        <div className="text-[9px] uppercase tracking-wider text-ink-faint">Frustr.</div>
+        <div className={`num-data font-bold ${frsTone}`}>{car.frs}</div>
       </div>
     </div>
   );
@@ -473,7 +478,7 @@ function RetireConfirmModal({
           You are about to call <b>{name}</b> into the pits and end his race. He is running{" "}
           <b>P{car.pos}</b>, {car.gapS.toFixed(1)}s behind the leader, with <b>{lapsLeft}</b> lap(s) remaining.
         </p>
-        <div className="grid grid-cols-3 gap-1.5 text-xs">
+        <div className="grid grid-cols-2 gap-1.5 text-xs sm:grid-cols-4">
           <div className="rounded-sm border border-hairline bg-raised/40 px-2 py-1">
             <div className="text-[9px] uppercase tracking-wider text-ink-faint">Tire life</div>
             <div className="num-data font-bold">{car.tire}%</div>
@@ -487,6 +492,12 @@ function RetireConfirmModal({
             <div className="num-data font-bold">
               {car.form >= 0 ? "+" : ""}
               {car.form}
+            </div>
+          </div>
+          <div className="rounded-sm border border-hairline bg-raised/40 px-2 py-1" title="Frustration right now — the order lands on this immediately">
+            <div className="text-[9px] uppercase tracking-wider text-ink-faint">Frustration</div>
+            <div className={`num-data font-bold ${car.frs >= 65 ? "text-signal" : car.frs >= 40 ? "text-caution" : "text-positive"}`}>
+              {car.frs}
             </div>
           </div>
         </div>
@@ -581,11 +592,17 @@ function ComponentsCard({ state, onOpenGarage }: { state: SimulationState; onOpe
           const seatRepairs = repairs.filter((r) => r.seat === seat).length;
           return (
             <div key={seat} className={`rounded-md border p-2.5 ${seatRepairs > 0 ? "border-signal/50" : "border-hairline"}`}>
-              <div className="mb-2 flex items-center gap-2">
-                <Img src={driverImage(drv?.id ?? "", state.season)} alt={drv?.shortName ?? seat} className="h-6 w-6 rounded-sm object-cover" />
-                <span className="font-display text-sm font-bold uppercase tracking-wide">{drv?.shortName ?? seat}</span>
-                <span className="text-[10px] uppercase tracking-widest text-ink-faint">Car {seat === "car1" ? 1 : 2}</span>
-                {seatRepairs > 0 && <Tag tone="signal">{seatRepairs} broken</Tag>}
+              <div className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-1">
+                <Img src={driverImage(drv?.id ?? "", state.season)} alt={drv?.shortName ?? seat} className="h-6 w-6 shrink-0 rounded-sm object-cover" />
+                <span className="min-w-0 max-w-[10rem] truncate font-display text-sm font-bold uppercase tracking-wide">
+                  {drv?.name ?? drv?.shortName ?? seat}
+                </span>
+                <span className="whitespace-nowrap text-[10px] uppercase tracking-widest text-ink-faint">Car {seat === "car1" ? 1 : 2}</span>
+                {seatRepairs > 0 && (
+                  <span className="whitespace-nowrap">
+                    <Tag tone="signal">{seatRepairs} broken</Tag>
+                  </span>
+                )}
               </div>
               <CarFormStrip t={t} season={state.season} seat={seat} />
               <div className="space-y-2">
@@ -614,7 +631,9 @@ function ComponentsCard({ state, onOpenGarage }: { state: SimulationState; onOpe
                       }`}
                     >
                       <div className="flex items-center gap-2">
-                        <span className="min-w-0 truncate text-xs font-semibold">{r.label}</span>
+                        <span className="min-w-0 flex-1">
+                          <ScrollText className="text-xs font-semibold">{r.label}</ScrollText>
+                        </span>
                         {damaged ? (
                           <Tag tone="signal">Broken</Tag>
                         ) : worn ? (

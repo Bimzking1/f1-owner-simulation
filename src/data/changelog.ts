@@ -22,6 +22,19 @@ export interface ChangeLogEntry {
 
 export const CHANGE_LOG: ChangeLogEntry[] = [
   {
+    version: "v0.13",
+    title: "Radio answers in real time — and no more clipped labels",
+    when: "24 August 2026 · 16:06",
+    summary:
+      "Retirement orders now bite instantly: the moment a driver answers the radio his frustration moves (+7 if he refuses, +4 if he grudgingly complies) along with a trust hit, visible immediately in the pit-wall telemetry's new Frustration cell, in the retirement briefing, and spelled out in the confirmation toasts — no more waiting for the GP to finish. Layout polish across the car panels: the Race tab's per-car headers wrap gracefully (long driver names truncate instead of pushing 'broken' tags off-screen), and long part names like 'ICE — Internal Combustion' scroll like a marquee while you hover, both in the Race tab's power-unit panel and in the Garage.",
+    items: [
+      { kind: "improve", text: "Immediate consequences: forced retirements apply frustration (+7 refused / +4 obeyed) and trust (−1 / −2) the second the order is given — shown live in the pit-wall Frustration cell, the retire briefing and the toast; finalizeRound only adds the news story now." },
+      { kind: "fix", text: "Race-tab POWER UNIT headers: flex-wrap layout so the 'N broken' tag wraps below instead of overflowing, and long driver names truncate cleanly." },
+      { kind: "new", text: "Hover marquee: truncated part names (e.g. 'ICE — Internal Combu…') scroll sideways while hovered until fully readable — applied to every part row in the Race tab panel and the Garage power-system cards." },
+      { kind: "docs", text: "README notes live frustration feedback." },
+    ],
+  },
+  {
     version: "v0.12",
     title: "Car form, per driver — the stat sheet catches up with per-car hardware",
     when: "24 August 2026 · 15:48",

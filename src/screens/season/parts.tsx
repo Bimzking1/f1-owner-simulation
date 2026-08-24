@@ -33,7 +33,7 @@ export interface LiveView {
   /** Why each retired car is out ("mechanical failure…", "called into the pits by the team"…). */
   retireReasons: Record<string, string>;
   /** Live per-car telemetry for the pit wall. */
-  cars: Record<string, { pos: number; gapS: number; tire: number; health: number; form: number }>;
+  cars: Record<string, { pos: number; gapS: number; tire: number; health: number; form: number; frs: number }>;
   gridPenaltyApplied: number;
   /** True while the race is held at a checkpoint awaiting owner orders. */
   paused: boolean;
