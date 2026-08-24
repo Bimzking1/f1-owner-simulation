@@ -6,6 +6,7 @@
 
 import type {
   ComponentKey,
+  ComponentState,
   EraComponentId,
   NewsPriority,
   RaceWeekendResult,
@@ -15,7 +16,7 @@ import type {
 import { driverById, engineById, engineerById, mechanicById, sponsorById } from "@/data";
 import { DIFFICULTIES } from "@/data/config";
 import { componentLabel, powerUnitForSeason, puComponentConfig } from "@/data/powerUnits";
-import { clamp, type Rng } from "./rng";
+import { chance, clamp, type Rng } from "./rng";
 
 // ---------------------------------------------------------------------------
 // Reputation (moves all season: results, driver mood, owner conduct)
@@ -205,6 +206,119 @@ function wearPuPart(part: { wear: [number, number] }, c: { condition: number }, 
   c.condition = Math.round(clamp(c.condition - loss, 5, 100) * 10) / 10;
 }
 
+// ---------------------------------------------------------------------------
+// Component failures — random blow-ups plus crash/impact damage. A busted part
+// must be replaced in the Garage before the next GP can be started.
+
+export interface UrgentRepair {
+  key: ComponentKey;
+  name: string;
+  note?: string;
+  condition: number;
+  cost: number;
+}
+
+function bustPart(c: ComponentState, note: string, rng: Rng): void {
+  c.condition = Math.round((8 + rng() * 8) * 10) / 10;
+  c.damaged = true;
+  c.damagedNote = note;
+}
+
+/** All parts currently flagged as broken and blocking the next race. */
+export function urgentRepairs(state: SimulationState): UrgentRepair[] {
+  const t = state.team;
+  if (!t) return [];
+  ensurePuComponents(state);
+  const list: UrgentRepair[] = [];
+  const check = (key: ComponentKey, c: ComponentState | undefined) => {
+    if (!c?.damaged) return;
+    list.push({
+      key,
+      name: componentLabel(key, state.season),
+      note: c.damagedNote,
+      condition: c.condition,
+      cost: replacementCost(key, state) ?? 0,
+    });
+  };
+  check("engine", t.components.engine);
+  check("gearbox", t.components.gearbox);
+  for (const p of powerUnitForSeason(state.season).components) {
+    check(p.id, t.components.powerUnit?.[p.id]);
+  }
+  return list;
+}
+
+/**
+ * Post-weekend damage pass:
+ *  1. every tracked part can fail outright at random — odds rise sharply with
+ *     wear and with the difficulty's failure multiplier;
+ *  2. DNF reasons feed back into hardware — an engine failure leaves a dead
+ *     ICE behind, crashes hammer random parts, electrical gremlins kill the
+ *     era's electronics.
+ */
+export function applyPartDamage(state: SimulationState, weekend: RaceWeekendResult, rng: Rng): void {
+  const t = state.team;
+  if (!t) return;
+  ensurePuComponents(state);
+  const diff = DIFFICULTIES.find((d) => d.id === state.difficulty) ?? DIFFICULTIES[1];
+  const failMult = diff.failureMultiplier;
+  const gp = state.calendar.find((tr) => tr.id === weekend.trackId)?.grandPrix ?? `round ${weekend.round}`;
+
+  interface Damageable {
+    key: ComponentKey;
+    c: ComponentState;
+    base: number;
+  }
+  const parts: Damageable[] = [
+    { key: "engine", c: t.components.engine, base: 0.006 },
+    { key: "gearbox", c: t.components.gearbox, base: 0.005 },
+    ...powerUnitForSeason(state.season).components.map(
+      (p): Damageable => ({ key: p.id, c: t.components.powerUnit![p.id]!, base: p.failRisk }),
+    ),
+  ];
+  const byKey = new Map(parts.map((p) => [p.key, p]));
+  const eraElectronics = (): EraComponentId => (state.season === 2013 ? "kers" : "controlElectronics");
+
+  // 1. independent random failures — worn parts are far more likely to let go
+  for (const p of parts) {
+    if (p.c.damaged) continue;
+    const wearFactor = 1 + Math.max(0, 100 - p.c.condition) / 70; // up to ≈2.6×
+    if (rng() < p.base * failMult * wearFactor) {
+      bustPart(p.c, `Busted at ${gp} — mechanical failure`, rng);
+    }
+  }
+
+  // 2. DNF reason feedback (full race entries carry the failure description)
+  const bust = (key: ComponentKey, note: string) => {
+    const p = byKey.get(key);
+    if (p && !p.c.damaged && rng() < 0.9) bustPart(p.c, note, rng);
+  };
+  const impact = (minLoss: number, maxLoss: number, note: string) => {
+    const intact = parts.filter((p) => !p.c.damaged);
+    if (!intact.length || rng() > Math.min(failMult, 1.3)) return;
+    const target = intact[Math.floor(rng() * intact.length)]!;
+    target.c.condition = Math.round(clamp(target.c.condition - (minLoss + rng() * (maxLoss - minLoss)), 5, 100) * 10) / 10;
+    if (target.c.condition < 22) bustPart(target.c, note, rng);
+  };
+
+  const playerIds = new Set(t.drivers.map((d) => d.driverId));
+  for (const entry of [...(weekend.sprint ?? []), ...weekend.race]) {
+    if (!entry.dnf || !entry.dnfReason || !playerIds.has(entry.driverId)) continue;
+    const r = entry.dnfReason.toLowerCase();
+    if (/power unit|engine/.test(r)) bust("engine", `Engine failure at ${gp}`);
+    else if (/gearbox|transmission/.test(r)) bust("gearbox", `Gearbox failure at ${gp}`);
+    else if (/electr/.test(r)) bust(eraElectronics(), `Electrical failure at ${gp}`);
+    else if (/hydraulic/.test(r)) impact(28, 46, `Hydraulic failure damaged it at ${gp}`);
+    else if (/brake/.test(r)) impact(12, 26, `Brake failure shook it up at ${gp}`);
+    else if (/contact|crash|collision|accident|damage/.test(r)) {
+      if (rng() < 0.75) impact(30, 55, `Crash damage at ${gp}`);
+    } else {
+      // unknown retirement cause — something took a hit
+      impact(15, 35, `Damaged before retirement at ${gp}`);
+    }
+  }
+}
+
 export function advanceWear(state: SimulationState, weekend: RaceWeekendResult, rng: Rng) {
   const t = state.team;
   if (!t) return;
@@ -231,6 +345,9 @@ export function advanceWear(state: SimulationState, weekend: RaceWeekendResult, 
       c.age++;
     }
   }
+
+  // random blow-ups + crash/impact damage feed back into the garage
+  applyPartDamage(state, weekend, rng);
 }
 
 /** Cost in $M to replace a component; null if unavailable this season. */
@@ -245,7 +362,15 @@ export function replaceComponent(draft: SimulationState, component: ComponentKey
   const t = draft.team;
   if (!t) return;
   const cost = replacementCost(component, draft);
-  if (cost === null || t.cash < cost) return;
+  if (cost === null) return;
+  // A busted part can be bought on supplier credit even without cash —
+  // going into debt feeds the normal bankruptcy watch instead of soft-locking.
+  const isUrgent =
+    component === "engine" || component === "gearbox"
+      ? t.components[component].damaged === true
+      : t.components.powerUnit?.[component]?.damaged === true;
+  if (t.cash < cost && !isUrgent) return;
+  const onCredit = t.cash < cost;
   t.cash = Math.round((t.cash - cost) * 100) / 100;
   const label = componentLabel(component, draft.season);
 
@@ -270,7 +395,9 @@ export function replaceComponent(draft: SimulationState, component: ComponentKey
     label: `${label} replacement`,
     amount: -cost,
     category: "other",
-    detail: `${label} unit purchased.\nPaid in full up front — one-time part purchase, not a recurring fee.`,
+    detail: onCredit
+      ? `${label} unit purchased on supplier credit — cash went negative.\nOne-time part purchase. The team's account is now in the red; the bank is watching.`
+      : `${label} unit purchased.\nPaid in full up front — one-time part purchase, not a recurring fee.`,
   });
 }
 
@@ -286,22 +413,43 @@ export interface RaceFinanceBreakdown {
   staff: number;
 }
 
-export function applyRaceFinance(state: SimulationState, weekend: RaceWeekendResult): RaceFinanceBreakdown {
+export function applyRaceFinance(state: SimulationState, weekend: RaceWeekendResult, rng?: Rng): RaceFinanceBreakdown {
   const t = state.team;
   if (!t)
     return { sponsorIncome: 0, promoterShare: 0, salaries: 0, operations: 0, supplier: 0, staff: 0 };
   const totalRounds = state.calendar.length || 19;
   const round = state.completedRounds + 1;
+  const diff = DIFFICULTIES.find((d) => d.id === state.difficulty) ?? DIFFICULTIES[1];
 
-  // sponsor race payments
+  // sponsor race payments — activation money fluctuates weekend to weekend
+  // (image-rights timing, hospitality targets, currency swings)
   let sponsorIncome = 0;
+  const sponsorLines: string[] = [];
   for (const s of t.sponsors) {
     if (!s.active) continue;
     const spec = sponsorById(s.sponsorId);
     if (!spec) continue;
-    const pay = Math.round(spec.racePayment * 100) / 100;
+    const variance = rng ? 0.85 + rng() * 0.23 : 1; // −15% .. +8%
+    const pay = Math.round(spec.racePayment * variance * 100) / 100;
     sponsorIncome += pay;
     s.totalPaid = Math.round((s.totalPaid + pay) * 100) / 100;
+    sponsorLines.push(`${spec.name} — $${pay.toFixed(2)}M${rng && pay !== spec.racePayment ? ` (target $${spec.racePayment}M)` : ""}`);
+  }
+  sponsorIncome = Math.round(sponsorIncome * 100) / 100;
+
+  // random operating shocks — freight damage, paddock fines, failed inspections
+  let incidentCost = 0;
+  let incidentLabel = "";
+  if (rng && chance(rng, 0.09)) {
+    const incidents = [
+      "Freight damage — spare parts lost in transit",
+      "Paddock fine — pit-lane safety breach",
+      "Failed scrutineering paperwork — re-submission costs",
+      "Hospitality unit repair bill",
+      "Wind-tunnel time overage invoiced by the FIA partner",
+    ];
+    incidentLabel = incidents[Math.floor(rng() * incidents.length)]!;
+    incidentCost = Math.round((1.5 + rng() * 2.5) * diff.costMultiplier * 100) / 100;
   }
 
   // promoter share from race points
@@ -322,17 +470,10 @@ export function applyRaceFinance(state: SimulationState, weekend: RaceWeekendRes
   const staff = perRace(staffTotal);
 
   const income = Math.round((sponsorIncome + promoterShare) * 100) / 100;
-  const expense = Math.round((salaries + operations + supplier + staff) * 100) / 100;
+  const expense = Math.round((salaries + operations + supplier + staff + incidentCost) * 100) / 100;
   t.cash = Math.round((t.cash + income - expense) * 100) / 100;
 
-  const sponsorBreakdown = t.sponsors
-    .filter((s) => s.active)
-    .map((s) => {
-      const spec = sponsorById(s.sponsorId);
-      return spec ? `${spec.name} — $${spec.racePayment}M/weekend` : null;
-    })
-    .filter((x): x is string => Boolean(x))
-    .join("\n");
+  const sponsorBreakdown = sponsorLines.join("\n");
   const engName = engineById(t.engineId)?.supplier ?? "engine";
   const staffLines = [
     ...t.engineerIds.map((id) => {
@@ -390,6 +531,17 @@ export function applyRaceFinance(state: SimulationState, weekend: RaceWeekendRes
       category: "supplier",
       detail: `${engName} power unit — $${leaseSeason}M annual lease.\n÷ ${totalRounds} weekends = $${supplier.toFixed(2)}M this weekend.\nEquipment lease fees are spread per race.`,
     },
+    ...(incidentCost > 0
+      ? [
+          {
+            round,
+            label: incidentLabel,
+            amount: -incidentCost,
+            category: "operations" as const,
+            detail: "Random operating shock — bad weekends happen to good teams too.\nBudget for these; they are part of running a team.",
+          },
+        ]
+      : []),
   );
   return { sponsorIncome, promoterShare, salaries, operations, supplier, staff };
 }
@@ -416,6 +568,14 @@ export function applyMorale(state: SimulationState, weekend: RaceWeekendResult) 
   const diff = DIFFICULTIES.find((d) => d.id === state.difficulty) ?? DIFFICULTIES[1];
   const mult = diff.moraleMultiplier;
 
+  // Slump pressure: pointless weekends stack. Each extra bad weekend in a row
+  // makes the next negative swing land harder (up to ×2), so a spiral of poor
+  // results genuinely damages drivers instead of washing out.
+  const weekendPoints = weekend.playerEntries.reduce((a, e) => a + e.points, 0);
+  t.slump = weekendPoints > 0 ? 0 : (t.slump ?? 0) + 1;
+  const slumpAmp = Math.min(2, 1 + 0.35 * Math.max(0, (t.slump ?? 1) - 1));
+  const amp = (v: number) => Math.round((v < 0 ? v * slumpAmp : v) * mult);
+
   // owner interventions: lingering boosts apply once per weekend, then expire
   for (const ds of t.drivers) {
     if (!ds.boosts?.length) continue;
@@ -435,24 +595,31 @@ export function applyMorale(state: SimulationState, weekend: RaceWeekendResult) 
     let conf = 0, mor = 0, frust = 0;
 
     if (entry.dnf) {
-      mor -= 6; frust += 7;
+      conf -= 3; mor -= 7; frust += 8;
     } else if (pos === 1) { conf += 9; mor += 8; frust -= 6; }
     else if (pos <= 3) { conf += 6; mor += 5; frust -= 4; }
     else if (pos <= 6) { conf += 3; mor += 3; frust -= 2; }
     else if (pos <= 10) { conf += 1; mor += 1; }
-    else if (pos <= 15) { mor -= 1; }
-    else { conf -= 2; mor -= 3; frust += 2; }
+    else if (pos <= 15) { mor -= 2; }
+    else { conf -= 3; mor -= 4; frust += 3; }
 
     const other = t.drivers.find((x) => x.driverId !== ds.driverId);
     const otherEntry = weekend.playerEntries.find((e) => e.driverId === other?.driverId);
     if (otherEntry && !otherEntry.dnf && !entry.dnf) {
       if (pos < otherEntry.position) conf += 2;
-      else if (pos > otherEntry.position + 1) mor -= 2;
+      else if (pos > otherEntry.position + 1) mor -= 3;
     }
 
-    ds.confidence = clamp(ds.confidence + Math.round(conf * mult), 0, 100);
-    ds.morale = clamp(ds.morale + Math.round(mor * mult), 0, 100);
-    ds.frustration = clamp(ds.frustration + Math.round(frust * mult), 0, 100);
+    // unrepaired broken hardware grinds everyone down — nobody trusts a broken car
+    const brokenParts = urgentRepairs(state).length;
+    if (brokenParts > 0) {
+      frust += 2 + brokenParts;
+      mor -= 1;
+    }
+
+    ds.confidence = clamp(ds.confidence + amp(conf), 0, 100);
+    ds.morale = clamp(ds.morale + amp(mor), 0, 100);
+    ds.frustration = clamp(ds.frustration + amp(frust), 0, 100);
     if (entry.dnf) ds.dnfs++;
     ds.points += entry.points;
   }

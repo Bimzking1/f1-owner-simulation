@@ -22,6 +22,21 @@ export interface ChangeLogEntry {
 
 export const CHANGE_LOG: ChangeLogEntry[] = [
   {
+    version: "v0.6",
+    title: "Breakdowns, urgent repairs & a meaner economy",
+    when: "24 August 2026 · 09:44",
+    summary:
+      "Components can now fail outright — a blown MGU-H, cracked exhaust or cooked gearbox is flagged as broken and blocks the next Grand Prix until you replace it. The Garage gets an urgent-repair banner, the tab bar shows a repair counter, and RUN GP opens an explanation modal instead of starting the weekend. Alongside that, a balance overhaul makes blind play expensive: random part failures scale with wear and difficulty, sponsor income wobbles, random operating incidents bite, and morale collapses faster during pointless streaks.",
+    items: [
+      { kind: "new", text: "Component breakage system. Every power-unit part, the engine and the gearbox can bust mid-season: independent per-weekend failure rolls (base risk per part × difficulty multiplier × wear factor up to ≈2.6× for clapped-out hardware), plus DNF feedback — race-ending failures and crashes hammer specific components (engine/gearbox/electronics dead, hydraulics/brakes/contact impacts). A busted part sits at 8–16% condition with a damage note until replaced." },
+      { kind: "new", text: "Urgent repairs gate the race weekend. With broken hardware on the car, RUN GP buttons (header, Overview, Race tab) open a red alert listing every damaged part with its note, condition and replacement cost instead of running the round; a ⚠ marks the button, and the Garage tab badge shows the number of repairs waiting." },
+      { kind: "new", text: "Emergency supplier credit. If cash can't cover a broken part's replacement, the purchase still goes through and the account goes into the red (ledger explains it) — feeding the normal bankruptcy watch instead of soft-locking the season." },
+      { kind: "improve", text: "Garage layout rebalanced: urgent repairs on top, development window + programmes + upgrades in the wide left column; Testing and Car philosophy move to a shorter right column so pages stop stretching. The gearbox rejoins the power-system tile grid, which now flows two tiles per row." },
+      { kind: "improve", text: "Income uncertainty: sponsor payments now vary ±(−15%/+8%) per weekend, and each weekend carries a 9% chance of a random operating incident ($1.5–4M × cost multiplier) — freight damage, hospitality fire, fine — logged in finance history under operations." },
+      { kind: "improve", text: "Slump-amplified morale: consecutive pointless weekends stack a slump counter (reset on scoring) that amplifies negative confidence/morale deltas up to ×2, and the baseline got harsher — DNFs now cost −3 confidence / −7 morale / +8 frustration, points finishes outside P15 hurt, being out-qualified by your teammate stings, and broken hardware in the garage frustrates drivers further." },
+    ],
+  },
+  {
     version: "v0.5",
     title: "Era-aware Garage & geekier Technical draft",
     when: "24 August 2026 · 02:20",

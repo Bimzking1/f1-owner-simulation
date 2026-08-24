@@ -40,6 +40,8 @@ export interface PuComponentConfig {
   ageDrag: number;
   /** One-time purchase price for a fresh unit ($M). */
   replaceCost: number;
+  /** Base chance per race weekend that the part fails outright, before difficulty/wear multipliers. */
+  failRisk: number;
 }
 
 export interface PowerUnitConfig {
@@ -52,6 +54,8 @@ export interface PowerUnitConfig {
   engineName: string;
   engineSpec: string;
   engineRole: string;
+  /** Gearbox hardware spec line for the unified garage tiles. */
+  gearboxSpec: string;
   components: PuComponentConfig[];
 }
 
@@ -73,6 +77,7 @@ const PU_2013: PowerUnitConfig = {
   engineSpec: "2.4L naturally aspirated V8 · 18,000 rpm limit · ≈750 hp · ~160 kg",
   engineRole:
     "The heartbeat of the car. Cylinder deactivation, pneumatic valves and an exhaust that sings to 18,000 rpm. Wear shows up as power fade and, eventually, smoke.",
+  gearboxSpec: "7-speed seamless-shift · hydraulic · structural titanium case",
   components: [
     {
       id: "kers",
@@ -90,6 +95,7 @@ const PU_2013: PowerUnitConfig = {
       wear: [0.7, 1.3],
       ageDrag: 0.6,
       replaceCost: 2.5,
+      failRisk: 0.008,
     },
   ],
 };
@@ -107,6 +113,7 @@ const PU_2025: PowerUnitConfig = {
   engineSpec: "1.6L V6 turbo · 15,000 rpm · fuel-flow limited ≈550 hp (+≈160 hp ERS)",
   engineRole:
     "Pre-chamber combustion under a strict fuel-flow ceiling. It feeds the turbine, the MGU-H and the hydraulics — ICE health sets the ceiling for everything else.",
+  gearboxSpec: "7-speed seamless-shift · carbon-composite case · PU-mounted",
   components: [
     {
       id: "turbo",
@@ -124,6 +131,7 @@ const PU_2025: PowerUnitConfig = {
       wear: [1.4, 2.2],
       ageDrag: 1.0,
       replaceCost: 3,
+      failRisk: 0.01,
     },
     {
       id: "mguK",
@@ -141,6 +149,7 @@ const PU_2025: PowerUnitConfig = {
       wear: [1.0, 1.6],
       ageDrag: 0.8,
       replaceCost: 3.5,
+      failRisk: 0.007,
     },
     {
       id: "mguH",
@@ -158,6 +167,7 @@ const PU_2025: PowerUnitConfig = {
       wear: [0.9, 1.5],
       ageDrag: 0.9,
       replaceCost: 3,
+      failRisk: 0.005,
     },
     {
       id: "energyStore",
@@ -175,6 +185,7 @@ const PU_2025: PowerUnitConfig = {
       wear: [1.2, 1.9],
       ageDrag: 1.2,
       replaceCost: 4.5,
+      failRisk: 0.006,
     },
     {
       id: "controlElectronics",
@@ -190,6 +201,7 @@ const PU_2025: PowerUnitConfig = {
       wear: [0.4, 0.8],
       ageDrag: 0.3,
       replaceCost: 2,
+      failRisk: 0.003,
     },
     {
       id: "exhaust",
@@ -206,6 +218,7 @@ const PU_2025: PowerUnitConfig = {
       wear: [1.6, 2.4],
       ageDrag: 1.4,
       replaceCost: 1.5,
+      failRisk: 0.012,
     },
   ],
 };

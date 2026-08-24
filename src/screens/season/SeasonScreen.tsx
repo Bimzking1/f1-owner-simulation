@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { SimulationState } from "@/simulation/types";
 import { constructorById } from "@/data";
 import { difficultyOf, ownerTitle } from "@/state";
+import { urgentRepairs } from "@/simulation/systems";
 import { Button, Img, Modal, Money } from "@/ui/kit";
 import type { Act } from "./parts";
 import { OverviewTab } from "./OverviewTab";
@@ -33,6 +34,7 @@ export default function SeasonScreen({ state, onRunRound, onNewsAction, act, onR
   const wccPos = state.standingsConstructors.findIndex((c) => c.teamId === t.constructorId) + 1;
   const [tab, setTab] = useState<Tab>("Overview");
   const [confirmMenu, setConfirmMenu] = useState(false);
+  const [repairOpen, setRepairOpen] = useState(false);
 
   if (state.phase === "bankrupt" || state.phase === "finished") {
     return <EndScreens state={state} onReset={onReset} />;
@@ -40,6 +42,13 @@ export default function SeasonScreen({ state, onRunRound, onNewsAction, act, onR
 
   const next = state.calendar[state.round];
   const seasonDone = !next;
+
+  /** Broken hardware blocks the next GP — Run buttons open the repair alert instead. */
+  const repairs = urgentRepairs(state);
+  const handleRunRound = () => {
+    if (repairs.length > 0) setRepairOpen(true);
+    else onRunRound();
+  };
 
   /** News actions can navigate ("goto:sponsors") instead of mutating the sim. */
   const handleNewsAction = (newsId: string, action: string) => {
@@ -116,7 +125,13 @@ export default function SeasonScreen({ state, onRunRound, onNewsAction, act, onR
             Menu
           </Button>
           {!seasonDone && (
-            <Button onClick={onRunRound} className="order-last w-full md:order-none md:w-auto md:shrink-0">
+            <Button
+              onClick={handleRunRound}
+              className={`order-last w-full md:order-none md:w-auto md:shrink-0 ${
+                repairs.length > 0 ? "border-signal/60 opacity-90" : ""
+              }`}
+            >
+              {repairs.length > 0 && <span className="mr-1">⚠</span>}
               Run R{state.round + 1} · {next.grandPrix} →
             </Button>
           )}
@@ -131,7 +146,9 @@ export default function SeasonScreen({ state, onRunRound, onNewsAction, act, onR
                 ? { count: openChats, cls: "bg-signal" }
                 : tb === "Sponsors"
                   ? sponsorsBadge
-                  : null;
+                  : tb === "Garage" && repairs.length > 0
+                    ? { count: repairs.length, cls: "bg-signal" }
+                    : null;
             return (
               <button
                 key={tb}
@@ -158,9 +175,9 @@ export default function SeasonScreen({ state, onRunRound, onNewsAction, act, onR
       </nav>
 
       {tab === "Overview" && (
-        <OverviewTab state={state} onNewsAction={handleNewsAction} onRunRound={onRunRound} onNavigate={(x) => setTab(x)} />
+        <OverviewTab state={state} onNewsAction={handleNewsAction} onRunRound={handleRunRound} onNavigate={(x) => setTab(x)} />
       )}
-      {tab === "Race" && <RaceTab state={state} onRunRound={onRunRound} />}
+      {tab === "Race" && <RaceTab state={state} onRunRound={handleRunRound} />}
       {tab === "Management" && <ManagementTab state={state} act={act} onNewsAction={handleNewsAction} />}
       {tab === "Market" && <MarketTab state={state} act={act} />}
       {tab === "Sponsors" && <SponsorsTab state={state} act={act} />}
@@ -174,6 +191,38 @@ export default function SeasonScreen({ state, onRunRound, onNewsAction, act, onR
         <div className="mt-4 flex justify-end gap-2">
           <Button small variant="ghost" onClick={() => setConfirmMenu(false)}>Keep playing</Button>
           <Button small onClick={onReset}>Quit to menu</Button>
+        </div>
+      </Modal>
+
+      <Modal open={repairOpen} onClose={() => setRepairOpen(false)} title="Urgent repair required">
+        <div className="space-y-3 text-sm">
+          {repairs.map((r) => (
+            <div key={r.key} className="rounded-md border border-caution/50 bg-caution/10 p-3">
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-display font-bold uppercase">{r.name}</span>
+                <span className="num-data text-caution">{r.condition.toFixed(1)}%</span>
+              </div>
+              <p className="mt-0.5 text-[11px] leading-relaxed text-caution">{r.note}</p>
+              <p className="mt-1 text-[11px] text-ink-faint">Replacement cost: ${r.cost}M</p>
+            </div>
+          ))}
+          <p className="rounded-md border-l-2 border-signal/60 bg-raised/40 p-3 text-xs leading-relaxed text-ink-soft">
+            You cannot start round {state.round + 1} · {next?.grandPrix ?? "GP"} with broken hardware. The car is unsafe
+            and the stewards would never let it out of the pit lane anyway. Head to the Garage and replace every broken
+            part first.
+          </p>
+          <div className="flex justify-end gap-2 pt-1">
+            <Button small variant="ghost" onClick={() => setRepairOpen(false)}>Understood</Button>
+            <Button
+              small
+              onClick={() => {
+                setRepairOpen(false);
+                setTab("Garage");
+              }}
+            >
+              To the garage →
+            </Button>
+          </div>
         </div>
       </Modal>
     </div>

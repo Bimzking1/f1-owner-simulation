@@ -5,6 +5,7 @@ import {
   generateDevOptions,
   isDevWindow,
   replacementCost,
+  urgentRepairs,
 } from "@/simulation/systems";
 import { engineById } from "@/data";
 import {
@@ -41,11 +42,47 @@ export function GarageTab({ state, act }: Props) {
   const [openPart, setOpenPart] = useState<ComponentKey | null>(null);
   const [testPick, setTestPick] = useState<TestType | null>(null);
   const costs = testingBudget();
+  const repairs = urgentRepairs(state);
 
   return (
-    <div className="grid gap-4 lg:grid-cols-3">
-      <div className="space-y-4 lg:col-span-2">
+    <div className="space-y-4">
+      {repairs.length > 0 && (
         <Card
+          title="Urgent repairs"
+          right={<Tag tone="signal">{repairs.length} broken</Tag>}
+        >
+          <p className="text-xs leading-relaxed text-caution">
+            The car is not raceable. Replace every broken part before running the next Grand Prix — the run button stays
+            locked until the garage is clean.
+          </p>
+          <div className="mt-2 grid gap-2 sm:grid-cols-2">
+            {repairs.map((r) => (
+              <div key={r.key} className="flex items-center justify-between gap-2 rounded-md border border-caution/50 bg-caution/10 p-2.5">
+                <div className="min-w-0">
+                  <div className="truncate font-display text-sm font-bold uppercase">{r.name}</div>
+                  <div className="truncate text-[11px] text-caution">
+                    {r.note} · {r.condition.toFixed(1)}%
+                  </div>
+                </div>
+                <Button small variant="danger" onClick={() => setConfirmSwap(r.key)}>
+                  Replace ${r.cost}M
+                </Button>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      <div className="grid gap-4 lg:grid-cols-3">
+        <div className="space-y-4 lg:col-span-2">
+          <PowerSystemCard
+            state={state}
+            openPart={openPart}
+            onToggle={(key) => setOpenPart((cur) => (cur === key ? null : key))}
+            onSwap={(key) => setConfirmSwap(key)}
+          />
+
+          <Card
           title="Development window"
           right={
             !devWindow ? (
@@ -146,26 +183,6 @@ export function GarageTab({ state, act }: Props) {
       </div>
 
       <div className="space-y-4">
-        <PowerSystemCard
-          state={state}
-          openPart={openPart}
-          onToggle={(key) => setOpenPart((cur) => (cur === key ? null : key))}
-          onSwap={(key) => setConfirmSwap(key)}
-        />
-
-        <Card title="Gearbox">
-          <SwapRow
-            label="Gearbox"
-            condition={t.components.gearbox.condition}
-            age={t.components.gearbox.age}
-            replacements={t.components.gearbox.replacements}
-            cost={replacementCost("gearbox", state) ?? 0}
-            cash={t.cash}
-            onSwap={() => setConfirmSwap("gearbox")}
-          />
-          <p className="mt-3 text-[11px] text-ink-faint">{gearboxEraNote(state.season)}</p>
-        </Card>
-
         <Card title="Testing" right={<span className="text-[10px] uppercase tracking-wider text-ink-faint">confirm before spend</span>}>
           <div className="space-y-2">
             {(["performance", "reliability", "tire", "driver"] as TestType[]).map((type) => (
@@ -232,8 +249,9 @@ export function GarageTab({ state, act }: Props) {
             });
             setTestPick(null);
           }}
-        />
-      )}
+          />
+        )}
+      </div>
     </div>
   );
 }
@@ -300,6 +318,9 @@ function SwapConfirmModal({
       : (t.components.powerUnit?.[component] ?? { condition: 100, age: 0, replacements: 0 });
   const cashAfter = Math.round((t.cash - cost) * 100) / 100;
   const label = componentLabel(component, state.season);
+  const urgent = cur.damaged === true;
+  const credit = cashAfter < 0 && urgent;
+  const cantAfford = t.cash < cost && !urgent;
   return (
     <Modal open onClose={onClose} title={`Replace ${label}?`}>
       <div className="space-y-3 text-sm">
@@ -307,6 +328,11 @@ function SwapConfirmModal({
           Buy a brand-new {label.toLowerCase()} unit for <Money value={cost} />? The old unit is scrapped — this is a
           one-time purchase, not a recurring fee.
         </p>
+        {urgent && (
+          <p className="rounded-md border-l-2 border-caution bg-caution/10 p-2 text-xs text-caution">
+            This part is broken — {label} cannot race until it is replaced.
+          </p>
+        )}
         <div className="grid gap-2 rounded-md border border-hairline bg-raised/40 p-3 text-xs">
           <div className="flex items-center justify-between">
             <span className="text-ink-faint">Current condition</span>
@@ -335,6 +361,12 @@ function SwapConfirmModal({
             </span>
           </div>
         </div>
+        {credit && (
+          <p className="rounded-md border-l-2 border-signal bg-signal/10 p-2 text-xs text-signal">
+            You can't cover this from cash — the supplier extends emergency credit and your account goes into the red.
+            The bank is watching.
+          </p>
+        )}
         {cashAfter < 10 && cashAfter >= 0 && (
           <p className="rounded-md border-l-2 border-caution bg-caution/10 p-2 text-xs text-caution">
             Warning: this leaves you with less than $10M. Race weekends cost several million in wages and operations.
@@ -342,7 +374,7 @@ function SwapConfirmModal({
         )}
         <div className="flex justify-end gap-2 pt-1">
           <Button small variant="ghost" onClick={onClose}>Keep current unit</Button>
-          <Button small disabled={t.cash < cost} onClick={onConfirm}>
+          <Button small disabled={cantAfford} onClick={onConfirm}>
             Replace for ${cost}M
           </Button>
         </div>
@@ -370,6 +402,7 @@ interface PartRow {
 
 const ENGINE_WEAR: [number, number] = [2.4, 4.0];
 const ENGINE_AGE_DRAG = 0.8;
+const GEARBOX_WEAR: [number, number] = [1.9, 3.1];
 
 function partRows(state: SimulationState): PartRow[] {
   const t = state.team!;
@@ -401,6 +434,24 @@ function partRows(state: SimulationState): PartRow[] {
         { kind: "condition", label: "Condition", hint: "Health of the installed unit." },
         { kind: "reliability", label: "Reliability", hint: "Estimated odds of surviving the weekend." },
         { kind: "output", label: "Output", hint: "Power delivery vs the day it left the factory." },
+        { kind: "usageRaces", label: "Age", hint: "Race weekends completed on this unit." },
+        { kind: "usageKm", label: "Mileage", hint: "Distance covered since installation." },
+      ],
+    },
+    {
+      key: "gearbox",
+      name: "Gearbox",
+      spec: cfg.gearboxSpec,
+      role: gearboxEraNote(state.season),
+      c: t.components.gearbox,
+      wear: GEARBOX_WEAR,
+      ageDrag: 0.7,
+      cost: replacementCost("gearbox", state) ?? 0,
+      baseRel: engBase,
+      stats: [
+        { kind: "condition", label: "Condition", hint: "Health of case, gears and hydraulics." },
+        { kind: "reliability", label: "Reliability", hint: "Estimated odds of surviving the weekend." },
+        { kind: "output", label: "Shift quality", hint: "Shift speed vs factory spec." },
         { kind: "usageRaces", label: "Age", hint: "Race weekends completed on this unit." },
         { kind: "usageKm", label: "Mileage", hint: "Distance covered since installation." },
       ],
@@ -469,7 +520,7 @@ function PowerSystemCard({
         <Meter value={sys} tone={ratingTone(sys)} className="mt-1" />
       </div>
 
-      <div className="space-y-2">
+      <div className="mt-3 grid gap-2 sm:grid-cols-2">
         {rows.map((r) => (
           <PuRow
             key={r.key}
@@ -539,26 +590,6 @@ function PuRow({
           </div>
         </div>
       )}
-    </div>
-  );
-}
-
-function SwapRow({
-  label, condition, age, replacements, cost, cash, onSwap,
-}: { label: string; condition: number; age: number; replacements: number; cost: number; cash: number; onSwap: () => void }) {
-  return (
-    <div className="rounded-md border border-hairline p-3">
-      <div className="flex items-center justify-between">
-        <span className="font-display font-bold uppercase">{label}</span>
-        <span className={`num-data text-base ${condition < 50 ? "text-caution" : "text-ink-soft"}`}>{condition.toFixed(1)}%</span>
-      </div>
-      <Meter value={condition} tone={ratingTone(condition)} className="my-2" />
-      <div className="flex items-center justify-between text-xs text-ink-faint">
-        <span>age {age} race(s) · {replacements} replaced</span>
-        <Button small variant="ghost" disabled={cash < cost} onClick={onSwap}>
-          Replace ${cost}M
-        </Button>
-      </div>
     </div>
   );
 }

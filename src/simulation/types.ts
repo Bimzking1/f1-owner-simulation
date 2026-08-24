@@ -364,6 +364,10 @@ export interface ComponentState {
   condition: number; // %
   age: number; // races used
   replacements: number;
+  /** True when the part failed outright (busted/crash damage) and must be replaced before the next GP. */
+  damaged?: boolean;
+  /** Short human note about how/where it broke, shown in alerts. */
+  damagedNote?: string;
 }
 
 /**
@@ -481,6 +485,8 @@ export interface TeamState {
   sponsors: SponsorState[];
   /** Training programmes (pit crew / driver) already run, keyed by round — one per weekend each. */
   trainings?: TrainingLog[];
+  /** Consecutive pointless weekends — bad streaks amplify morale/confidence drops. */
+  slump?: number;
   pitCrew: number; // 0-100 pit crew level (upgradeable)
   history: FinancialTransaction[];
   mgmt?: MgmtLog[]; // owner interventions per driver (cooldown tracking)

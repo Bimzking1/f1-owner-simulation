@@ -182,7 +182,7 @@ export function runRound(state: SimulationState): RoundOutcome {
   applyMorale(state, weekend);
   applyReputation(state, weekend);
   advanceWear(state, weekend, rng);
-  const finance = applyRaceFinance(state, weekend);
+  const finance = applyRaceFinance(state, weekend, rng);
   void finance;
   evaluateSponsors(state);
   advanceDevelopment(state);
