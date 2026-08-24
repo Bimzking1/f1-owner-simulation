@@ -121,7 +121,7 @@ export function Card({ title, right, children, className = "", pad = true }: { t
   );
 }
 
-export function Button({ children, onClick, variant = "primary", disabled, className = "", small }: { children: ReactNode; onClick?: () => void; variant?: "primary" | "ghost" | "danger" | "positive" | "signal"; disabled?: boolean; className?: string; small?: boolean }) {
+export function Button({ children, onClick, variant = "primary", disabled, className = "", small, title }: { children: ReactNode; onClick?: () => void; variant?: "primary" | "ghost" | "danger" | "positive" | "signal"; disabled?: boolean; className?: string; small?: boolean; title?: string }) {
   const vars: Record<string, string> = {
     primary: "bg-signal text-white hover:bg-signal/80 border border-signal/60",
     ghost: "bg-raised text-ink-soft hover:text-ink hover:bg-raised/80 border border-hairline",
@@ -134,6 +134,7 @@ export function Button({ children, onClick, variant = "primary", disabled, class
       type="button"
       disabled={disabled}
       onClick={onClick}
+      title={title}
       className={`inline-flex items-center justify-center gap-1.5 ${small ? "px-2 py-1 text-[11px]" : "px-3.5 py-2 text-sm"} rounded-sm font-display font-bold uppercase tracking-widest transition disabled:cursor-not-allowed disabled:opacity-40 ${vars[variant]} ${className}`}
     >
       {children}

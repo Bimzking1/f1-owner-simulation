@@ -8,13 +8,29 @@ import type {
   DifficultyId,
   Driver,
   Phase,
+  RaceEntry,
+  RaceEvent,
   RaceWeekendResult,
   SimulationState,
   SponsorSpec,
   TeamState,
+  Track,
+  WeatherId,
 } from "./types";
+import { createRng, clamp, rand, type Rng } from "./rng";
 import { computeCarStats, carRating, driverAbility, trackWeights } from "./perf";
-import { simulateRaceWeekend, type Competitor, type RaceInput } from "./race";
+import {
+  assembleWeekend,
+  beginRace,
+  advanceRace,
+  completeRace,
+  generateForecast,
+  rollWeather,
+  simulateQualifying,
+  type Competitor,
+  type RaceInput,
+  type RaceSession,
+} from "./race";
 import { buildGridLineups } from "./grid";
 import { applyChatResponse } from "./systems";
 import {
@@ -27,11 +43,12 @@ import {
   bankruptcyCheck,
   effectivePuHealth,
   evaluateSponsors,
+  generateDriverChallenge,
   generateDriverChat,
   generatePaddockNews,
+  resolveDriverChallenge,
   scheduleSponsorObjectives,
 } from "./systems";
-import { createRng, rand, type Rng } from "./rng";
 import {
   constructorById,
   driverById,
@@ -153,18 +170,37 @@ export interface RoundOutcome {
   bankruptNow: boolean;
 }
 
-/** Run the next race weekend of the season. Mutates state. */
-export function runRound(state: SimulationState): RoundOutcome {
+/** Everything decided before the feature race starts: forecast, weather,
+ *  qualifying, sprint. The returned session is resumable lap-by-lap so the
+ *  UI can run a live race with owner interventions. Keep out of saves —
+ *  the session holds closures (Rng). */
+export interface PreparedRound {
+  roundIdx: number;
+  track: Track;
+  input: RaceInput;
+  weatherId: WeatherId;
+  forecast: { rainProbability: number; confidence: "low" | "medium" | "high"; window?: string };
+  qualifying: RaceEntry[];
+  sprint?: RaceEntry[];
+  preRaceEvents: RaceEvent[];
+  gridPenaltyApplied: number;
+  session: RaceSession;
+}
+
+/** Set the weekend up through the start of the feature race. Mutates state
+ *  only by clearing lastSwap (a race locks in the line-up). */
+export function prepareRound(state: SimulationState): PreparedRound | null {
   state.lastSwap = null; // a race locks in the line-up — no refunds once it counts
   const t = state.team;
-  if (!t) return { weekend: state.lastWeekend!, phase: state.phase, bankruptNow: false };
+  if (!t) return null;
   const idx = state.round;
   const track = state.calendar[idx];
-  if (!track) return { weekend: state.lastWeekend!, phase: "finished", bankruptNow: false };
+  if (!track) return null;
 
   const rng = createRng(`${state.seed}:r${idx}`);
   const competitors = buildCompetitors(state, rng);
 
+  const gridPenalty = t.gridPenalty ?? 0;
   const input: RaceInput = {
     season: state.season,
     difficulty: state.difficulty,
@@ -174,25 +210,94 @@ export function runRound(state: SimulationState): RoundOutcome {
     competitors,
     playerTeamId: t.constructorId,
     runSprint: track.sprint && state.gameLength !== "short",
+    gridPenalty,
   };
-  const weekend = simulateRaceWeekend(input);
-  weekend.round = idx + 1;
+
+  const forecast = generateForecast(track, rng, state.difficulty);
+  const weatherId = rollWeather(track, forecast, rng);
+  const preRaceEvents: RaceEvent[] = [];
+
+  let grid = simulateQualifying(input);
+  preRaceEvents.push({
+    lap: 0,
+    type: "info",
+    severity: "info",
+    text: `Qualifying complete — ${grid[0].driverId} on pole.`,
+    textEnjoyer: "Qualifying done — the grid is set.",
+  });
+
+  let sprint: RaceEntry[] | undefined;
+  if (input.runSprint && state.season === 2025) {
+    const sprintSession = beginRace(input, weatherId, grid, [8, 7, 6, 5, 4, 3, 2, 1], false);
+    advanceRace(sprintSession, sprintSession.laps);
+    for (const e of sprintSession.events) preRaceEvents.push(e);
+    sprint = completeRace(sprintSession);
+    grid = sprint.map((s) => ({ ...s, points: 0 })).sort((a, b) => (a.position ?? 99) - (b.position ?? 99));
+    grid.forEach((g, i) => (g.gridPosition = i + 1));
+    preRaceEvents.push({
+      lap: Math.round(track.laps * 0.4),
+      type: "info",
+      severity: "success",
+      text: "SPRINT complete — its order sets tomorrow's grid.",
+      textEnjoyer: "SPRINT done — the grid is set.",
+    });
+  }
+
+  const session = beginRace(input, weatherId, grid, [25, 18, 15, 12, 10, 8, 6, 4, 2, 1], state.season === 2025);
+
+  return {
+    roundIdx: idx,
+    track,
+    input,
+    weatherId,
+    forecast: {
+      rainProbability: forecast.rainProbability,
+      confidence: forecast.confidence,
+      window: forecast.window,
+    },
+    qualifying: grid,
+    sprint,
+    preRaceEvents,
+    gridPenaltyApplied: gridPenalty,
+    session,
+  };
+}
+
+/** Apply post-race systems and advance the calendar. Consumes the prepared
+ *  round's finished session. */
+export function finalizeRound(state: SimulationState, prep: PreparedRound): RoundOutcome {
+  const classified = completeRace(prep.session);
+  const weekend = assembleWeekend(prep.input, {
+    track: prep.track,
+    weather: prep.weatherId,
+    forecast: prep.forecast,
+    qualifying: prep.qualifying,
+    sprint: prep.sprint,
+    race: classified,
+    events: [...prep.preRaceEvents, ...prep.session.events],
+    lapOrder: prep.session.lapOrder,
+  });
+  weekend.round = prep.roundIdx + 1;
 
   applyStandings(state, weekend);
-  applyMorale(state, weekend);
+  applyMorale(state, weekend, createRng(`${state.seed}:mor:r${prep.roundIdx}`));
   applyReputation(state, weekend);
-  advanceWear(state, weekend, rng);
-  const finance = applyRaceFinance(state, weekend, rng);
+  advanceWear(state, weekend, createRng(`${state.seed}:wear:r${prep.roundIdx}`));
+  const finance = applyRaceFinance(state, weekend, createRng(`${state.seed}:fin:r${prep.roundIdx}`));
   void finance;
   evaluateSponsors(state);
+  resolveDriverChallenge(state, weekend);
   advanceDevelopment(state);
-  generatePaddockNews(state, rng);
-  generateDriverChat(state, rng);
+  generatePaddockNews(state, createRng(`${state.seed}:news:r${prep.roundIdx}`));
+  generateDriverChat(state, createRng(`${state.seed}:chat:r${prep.roundIdx}`));
+  generateDriverChallenge(state, createRng(`${state.seed}:chal:r${prep.roundIdx}`));
   bankruptcyCheck(state);
   pushRaceNews(state, weekend);
 
+  const t = state.team!;
+  t.gridPenalty = undefined; // penalty served at this GP
   state.lastWeekend = weekend;
-  state.completedRounds = idx + 1;
+  state.completedRounds = prep.roundIdx + 1;
   state.round = state.completedRounds;
   state.updatedAt = Date.now();
 
@@ -200,6 +305,14 @@ export function runRound(state: SimulationState): RoundOutcome {
   if (state.round >= state.calendar.length) state.phase = "finished";
   const bankruptNow = prePhase !== "bankrupt" && state.phase === "bankrupt";
   return { weekend, phase: state.phase, bankruptNow };
+}
+
+/** Run the next race weekend of the season. Mutates state. */
+export function runRound(state: SimulationState): RoundOutcome {
+  const prep = prepareRound(state);
+  if (!prep) return { weekend: state.lastWeekend!, phase: state.phase, bankruptNow: false };
+  advanceRace(prep.session, prep.session.laps);
+  return finalizeRound(state, prep);
 }
 
 // ---------------------------------------------------------------------------
@@ -415,6 +528,63 @@ export function resolveNewsAction(state: SimulationState, newsId: string, action
       const ack = CHAT_ACKS[action];
       item.body += `\n\n${label} — ${delta("morale")} · ${delta("confidence")} · ${delta("frustration")}.\nPaddock trust ${trustDelta > 0 ? "+" : ""}${trustDelta} (${t.trust ?? 50}/100).\nNow: morale ${ds.morale} · confidence ${ds.confidence} · frustration ${ds.frustration}.${ack ? `\n"${ack}, ${ownerTitleOf(state)}."` : ""}`;
     }
+    return;
+  }
+
+  // Bossy-driver ultimatums: pay a bonus for a promised podium — or refuse.
+  if (action === "challenge-accept" || action === "challenge-reject") {
+    const ch = t.driverChallenge;
+    const ds = t.drivers.find((x) => x.driverId === ch?.driverId);
+    const d = ch ? driverById(ch.driverId, state.season) : null;
+    if (!ch || !ds || !d || ch.accepted) {
+      item.resolved = true;
+      item.options = [];
+      return;
+    }
+    if (action === "challenge-reject") {
+      ds.frustration = clamp(ds.frustration + 10, 0, 100);
+      ds.morale = clamp(ds.morale - 4, 0, 100);
+      t.trust = clamp((t.trust ?? 50) - 1, 0, 100);
+      item.body += `\n\nDemand rejected. "${d.shortName}" takes it badly: frustration +10 · morale −4 · trust −1.`;
+      item.bodyEnjoyer = `You called ${d.shortName}'s bluff. He didn't like it.`;
+      t.driverChallenge = undefined;
+      item.resolved = true;
+      item.options = [];
+      return;
+    }
+    // accept
+    if (t.cash < ch.amount) {
+      item.body += `\n\nYou tried to accept but cannot cover $${ch.amount}M (cash $${t.cash.toFixed(2)}M). The demand still stands.`;
+      item.bodyEnjoyer = `$${ch.amount}M needed — you have $${t.cash.toFixed(2)}M.`;
+      return; // stays unresolved so the owner can free up cash or reject later
+    }
+    const round = state.completedRounds + 1;
+    t.cash = Math.round((t.cash - ch.amount) * 100) / 100;
+    t.history.push({
+      round,
+      label: `${d.shortName} podium bonus`,
+      amount: -ch.amount,
+      category: "other",
+      detail: `Challenge accepted: $${ch.amount}M up front against a promised podium within ${ch.roundsLeft} race(s).\nDelivered → morale/trust reward. Missed → frustration +12 and trust −4.`,
+    });
+    ds.morale = clamp(ds.morale + 4, 0, 100);
+    ds.confidence = clamp(ds.confidence + 3, 0, 100);
+    ds.boosts ??= [];
+    ds.boosts.push({ label: "Bonus challenge", confidence: 2, racesLeft: ch.roundsLeft + 1 });
+    ch.accepted = true;
+    item.body += `\n\nDeal. $${ch.amount}M paid up front — a podium is promised within ${ch.roundsLeft} race(s). Morale +4 · confidence +3. The whole paddock is watching.`;
+    item.bodyEnjoyer = `${d.shortName} has ${ch.roundsLeft} race(s) to deliver. The money's gone either way.`;
+    state.news.unshift({
+      id: `chal-deal-${round}`,
+      round,
+      tag: "driver",
+      priority: "info",
+      title: `${d.shortName}'s challenge is on`,
+      body: `The garage knows about the bet. Deliver or melt down.`,
+      bodyEnjoyer: `A star wagered his own pride for $${ch.amount}M.`,
+    });
+    item.resolved = true;
+    item.options = [];
     return;
   }
 

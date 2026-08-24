@@ -382,14 +382,24 @@ function SwapConfirm({
             </span>
           </div>
           <div className="flex justify-between">
-            <span className="text-ink-faint">Break fee</span>
-            <span className="num-data text-signal">−$2.0M</span>
+            <span className="text-ink-faint">Break fee + star markup</span>
+            <span className="num-data text-signal">−${quote.fee.toFixed(1)}M</span>
           </div>
           <div className="flex justify-between border-t border-hairline pt-1 font-semibold">
             <span>Total cost</span>
             <Money value={-quote.total} className={quote.canAfford ? "" : "text-signal"} />
           </div>
-          {!quote.canAfford && <div className="text-[11px] font-semibold uppercase tracking-wider text-signal">Not enough cash — need $${quote.total.toFixed(1)}M</div>}
+          {quote.reputationBlocked ? (
+            <div className="rounded-md border-l-2 border-signal bg-signal/10 p-2 text-[11px] leading-relaxed text-signal">
+              {quote.target.shortName} will not sign for a team with reputation {state.team!.reputation} — his agent
+              wants at least {quote.requiredReputation}. Win races and build the brand first.
+            </div>
+          ) : quote.fee > 2.05 ? (
+            <div className="text-[11px] leading-relaxed text-caution">
+              Star markup: a driver rated {quote.target.overall} charges a premium on top of the $2M break fee.
+            </div>
+          ) : null}
+          {!quote.canAfford && !quote.reputationBlocked && <div className="text-[11px] font-semibold uppercase tracking-wider text-signal">Not enough cash — need ${quote.total.toFixed(1)}M</div>}
           <div className="pt-1 text-[11px] leading-relaxed text-ink-faint">
             Warning: the swap affects morale and line-up immediately. Undo is possible only once, before the next race.
           </div>
@@ -398,11 +408,11 @@ function SwapConfirm({
         <div className="flex justify-end gap-2">
           <Button variant="ghost" onClick={onCancel}>Cancel</Button>
           <Button
-            variant={quote.canAfford && !onTeam ? "primary" : "ghost"}
-            disabled={!quote.canAfford || onTeam}
+            variant={quote.canAfford && !onTeam && !quote.reputationBlocked ? "primary" : "ghost"}
+            disabled={!quote.canAfford || onTeam || quote.reputationBlocked}
             onClick={onConfirm}
           >
-            {onTeam ? "Already on the team" : `Swap ${quote.target.shortName}`}
+            {onTeam ? "Already on the team" : quote.reputationBlocked ? "Reputation too low" : `Swap ${quote.target.shortName}`}
           </Button>
         </div>
       </div>

@@ -318,6 +318,8 @@ export interface RaceWeekendResult {
   race: RaceEntry[];
   sprint?: RaceEntry[];
   events: RaceEvent[];
+  /** Per-lap running order — index 0 is the starting grid, then one entry per completed lap. */
+  lapOrder?: string[][];
   playerEntries: { driverId: string; position: number; points: number; dnf: boolean }[];
   breakdown: { car: number; driver: number; strategy: number; reliability: number; luck: number };
   chaos: number;
@@ -487,6 +489,14 @@ export interface TeamState {
   trainings?: TrainingLog[];
   /** Consecutive pointless weekends — bad streaks amplify morale/confidence drops. */
   slump?: number;
+  /**
+   * A star driver's ultimatum: "pay me a bonus and I promise a podium within
+   * N races." Accepted challenges are paid up front; failing the promise
+   * frustrates the driver and costs trust.
+   */
+  driverChallenge?: DriverChallenge;
+  /** Grid places lost at the next GP for changing engine (+10) or gearbox (+5). */
+  gridPenalty?: number;
   pitCrew: number; // 0-100 pit crew level (upgradeable)
   history: FinancialTransaction[];
   mgmt?: MgmtLog[]; // owner interventions per driver (cooldown tracking)
@@ -495,6 +505,16 @@ export interface TeamState {
   podiums: number;
   dnfs: number;
   lastRoundCompleted: number;
+}
+
+/** Driver → owner ultimatum (spec §22b): cash for a promised result. */
+export interface DriverChallenge {
+  driverId: string;
+  /** Up-front bonus in $M the owner pays on acceptance. */
+  amount: number;
+  /** Races remaining to deliver the promised podium. */
+  roundsLeft: number;
+  accepted: boolean;
 }
 
 export type TestType = "performance" | "reliability" | "tire" | "driver";

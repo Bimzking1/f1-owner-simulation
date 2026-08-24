@@ -115,9 +115,23 @@ export interface SwapQuote {
   fee: number;
   total: number;
   canAfford: boolean;
+  /** Reputation the team needs before this driver will even talk (0 = none). */
+  requiredReputation: number;
+  /** True when the target refuses to sign at the team's current reputation. */
+  reputationBlocked: boolean;
 }
 
-/** Transfer cost for a seat swap: prorated salary delta + $2M break fee. */
+/** Minimum reputation to attract a driver of a given overall rating.
+ *  A midfield car cannot simply buy a champion — reputation must be earned. */
+export function requiredReputationFor(overall: number): number {
+  return Math.max(0, Math.round((overall - 68) * 2.2));
+}
+
+/**
+ * Transfer cost for a seat swap: prorated salary delta + break fee, with a
+ * star premium — drivers above ~80 overall charge a signing markup that
+ * grows with every point of rating.
+ */
 export function swapQuote(state: SimulationState, slot: 1 | 2, driverId: string): SwapQuote | null {
   const t = state.team!;
   const currentId = slot === 1 ? t.driver1Id : t.driver2Id;
@@ -127,8 +141,19 @@ export function swapQuote(state: SimulationState, slot: 1 | 2, driverId: string)
   const roundsLeft = Math.max(1, state.calendar.length - state.round);
   const prorated = Math.max(0, ((target.salary - (old?.salary ?? 4)) / state.calendar.length) * roundsLeft);
   const fee = 2; // $M break fee
-  const total = Math.round((prorated + fee) * 100) / 100;
-  return { currentId, target, prorated, fee, total, canAfford: t.cash >= total };
+  const starPremium = Math.round(Math.max(0, target.overall - 80) * 0.14 * fee * 10) / 10;
+  const total = Math.round((prorated + fee + starPremium) * 100) / 100;
+  const requiredReputation = requiredReputationFor(target.overall);
+  return {
+    currentId,
+    target,
+    prorated,
+    fee: Math.round((fee + starPremium) * 100) / 100,
+    total,
+    canAfford: t.cash >= total,
+    requiredReputation,
+    reputationBlocked: t.reputation < requiredReputation,
+  };
 }
 
 /** Swap one of the two seats (spec §45 driver market). */
@@ -143,6 +168,13 @@ export function swapDriver(state: SimulationState, slot: 1 | 2, driverId: string
   if (!target) return msg(result, false, "Unknown driver.");
   const old = driverById(currentId, state.season);
   const quote = swapQuote(state, slot, driverId)!;
+  if (quote.reputationBlocked) {
+    return msg(
+      result,
+      false,
+      `${target.shortName} won't join a team with reputation ${t.reputation} — needs ${quote.requiredReputation}.`,
+    );
+  }
   const total = quote.total;
   if (t.cash < total) return msg(result, false, `Need $${total}M for the transfer.`);
   t.cash = Math.round((t.cash - total) * 100) / 100;
@@ -165,7 +197,7 @@ export function swapDriver(state: SimulationState, slot: 1 | 2, driverId: string
     label: `${old?.shortName ?? currentId} out, ${target.shortName} in`,
     amount: -total,
     category: "other",
-    detail: `Seat change.\nBreak fee: $${quote.fee}M\nProrated salary delta (${state.calendar.length - state.completedRounds} remaining rounds): $${quote.prorated}M\nTotal: $${total}M`,
+      detail: `Seat change.\nBreak fee (+star markup if any): $${quote.fee}M\nProrated salary delta (${state.calendar.length - state.completedRounds} remaining rounds): $${quote.prorated}M\nTotal: $${total}M`,
   });
   state.news.unshift({
     id: `swap-${state.completedRounds + 1}-${driverId}`,

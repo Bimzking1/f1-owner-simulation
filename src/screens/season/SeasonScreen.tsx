@@ -4,7 +4,7 @@ import { constructorById } from "@/data";
 import { difficultyOf, ownerTitle } from "@/state";
 import { urgentRepairs } from "@/simulation/systems";
 import { Button, Img, Modal, Money } from "@/ui/kit";
-import type { Act } from "./parts";
+import type { Act, LiveCommand, LiveView } from "./parts";
 import { OverviewTab } from "./OverviewTab";
 import { RaceTab } from "./RaceTab";
 import { MarketTab } from "./MarketTab";
@@ -19,6 +19,13 @@ export type { Act };
 interface Props {
   state: SimulationState;
   onRunRound: () => void;
+  /** Start a live desktop race; false → fall back to the instant sim. */
+  onStartLive?: () => boolean;
+  onAutoRun?: () => void;
+  live?: LiveView | null;
+  sendCommand?: (cmd: LiveCommand) => void;
+  onResume?: () => void;
+  onSkipToEnd?: () => void;
   onNewsAction: (newsId: string, action: string) => void;
   act: Act;
   onReset: () => void;
@@ -28,7 +35,19 @@ type Tab = "Overview" | "Race" | "Management" | "Market" | "Sponsors" | "Garage"
 
 const TABS: Tab[] = ["Overview", "Race", "Management", "Market", "Sponsors", "Garage", "Finance"];
 
-export default function SeasonScreen({ state, onRunRound, onNewsAction, act, onReset }: Props) {
+export default function SeasonScreen({
+  state,
+  onRunRound,
+  onStartLive,
+  onAutoRun,
+  live,
+  sendCommand,
+  onResume,
+  onSkipToEnd,
+  onNewsAction,
+  act,
+  onReset,
+}: Props) {
   const t = state.team!;
   const ctor = constructorById(t.constructorId, state.season);
   const wccPos = state.standingsConstructors.findIndex((c) => c.teamId === t.constructorId) + 1;
@@ -42,12 +61,23 @@ export default function SeasonScreen({ state, onRunRound, onNewsAction, act, onR
 
   const next = state.calendar[state.round];
   const seasonDone = !next;
+  const raceBusy = !!live && !live.done;
 
   /** Broken hardware blocks the next GP — Run buttons open the repair alert instead. */
   const repairs = urgentRepairs(state);
   const handleRunRound = () => {
-    if (repairs.length > 0) setRepairOpen(true);
-    else onRunRound();
+    if (repairs.length > 0) {
+      setRepairOpen(true);
+      return;
+    }
+    if (raceBusy) return;
+    // Desktop manual runs go through the live race on the Race tab.
+    setTab("Race");
+    if (!onStartLive?.()) onRunRound();
+  };
+  const handleAutoRound = () => {
+    if (repairs.length > 0 || raceBusy) return;
+    onAutoRun?.();
   };
 
   /** News actions can navigate ("goto:sponsors") instead of mutating the sim. */
@@ -125,15 +155,28 @@ export default function SeasonScreen({ state, onRunRound, onNewsAction, act, onR
             Menu
           </Button>
           {!seasonDone && (
-            <Button
-              onClick={handleRunRound}
-              className={`order-last w-full md:order-none md:w-auto md:shrink-0 ${
-                repairs.length > 0 ? "border-signal/60 opacity-90" : ""
-              }`}
-            >
-              {repairs.length > 0 && <span className="mr-1">⚠</span>}
-              Run R{state.round + 1} · {next.grandPrix} →
-            </Button>
+            <div className="order-last flex w-full gap-2 md:order-none md:w-auto">
+              <Button
+                variant="ghost"
+                onClick={handleAutoRound}
+                disabled={raceBusy}
+                title="Simulate weekends automatically — stops when parts break, a driver demands a word, or the season ends"
+                className={`flex-1 md:flex-none ${repairs.length > 0 ? "border-signal/60 opacity-90" : ""}`}
+              >
+                {repairs.length > 0 && <span className="mr-1">⚠</span>}Auto
+              </Button>
+              <Button
+                onClick={handleRunRound}
+                disabled={raceBusy}
+                title={live ? "Race in progress" : "Run this weekend"}
+                className="flex-[2] md:flex-none md:shrink-0"
+              >
+                <span className={repairs.length > 0 || raceBusy ? "mr-1" : ""}>
+                  {(repairs.length > 0 && "⚠") || (raceBusy && "🏁")}
+                </span>
+                {raceBusy ? "Race live…" : `Run R${state.round + 1} · ${next.grandPrix} →`}
+              </Button>
+            </div>
           )}
         </div>
       </header>
@@ -177,7 +220,16 @@ export default function SeasonScreen({ state, onRunRound, onNewsAction, act, onR
       {tab === "Overview" && (
         <OverviewTab state={state} onNewsAction={handleNewsAction} onRunRound={handleRunRound} onNavigate={(x) => setTab(x)} />
       )}
-      {tab === "Race" && <RaceTab state={state} onRunRound={handleRunRound} />}
+      {tab === "Race" && (
+        <RaceTab
+          state={state}
+          onRunRound={handleRunRound}
+          live={live}
+          sendCommand={sendCommand}
+          onResume={onResume}
+          onSkipToEnd={onSkipToEnd}
+        />
+      )}
       {tab === "Management" && <ManagementTab state={state} act={act} onNewsAction={handleNewsAction} />}
       {tab === "Market" && <MarketTab state={state} act={act} />}
       {tab === "Sponsors" && <SponsorsTab state={state} act={act} />}

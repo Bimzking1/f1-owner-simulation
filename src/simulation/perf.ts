@@ -112,7 +112,9 @@ export function carRating(car: CarStats, w: TrackWeights): number {
   );
 }
 
-/** Overall driver ability for a track (0-100), season form folded in. */
+/** Overall driver ability for a track (0-100), season form folded in.
+ *  Frustration poisons everything above ~40 — a furious driver loses up to
+ *  3 rating points and starts forcing it. */
 export function driverAbility(
   driver: Driver,
   state: DriverState | undefined,
@@ -122,6 +124,7 @@ export function driverAbility(
   const a = driver.attributes;
   const mood = state ? (state.confidence * 0.55 + state.morale * 0.45 - 50) / 100 : 0;
   const form = (driver.seasonForm + (state?.form ?? 0)) * 0.5;
+  const frust = Math.max(0, (state?.frustration ?? 40) - 40) * 0.05;
   let base =
     a.pace * 0.4 +
     a.qualifying * 0.14 +
@@ -129,7 +132,7 @@ export function driverAbility(
     a.consistency * 0.1 +
     a.tireManagement * 0.2;
   if (wet !== undefined) base += (a.wetSkill - w.driverWeight * 100) * (wet / 300);
-  return clamp(base + mood * 2 + form, 30, 100);
+  return clamp(base + mood * 2 + form - frust, 30, 100);
 }
 
 /** Qualifying effectiveness (one-lap speed). */
@@ -141,7 +144,8 @@ export function qualifyingAbility(
   const base =
     a.qualifying * 0.5 + a.pace * 0.4 + a.consistency * 0.1;
   const mood = state ? (state.confidence - 50) / 100 : 0;
-  return clamp(base + mood * 2 + (driver.seasonForm + (state?.form ?? 0)) * 0.5, 30, 100);
+  const frust = Math.max(0, (state?.frustration ?? 40) - 40) * 0.04;
+  return clamp(base + mood * 2 + (driver.seasonForm + (state?.form ?? 0)) * 0.5 - frust, 30, 100);
 }
 
 /** Seconds-per-lap offset from a rating (centered so ~85 = pack median). */

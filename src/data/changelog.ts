@@ -22,6 +22,25 @@ export interface ChangeLogEntry {
 
 export const CHANGE_LOG: ChangeLogEntry[] = [
   {
+    version: "v0.7",
+    title: "Live races, owner orders & a paddock that talks back",
+    when: "24 August 2026 · 11:19",
+    summary:
+      "The biggest feedback batch yet: RUN GP on desktop is now a live race — the position chart builds lap by lap while the race-control log streams in, pausing at two checkpoints where you issue pit-wall orders (push, steady, conserve, one-shot motivate or retire the car; pushing buys pace with real mechanical and accident risk). An AUTO button simulates weekends until something demands you: broken parts, a driver wanting a word, or bankruptcy. The driver market gains a reputation gate — champions like Verstappen now demand reputation 68+ before they'll even talk — plus star signing markups, FIA-style grid penalties for engine/gearbox changes, an upset premium on promoter payouts for underdog podiums, wider income swings per difficulty, and frustration that finally slows drivers down: angry stars confront you demanding podium bonuses, rant to the press, and bleed lap time.",
+    items: [
+      { kind: "new", text: "Live race engine on desktop. Running a GP no longer resolves instantly: the Race tab streams qualifying → lights out → every lap, drawing the position-movement chart in real time. The race pauses at ~33% and ~66% distance checkpoints so you can set each driver's stance — PUSH (+pace, ×1.8 crash risk, extra tire wear and failures), STEADY, CONSERVE (−pace, calmer car), a one-per-race MOTIVATE pep talk, or RETIRE the car outright. Skip-to-result any time; mobile keeps the instant simulation." },
+      { kind: "new", text: "Position chart & race log exposed post-race too. The desktop Race tab shows the finished race's lap-by-lap position chart (playback controls, scrubber, click a line to isolate a driver) and the full race-control log without opening Replay." },
+      { kind: "new", text: "AUTO simulate. A header button runs weekends back-to-back and stops the moment something needs its owner: parts break, a driver demands a meeting, cash dies, or the season ends — with a toast explaining why it stopped." },
+      { kind: "new", text: "Bossy-driver challenges. Frustrated or slumping stars (OVR 78+) may demand a podium bonus ($1.5–8M over 2–3 rounds) via a chat card in Management. Accept pays up front and buys morale/confidence/trust; delivering the podium supercharges it; missing the window detonates frustration, trust and reputation. Ignoring or rejecting has its own costs." },
+      { kind: "new", text: "Reputation-gated driver market. Drivers above OVR 68 require team reputation (~2.2 pts of rep per rating point above 68): Verstappen needs 68, Hamilton/Alonso sit in the 50s — no more purple-lineup Aston Martins in week one. Stars also charge a growing signing markup over the $2M break fee." },
+      { kind: "new", text: "Grid penalties, FIA-style. Replacing the engine drops both cars 10 grid places at the next GP, gearbox 5 (stacking to −20). Broken-part replacements count too — the stewards only see a new unit. The penalty appears on the Race tab, Next-race card and swap confirmations, then clears once served." },
+      { kind: "improve", text: "Promoter share rework: base rate stays $0.45M/point ±12% gate noise, but underdog podiums pay a premium — the weaker your car DNA and the lower-rated your scoring drivers, the bigger the bonus (up to ×1.7), because promoters pay for a story. Ledger detail spells out the formula." },
+      { kind: "improve", text: "Income uncertainty scaled by difficulty: sponsor payments swing within bands from rookie −15%/+8% to ruthless −40%/+28%, incident chance rises 6%→19%, and expert/ruthless add nastier shocks (supplier price hikes, sponsor clawbacks, FIA surcharges, overtime settlements)." },
+      { kind: "improve", text: "Frustration bites for real. Above ~40 frustration drivers lose up to half a second of pace (race & quali); incidents become more likely as tempers fray; P16+ finishes, DNFs, teammate beatings and active bonus-demands all feed the fire; and at 72+ a star may publicly slam the team — costing reputation and trust until you manage them." },
+      { kind: "docs", text: "README updated: live racing + AUTO button, reputation gate and star markups in the market, grid penalties and promoter economics documented alongside the existing Garage/Finance sections." },
+    ],
+  },
+  {
     version: "v0.6",
     title: "Breakdowns, urgent repairs & a meaner economy",
     when: "24 August 2026 · 09:44",

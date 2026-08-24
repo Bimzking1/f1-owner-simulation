@@ -4,18 +4,25 @@ import { driverById, trackById } from "@/data";
 import { Button, Card, Empty, ImageLightbox, Img, Meter, Modal, Tag } from "@/ui/kit";
 import { ratingTone } from "@/ui/ratings";
 import { driverImage } from "@/data/assets";
-import { NextRaceCard } from "./parts";
+import { NextRaceCard, type LiveCommand, type LiveView } from "./parts";
+import { PositionChart } from "./PositionChart";
 
 interface Props {
   state: SimulationState;
   onRunRound: () => void;
+  /** Present while a live race is running (desktop manual runs). */
+  live?: LiveView | null;
+  sendCommand?: (cmd: LiveCommand) => void;
+  onResume?: () => void;
+  onSkipToEnd?: () => void;
 }
 
-export function RaceTab({ state, onRunRound }: Props) {
+export function RaceTab({ state, onRunRound, live, sendCommand, onResume, onSkipToEnd }: Props) {
   const t = state.team!;
   const done = state.completedRounds >= state.calendar.length;
   const next = state.calendar[state.round];
   const last = state.lastWeekend;
+  const busy = !!live && !live.done;
   return (
     <div className="grid gap-4 lg:grid-cols-3">
       <div className="space-y-4 lg:col-span-2">
@@ -27,21 +34,32 @@ export function RaceTab({ state, onRunRound }: Props) {
               <p className="text-sm text-ink-soft">
                 {next ? `Next: ${next.grandPrix} (Round ${state.round + 1})` : "Calendar complete."}
               </p>
-              <div className="mt-3">
-                <Button onClick={onRunRound}>Run the {next?.grandPrix ?? ""} →</Button>
+              {!!t.gridPenalty && (
+                <div className="mt-2 rounded-md border-l-2 border-caution bg-caution/10 p-2 text-xs text-caution">
+                  Stewards' ruling: both cars carry a −{t.gridPenalty} grid penalty at this GP for power-unit/gearbox
+                  changes.
+                </div>
+              )}
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <Button onClick={onRunRound} disabled={busy}>
+                  {busy ? "Race in progress…" : `Run the ${next?.grandPrix ?? ""} →`}
+                </Button>
               </div>
               <p className="mt-4 text-xs text-ink-faint">
                 The weekend simulates qualifying{next?.sprint && state.gameLength !== "short" ? ", a sprint" : ""} and the race with
-                lap-level events, weather and mechanical risk. Results land in the news feed.
+                lap-level events, weather and mechanical risk. On desktop you can follow the race live at checkpoints and issue pit-wall orders.
               </p>
             </div>
           )}
         </Card>
         {last && <ResultCard weekend={last} season={state.season} />}
         {last && <WeekendClassification state={state} weekend={last} />}
-        {next && <NextRaceCard track={next} round={state.round + 1} />}
+        {next && <NextRaceCard track={next} round={state.round + 1} gridPenalty={t.gridPenalty} />}
       </div>
       <div className="space-y-4">
+        {live && (
+          <LiveRacePanel live={live} state={state} sendCommand={sendCommand} onResume={onResume} onSkipToEnd={onSkipToEnd} />
+        )}
         <Card title="Components">
           <div className="space-y-3 text-sm">
             <div className="flex items-center justify-between gap-2">
@@ -61,6 +79,16 @@ export function RaceTab({ state, onRunRound }: Props) {
             <Meter value={t.pitCrew} tone={ratingTone(t.pitCrew)} />
           </div>
         </Card>
+        {!live && last?.lapOrder && last.lapOrder.length > 1 && (
+          <Card title="Position chart" className="hidden lg:block">
+            <PositionChart key={`wk-${last.round}`} weekend={last} season={state.season} />
+          </Card>
+        )}
+        {!live && last && last.events.length > 0 && (
+          <Card title="Race control log" className="hidden lg:block">
+            <RaceLogFeed events={[...last.events].sort((a, b) => a.lap - b.lap)} />
+          </Card>
+        )}
         {t.upgrades.length > 0 && (
           <Card title="Development in progress">
             <div className="space-y-2">
@@ -77,6 +105,163 @@ export function RaceTab({ state, onRunRound }: Props) {
           </Card>
         )}
       </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Live race panel (desktop) — chart builds lap by lap, log streams, and at
+// checkpoints the owner issues pit-wall orders.
+
+function LiveRacePanel({
+  live,
+  state,
+  sendCommand,
+  onResume,
+  onSkipToEnd,
+}: {
+  live: LiveView;
+  state: SimulationState;
+  sendCommand?: (cmd: LiveCommand) => void;
+  onResume?: () => void;
+  onSkipToEnd?: () => void;
+}) {
+  return (
+    <Card
+      title={
+        <span className="flex items-center gap-2">
+          R{live.roundIdx + 1} · {live.grandPrix}
+          {live.done ? <Tag tone="positive">Finished</Tag> : <Tag tone="signal">LIVE</Tag>}
+        </span>
+      }
+      right={
+        !live.done ? (
+          <Button small variant="ghost" onClick={onSkipToEnd}>
+            Skip to result ⏭
+          </Button>
+        ) : undefined
+      }
+      className="hidden lg:block"
+    >
+      <PositionChart
+        weekend={{
+          qualifying: live.qualifying,
+          race: [],
+          lapOrder: live.lapOrder,
+        }}
+        season={state.season}
+        liveLap={live.currentLap}
+      />
+
+      <div className="mt-3 max-h-52 space-y-1 overflow-y-auto rounded-md border border-hairline bg-void p-2">
+        {live.events.slice(-30).map((e, i) => (
+          <div key={`${e.lap}-${i}`} className="text-xs leading-relaxed text-ink-soft">
+            <Tag tone={sev(e.severity)}>L{e.lap}</Tag> <span className="text-ink-faint">·</span> {e.text}
+          </div>
+        ))}
+        {live.events.length === 0 && <p className="text-xs text-ink-faint">Formation lap…</p>}
+      </div>
+
+      {live.paused && !live.done && sendCommand && (
+        <div className="mt-3 space-y-2 rounded-md border border-signal/40 bg-signal/5 p-3">
+          <div className="text-[11px] font-bold uppercase tracking-widest text-signal">
+            Checkpoint — pit wall is yours
+          </div>
+          {live.playerIds.map((id) => (
+            <DriverOrderRow
+              key={id}
+              driverId={id}
+              season={state.season}
+              stance={live.stances[id] ?? "steady"}
+              motivateUsed={!!live.motivateUsed[id]}
+              sendCommand={sendCommand}
+            />
+          ))}
+          <Button small className="w-full" onClick={onResume}>
+            Green flag — resume ▶
+          </Button>
+        </div>
+      )}
+      {!live.paused && !live.done && (
+        <p className="mt-3 text-[11px] leading-relaxed text-ink-faint">
+          Orders open automatically at the lap ~33% and ~66% checkpoints.
+        </p>
+      )}
+    </Card>
+  );
+}
+
+function DriverOrderRow({
+  driverId,
+  season,
+  stance,
+  motivateUsed,
+  sendCommand,
+}: {
+  driverId: string;
+  season: number;
+  stance: "push" | "steady" | "conserve";
+  motivateUsed: boolean;
+  sendCommand: (cmd: LiveCommand) => void;
+}) {
+  const d = driverById(driverId, season);
+  const btn = (kind: "push" | "steady" | "conserve", label: string, cls: string) => (
+    <button
+      type="button"
+      onClick={() => sendCommand({ driverId, kind })}
+      className={`rounded-sm border px-2 py-1 text-[10px] font-bold uppercase tracking-wider transition ${
+        stance === kind ? `${cls}` : "border-hairline bg-raised/40 text-ink-soft hover:bg-raised"
+      }`}
+    >
+      {label}
+    </button>
+  );
+  return (
+    <div className="rounded-md border border-hairline bg-raised/40 p-2">
+      <div className="mb-1 flex items-center gap-2">
+        <Img src={driverImage(driverId, season)} alt={d?.shortName ?? driverId} className="h-5 w-5 rounded-sm object-cover" />
+        <span className="text-sm font-semibold">{d?.shortName ?? driverId}</span>
+      </div>
+      <div className="flex flex-wrap items-center gap-1.5">
+        {btn("push", "Push", "border-caution/60 bg-caution/15 text-caution")}
+        {btn("steady", "Steady", "border-signal/50 bg-signal/15 text-signal")}
+        {btn("conserve", "Conserve", "border-positive/60 bg-positive/15 text-positive")}
+        <button
+          type="button"
+          disabled={motivateUsed}
+          onClick={() => sendCommand({ driverId, kind: "motivate" })}
+          className={`rounded-sm border px-2 py-1 text-[10px] font-bold uppercase tracking-wider transition ${
+            motivateUsed ? "cursor-not-allowed border-transparent text-ink-faint opacity-50" : "border-elite/60 bg-elite/10 text-elite hover:bg-elite/20"
+          }`}
+        >
+          Motivate {motivateUsed ? "✓" : ""}
+        </button>
+        <button
+          type="button"
+          onClick={() => sendCommand({ driverId, kind: "retire" })}
+          className="ml-auto rounded-sm border border-signal/60 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-signal transition hover:bg-signal/10"
+        >
+          Retire car
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** Auto-scrolling race log used by the desktop "Race control log" card. */
+function RaceLogFeed({ events }: { events: import("@/simulation/types").RaceEvent[] }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    ref.current?.scrollTo({ top: ref.current.scrollHeight });
+  }, [events.length]);
+  return (
+    <div ref={ref} className="max-h-64 space-y-1 overflow-y-auto pr-1 [scrollbar-gutter:stable]">
+      {events.map((e, i) => (
+        <div key={`${e.lap}-${i}`} className="text-xs leading-relaxed text-ink-soft">
+          <Tag tone={sev(e.severity)}>L{e.lap}</Tag> <span className="text-ink-faint">·</span> {e.text}
+        </div>
+      ))}
+      {events.length === 0 && <p className="text-xs text-ink-faint">No events.</p>}
     </div>
   );
 }

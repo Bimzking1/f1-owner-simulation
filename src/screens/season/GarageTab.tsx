@@ -321,6 +321,7 @@ function SwapConfirmModal({
   const urgent = cur.damaged === true;
   const credit = cashAfter < 0 && urgent;
   const cantAfford = t.cash < cost && !urgent;
+  const gridPenalty = component === "engine" ? 10 : component === "gearbox" ? 5 : 0;
   return (
     <Modal open onClose={onClose} title={`Replace ${label}?`}>
       <div className="space-y-3 text-sm">
@@ -361,6 +362,12 @@ function SwapConfirmModal({
             </span>
           </div>
         </div>
+        {gridPenalty > 0 && (
+          <p className="rounded-md border-l-2 border-caution bg-caution/10 p-2 text-xs text-caution">
+            Stewards' ruling: a {label.toLowerCase()} change takes a new allocation — both cars drop{" "}
+            {gridPenalty} grid places at the next GP{t.gridPenalty ? ` (stacks with the −${t.gridPenalty} you already carry)` : ""}.
+          </p>
+        )}
         {credit && (
           <p className="rounded-md border-l-2 border-signal bg-signal/10 p-2 text-xs text-signal">
             You can't cover this from cash — the supplier extends emergency credit and your account goes into the red.

@@ -7,13 +7,14 @@
 import type {
   ComponentKey,
   ComponentState,
+  DriverChallenge,
   EraComponentId,
   NewsPriority,
   RaceWeekendResult,
   SimulationState,
   TeamState,
 } from "./types";
-import { driverById, engineById, engineerById, mechanicById, sponsorById } from "@/data";
+import { constructorById, driverById, engineById, engineerById, mechanicById, sponsorById } from "@/data";
 import { DIFFICULTIES } from "@/data/config";
 import { componentLabel, powerUnitForSeason, puComponentConfig } from "@/data/powerUnits";
 import { chance, clamp, type Rng } from "./rng";
@@ -371,6 +372,15 @@ export function replaceComponent(draft: SimulationState, component: ComponentKey
       : t.components.powerUnit?.[component]?.damaged === true;
   if (t.cash < cost && !isUrgent) return;
   const onCredit = t.cash < cost;
+
+  // FIA-style grid penalty: changing the internal combustion engine costs
+  // 10 places at the next GP, a gearbox 5. Broken hardware is no excuse —
+  // the stewards only see a new unit going in.
+  let penalty = 0;
+  if (component === "engine") penalty = 10;
+  else if (component === "gearbox") penalty = 5;
+  if (penalty > 0) t.gridPenalty = Math.min(20, (t.gridPenalty ?? 0) + penalty);
+
   t.cash = Math.round((t.cash - cost) * 100) / 100;
   const label = componentLabel(component, draft.season);
 
@@ -395,9 +405,11 @@ export function replaceComponent(draft: SimulationState, component: ComponentKey
     label: `${label} replacement`,
     amount: -cost,
     category: "other",
-    detail: onCredit
-      ? `${label} unit purchased on supplier credit — cash went negative.\nOne-time part purchase. The team's account is now in the red; the bank is watching.`
-      : `${label} unit purchased.\nPaid in full up front — one-time part purchase, not a recurring fee.`,
+    detail:
+      (onCredit
+        ? `${label} unit purchased on supplier credit — cash went negative.\nOne-time part purchase. The team's account is now in the red; the bank is watching.`
+        : `${label} unit purchased.\nPaid in full up front — one-time part purchase, not a recurring fee.`) +
+      (penalty > 0 ? `\nStewards' ruling: −${penalty} grid places at the next Grand Prix.` : ""),
   });
 }
 
@@ -422,14 +434,23 @@ export function applyRaceFinance(state: SimulationState, weekend: RaceWeekendRes
   const diff = DIFFICULTIES.find((d) => d.id === state.difficulty) ?? DIFFICULTIES[1];
 
   // sponsor race payments — activation money fluctuates weekend to weekend
-  // (image-rights timing, hospitality targets, currency swings)
+  // (image-rights timing, hospitality targets, currency swings). Higher
+  // difficulty = wider bands: on Ruthless a partner can pay 40% short.
   let sponsorIncome = 0;
   const sponsorLines: string[] = [];
+  const band: [number, number] =
+    state.difficulty === "rookie"
+      ? [0.85, 1.08]
+      : state.difficulty === "professional"
+        ? [0.8, 1.12]
+        : state.difficulty === "expert"
+          ? [0.72, 1.18]
+          : [0.6, 1.28];
   for (const s of t.sponsors) {
     if (!s.active) continue;
     const spec = sponsorById(s.sponsorId);
     if (!spec) continue;
-    const variance = rng ? 0.85 + rng() * 0.23 : 1; // −15% .. +8%
+    const variance = rng ? band[0] + rng() * (band[1] - band[0]) : 1;
     const pay = Math.round(spec.racePayment * variance * 100) / 100;
     sponsorIncome += pay;
     s.totalPaid = Math.round((s.totalPaid + pay) * 100) / 100;
@@ -437,24 +458,55 @@ export function applyRaceFinance(state: SimulationState, weekend: RaceWeekendRes
   }
   sponsorIncome = Math.round(sponsorIncome * 100) / 100;
 
-  // random operating shocks — freight damage, paddock fines, failed inspections
+  // random operating shocks — freight damage, paddock fines, failed inspections.
+  // Frequency and severity scale with the difficulty's cost multiplier.
   let incidentCost = 0;
   let incidentLabel = "";
-  if (rng && chance(rng, 0.09)) {
-    const incidents = [
-      "Freight damage — spare parts lost in transit",
-      "Paddock fine — pit-lane safety breach",
-      "Failed scrutineering paperwork — re-submission costs",
-      "Hospitality unit repair bill",
-      "Wind-tunnel time overage invoiced by the FIA partner",
-    ];
-    incidentLabel = incidents[Math.floor(rng() * incidents.length)]!;
-    incidentCost = Math.round((1.5 + rng() * 2.5) * diff.costMultiplier * 100) / 100;
+  if (rng) {
+    const incidentChance =
+      state.difficulty === "rookie" ? 0.06 : state.difficulty === "professional" ? 0.09 : state.difficulty === "expert" ? 0.14 : 0.19;
+    if (chance(rng, incidentChance)) {
+      const incidents = [
+        "Freight damage — spare parts lost in transit",
+        "Paddock fine — pit-lane safety breach",
+        "Failed scrutineering paperwork — re-submission costs",
+        "Hospitality unit repair bill",
+        "Wind-tunnel time overage invoiced by the FIA partner",
+      ];
+      if (state.difficulty === "expert" || state.difficulty === "ruthless") {
+        incidents.push(
+          "Supplier price hike — mid-season invoice adjustment",
+          "Sponsor activation audit — clawback of unpaid bonuses",
+          "FIA travel and logistics surcharge",
+          "Staff overtime settlement after a triple-header",
+        );
+      }
+      incidentLabel = incidents[Math.floor(rng() * incidents.length)]!;
+      incidentCost = Math.round((1.5 + rng() * (state.difficulty === "ruthless" ? 3.5 : 2.5)) * diff.costMultiplier * 100) / 100;
+    }
   }
 
-  // promoter share from race points
+  // promoter share from race points — base rate $0.45M per point, but
+  // promoters pay a premium when an unfancied team or driver lands big:
+  // the weaker the machinery and the lower-rated the drivers, the bigger
+  // the story — and the bigger the gate/TV share cheque.
   const teamPoints = weekend.playerEntries.reduce((a, e) => a + e.points, 0);
-  const promoterShare = Math.round(teamPoints * 0.45 * 100) / 100;
+  let upset = 1;
+  if (teamPoints > 0) {
+    const ctor = constructorById(t.constructorId, state.season);
+    const finishes = weekend.playerEntries.filter((e) => !e.dnf).map((e) => e.position);
+    const bestPos = finishes.length ? Math.min(...finishes) : 99;
+    if (ctor && bestPos <= 3) {
+      const carTier = (ctor.dna.aero + ctor.dna.chassis) / 2; // ~85 top teams · ~65 backmarkers
+      const scoring = weekend.playerEntries
+        .filter((e) => !e.dnf && e.position <= 3)
+        .map((e) => driverById(e.driverId, state.season)?.overall ?? 75);
+      const driverTier = scoring.length ? scoring.reduce((a, b) => a + b, 0) / scoring.length : 80;
+      upset = clamp(1 + Math.max(0, 78 - carTier) * 0.016 + Math.max(0, 80 - driverTier) * 0.014, 1, 1.7);
+    }
+  }
+  const promVar = rng ? 0.88 + rng() * 0.24 : 1; // ±12% gate/TV noise
+  const promoterShare = Math.round(teamPoints * 0.45 * promVar * upset * 100) / 100;
 
   const perRace = (seasonTotal: number) => Math.round((seasonTotal / totalRounds) * 100) / 100;
   const d1 = driverById(t.driver1Id, state.season);
@@ -501,7 +553,12 @@ export function applyRaceFinance(state: SimulationState, weekend: RaceWeekendRes
       label: "Promoter share",
       amount: promoterShare,
       category: "prize",
-      detail: `${teamPoints} point(s) × $0.45M = $${promoterShare.toFixed(2)}M. Promoter pays the team per championship point scored.`,
+      detail:
+        `${teamPoints} point(s) × $0.45M base rate${promVar !== 1 ? ` × ${promVar.toFixed(2)} gate/TV variance` : ""}` +
+        (upset > 1.01
+          ? ` × ${upset.toFixed(2)} upset bonus — promoters pay a premium when a low-rated team/driver lands a big result`
+          : "") +
+        ` = $${promoterShare.toFixed(2)}M.`,
     },
     {
       round,
@@ -562,7 +619,7 @@ export function prizeMoney(teamsCount: number, position: number): number {
 // ---------------------------------------------------------------------------
 // Driver morale (spec §22)
 
-export function applyMorale(state: SimulationState, weekend: RaceWeekendResult) {
+export function applyMorale(state: SimulationState, weekend: RaceWeekendResult, rng?: Rng) {
   const t = state.team;
   if (!t) return;
   const diff = DIFFICULTIES.find((d) => d.id === state.difficulty) ?? DIFFICULTIES[1];
@@ -595,19 +652,25 @@ export function applyMorale(state: SimulationState, weekend: RaceWeekendResult) 
     let conf = 0, mor = 0, frust = 0;
 
     if (entry.dnf) {
-      conf -= 3; mor -= 7; frust += 8;
+      conf -= 3; mor -= 7; frust += 9;
     } else if (pos === 1) { conf += 9; mor += 8; frust -= 6; }
     else if (pos <= 3) { conf += 6; mor += 5; frust -= 4; }
     else if (pos <= 6) { conf += 3; mor += 3; frust -= 2; }
     else if (pos <= 10) { conf += 1; mor += 1; }
     else if (pos <= 15) { mor -= 2; }
-    else { conf -= 3; mor -= 4; frust += 3; }
+    else { conf -= 3; mor -= 4; frust += 4; }
 
     const other = t.drivers.find((x) => x.driverId !== ds.driverId);
     const otherEntry = weekend.playerEntries.find((e) => e.driverId === other?.driverId);
     if (otherEntry && !otherEntry.dnf && !entry.dnf) {
       if (pos < otherEntry.position) conf += 2;
-      else if (pos > otherEntry.position + 1) mor -= 3;
+      else if (pos > otherEntry.position + 1) { mor -= 3; frust += 2; }
+    }
+
+    // an accepted challenge turns every race into a pressure cooker
+    const ch = t.driverChallenge;
+    if (ch?.accepted && ch.driverId === ds.driverId) {
+      frust += 2;
     }
 
     // unrepaired broken hardware grinds everyone down — nobody trusts a broken car
@@ -622,6 +685,132 @@ export function applyMorale(state: SimulationState, weekend: RaceWeekendResult) 
     ds.frustration = clamp(ds.frustration + amp(frust), 0, 100);
     if (entry.dnf) ds.dnfs++;
     ds.points += entry.points;
+  }
+
+  // Boiling-over drivers go public: a furious star ranting to the media
+  // bleeds reputation and garage trust until the root cause is fixed.
+  if (rng) {
+    for (const ds of t.drivers) {
+      if (ds.frustration < 72 || !chance(rng, 0.5)) continue;
+      const d = driverById(ds.driverId, state.season);
+      if (!d) continue;
+      addReputation(t, -1);
+      t.trust = clamp((t.trust ?? 50) - 2, 0, 100);
+      state.news.unshift({
+        id: `rant-${weekend.round}-${ds.driverId}`,
+        round: weekend.round,
+        tag: "driver",
+        priority: "warning" satisfies NewsPriority,
+        title: `${d.shortName} slams the team in the media`,
+        body: `"I am done pretending everything is fine. Frustration ${ds.frustration}/100 — either things change or I will change them myself." The interview is everywhere; paddock trust −2, reputation −1.`,
+        bodyEnjoyer: `${d.shortName} torched the team in a tell-all interview. Fix it, or fire him.`,
+        options: [{ label: "Open team management", action: "goto:management" }],
+      });
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Driver challenges (spec §22b) — bossy stars demand cash for promises
+
+/** A frustrated/ambitious high-rated driver demands an up-front bonus and
+ *  promises a podium within N races. Owner can accept or reject. */
+export function generateDriverChallenge(state: SimulationState, rng: Rng) {
+  const t = state.team;
+  if (!t || t.driverChallenge) return;
+  if (state.completedRounds < 2) return;
+  const round = state.completedRounds + 1;
+  const slump = t.slump ?? 0;
+
+  for (const ds of t.drivers) {
+    const d = driverById(ds.driverId, state.season);
+    if (!d || d.overall < 78) continue;
+    // stars get bossy when results, morale or patience run out
+    const entitled = ds.frustration >= 58 || ds.morale <= 42 || slump >= 2;
+    if (!entitled || !chance(rng, 0.22)) continue;
+
+    const amount = clamp(Math.round(((d.overall - 70) * 0.35 + d.salary * 0.18) * 10) / 10, 1.5, 8);
+    const roundsLeft = chance(rng, 0.5) ? 3 : 2;
+    const challenge: DriverChallenge = { driverId: ds.driverId, amount, roundsLeft, accepted: false };
+    t.driverChallenge = challenge;
+    state.news.unshift({
+      id: `chal-${round}-${ds.driverId}`,
+      round,
+      tag: "driver",
+      kind: "chat",
+      priority: "warning" satisfies NewsPriority,
+      title: `${d.shortName} wants a bonus — and promises a podium`,
+      body:
+        `"Let's be honest, ${t.owner?.callout?.trim() || "Boss"}: I am worth more than this car shows. ` +
+        `Pay me a $${amount}M bonus now and I promise a podium within the next ${roundsLeft} race${roundsLeft > 1 ? "s" : ""}. ` +
+        `No podium — you can put it on my head."`,
+      bodyEnjoyer: `${d.shortName} puts $${amount}M on the table against his own podium within ${roundsLeft} race(s). Your call.`,
+      options: [
+        { label: `Accept — pay $${amount}M`, action: "challenge-accept", payload: ds.driverId },
+        { label: "Reject the demand", action: "challenge-reject", payload: ds.driverId },
+      ],
+    });
+    return;
+  }
+}
+
+/** Weekend resolution for an active challenge. Ignoring a demand also has a cost. */
+export function resolveDriverChallenge(state: SimulationState, weekend: RaceWeekendResult) {
+  const t = state.team;
+  if (!t) return;
+  const ch = t.driverChallenge;
+  if (!ch) return;
+  const ds = t.drivers.find((x) => x.driverId === ch.driverId);
+  const d = driverById(ch.driverId, state.season);
+  if (!ds || !d) {
+    t.driverChallenge = undefined;
+    return;
+  }
+
+  // pending demand ignored through a full weekend → insulted driver
+  if (!ch.accepted) {
+    ds.frustration = clamp(ds.frustration + 6, 0, 100);
+    t.trust = clamp((t.trust ?? 50) - 1, 0, 100);
+    t.driverChallenge = undefined;
+    return;
+  }
+
+  const entry = weekend.playerEntries.find((p) => p.driverId === ch.driverId);
+  const delivered = !!entry && !entry.dnf && entry.position <= 3;
+  ch.roundsLeft -= 1;
+
+  if (delivered) {
+    ds.morale = clamp(ds.morale + 7, 0, 100);
+    ds.confidence = clamp(ds.confidence + 6, 0, 100);
+    ds.frustration = clamp(ds.frustration - 10, 0, 100);
+    t.trust = clamp((t.trust ?? 50) + 3, 0, 100);
+    addReputation(t, 1.2);
+    state.news.unshift({
+      id: `chal-ok-${weekend.round}`,
+      round: weekend.round,
+      tag: "driver",
+      priority: "info" satisfies NewsPriority,
+      title: `${d.shortName} delivered the promised podium`,
+      body: `P${entry!.position} — exactly what he guaranteed for his $${ch.amount}M. Morale soars, trust +3.`,
+      bodyEnjoyer: `${d.shortName} banked his bonus with interest — P${entry!.position}.`,
+    });
+    t.driverChallenge = undefined;
+  } else if (ch.roundsLeft <= 0) {
+    ds.frustration = clamp(ds.frustration + 12, 0, 100);
+    ds.confidence = clamp(ds.confidence - 4, 0, 100);
+    ds.morale = clamp(ds.morale - 5, 0, 100);
+    t.trust = clamp((t.trust ?? 50) - 4, 0, 100);
+    addReputation(t, -0.8);
+    state.news.unshift({
+      id: `chal-fail-${weekend.round}`,
+      round: weekend.round,
+      tag: "driver",
+      priority: "warning" satisfies NewsPriority,
+      title: `${d.shortName} failed his own promise`,
+      body: `No podium in the window despite the $${ch.amount}M bonus. He is angry at everyone — mostly himself. Trust −4.`,
+      bodyEnjoyer: `${d.shortName} took the money and vanished when it mattered. Awkward.`,
+    });
+    t.driverChallenge = undefined;
   }
 }
 

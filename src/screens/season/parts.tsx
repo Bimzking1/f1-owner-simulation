@@ -1,11 +1,45 @@
 import { useState } from "react";
-import type { SimulationState, Track } from "@/simulation/types";
+import type {
+  RaceEntry,
+  RaceEvent,
+  SimulationState,
+  Track,
+  WeatherId,
+} from "@/simulation/types";
 import { constructorById, driverById, trackById } from "@/data";
 import { Card, ImageLightbox, Img, Meter, Tag } from "@/ui/kit";
 import { ratingTone, type KitTone } from "@/ui/ratings";
 import { driverImage } from "@/data/assets";
 
 export type Act = (fn: (s: SimulationState) => string) => void;
+
+/** Serializable snapshot of an in-progress live race (App owns the engine). */
+export interface LiveView {
+  roundIdx: number;
+  grandPrix: string;
+  laps: number;
+  currentLap: number;
+  lapOrder: string[][];
+  events: RaceEvent[];
+  qualifying: RaceEntry[];
+  sprint?: RaceEntry[];
+  weather: WeatherId;
+  forecast: { rainProbability: number; confidence: "low" | "medium" | "high"; window?: string };
+  playerIds: string[];
+  stances: Record<string, "push" | "steady" | "conserve">;
+  motivateUsed: Record<string, boolean>;
+  gridPenaltyApplied: number;
+  /** True while the race is held at a checkpoint awaiting owner orders. */
+  paused: boolean;
+  /** True once every lap has run and the weekend is being finalized. */
+  done: boolean;
+}
+
+/** One pit-wall order from the owner during a live race. */
+export interface LiveCommand {
+  driverId: string;
+  kind: "push" | "steady" | "conserve" | "retire" | "motivate";
+}
 
 export function MiniBar({ label, value, tone }: { label: string; value: number; tone?: KitTone }) {
   return (
@@ -36,7 +70,16 @@ function attendanceFor(track: Track): number {
   return Math.round(raw / 1000) * 1000;
 }
 
-export function NextRaceCard({ track, round }: { track: Track; round?: number }) {
+export function NextRaceCard({
+  track,
+  round,
+  gridPenalty,
+}: {
+  track: Track;
+  round?: number;
+  /** Pending steward grid penalty the team carries into this GP. */
+  gridPenalty?: number;
+}) {
   const [zoom, setZoom] = useState(false);
   const weatherNote =
     track.characteristics.weatherRisk > 65
@@ -65,6 +108,11 @@ export function NextRaceCard({ track, round }: { track: Track; round?: number })
             </span>
           </div>
           <div className="mt-2 text-xs text-ink-soft">{weatherNote}</div>
+          {!!gridPenalty && (
+            <div className="mt-2 inline-block rounded-sm border border-caution/50 bg-caution/10 px-2 py-1 text-[11px] font-semibold text-caution">
+              −{gridPenalty} grid places (stewards)
+            </div>
+          )}
           <div className="mt-3 grid max-w-sm grid-cols-2 gap-x-4 gap-y-1 text-[11px] text-ink-faint">
             {[
               ["Downforce", track.characteristics.downforce],
