@@ -22,8 +22,9 @@ import type { LiveCommand, LiveView } from "@/screens/season/parts";
 import { audioManager, SFX } from "@/ui/audio";
 import { AudioSettings } from "@/ui/AudioSettings";
 import SplashScreen from "@/screens/SplashScreen";
+import TrackTracerScreen from "@/screens/TrackTracerScreen";
 
-type Screen = "splash" | "landing" | "changelog" | "setup" | "expectations" | "testing" | "season";
+type Screen = "splash" | "landing" | "changelog" | "setup" | "expectations" | "testing" | "season" | "track-tracer";
 
 /** Mutable engine for a live race. NEVER part of SimulationState — the draft
  *  is only committed to React state once the weekend is finalized. */
@@ -43,7 +44,9 @@ const isDesktop = () =>
   typeof window !== "undefined" && window.matchMedia("(min-width: 1024px)").matches;
 
 export default function App() {
-  const [screen, setScreen] = useState<Screen>("splash");
+  const [screen, setScreen] = useState<Screen>(() =>
+    window.location.pathname === "/track-tracer" ? "track-tracer" : "splash",
+  );
   const [cfg, setCfg] = useState<SetupConfig | null>(null);
   const [seed, setSeed] = useState("");
   const [sim, setSim] = useState<SimulationState | null>(null);
@@ -482,6 +485,8 @@ export default function App() {
             onReset={reset}
           />
         ) : null;
+      case "track-tracer":
+        return <TrackTracerScreen />;
       default:
         return null;
     }
@@ -491,23 +496,25 @@ export default function App() {
   return (
     <div className="min-h-full">
       {body}
-      {toast && (
+      {screen !== "track-tracer" && toast && (
         <div className="fixed bottom-4 left-1/2 z-[60] -translate-x-1/2 rounded-sm border border-telemetry/50 bg-void px-4 py-2 text-sm text-telemetry shadow-xl">
           {toast}
         </div>
       )}
       
-      {/* Audio settings button - fixed top right */}
-      <button
-        type="button"
-        onClick={() => setAudioSettingsOpen(true)}
-        className="fixed left-4 top-4 z-50 flex h-10 w-10 items-center justify-center rounded-full border border-hairline bg-surface/95 shadow-lg backdrop-blur transition hover:border-telemetry/50 hover:bg-raised"
-        title="Audio Settings"
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-ink-soft" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
-        </svg>
-      </button>
+      {/* Audio settings button - fixed top right (hidden on track tracer) */}
+      {screen !== "track-tracer" && (
+        <button
+          type="button"
+          onClick={() => setAudioSettingsOpen(true)}
+          className="fixed left-4 top-4 z-50 flex h-10 w-10 items-center justify-center rounded-full border border-hairline bg-surface/95 shadow-lg backdrop-blur transition hover:border-telemetry/50 hover:bg-raised"
+          title="Audio Settings"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-ink-soft" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+          </svg>
+        </button>
+      )}
       
       <AudioSettings open={audioSettingsOpen} onClose={() => setAudioSettingsOpen(false)} />
     </div>
