@@ -204,7 +204,12 @@ export default function SetupScreen({ cfg, onStart, onBack }: Props) {
           <button
             key={s}
             type="button"
-            onClick={() => i < stepIndex && setStep(s)}
+            onClick={() => {
+              if (i < stepIndex) {
+                setStep(s);
+                window.scrollTo({ top: 0, behavior: "smooth" });
+              }
+            }}
             className={`rounded-sm border px-2 py-1 text-[11px] font-semibold uppercase tracking-wider transition ${
               i === stepIndex
                 ? "border-signal bg-signal/15 text-signal"
@@ -730,7 +735,14 @@ export default function SetupScreen({ cfg, onStart, onBack }: Props) {
       )}
 
       <div className="fixed inset-x-3 bottom-3 z-40 flex items-center justify-between gap-3">
-        <Button variant="ghost" onClick={() => (stepIndex > 0 ? setStep(STEPS[stepIndex - 1]) : onBack())}>
+        <Button variant="ghost" onClick={() => {
+          if (stepIndex > 0) {
+            setStep(STEPS[stepIndex - 1]);
+            window.scrollTo({ top: 0, behavior: "smooth" });
+          } else {
+            onBack();
+          }
+        }}>
           Back
         </Button>
         <div className="flex items-center gap-3">

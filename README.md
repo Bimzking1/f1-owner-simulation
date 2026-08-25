@@ -8,6 +8,9 @@ Built with **React 19 + TypeScript + Vite**, styled with **Tailwind CSS 4**. No 
 
 ## Features
 
+### Splash screen
+- A **cinematic splash screen** greets the player on launch: the F1 Owner logo centered on a dark backdrop with a radial vignette and a pulsing glow. Clicking anywhere plays the box-box SFX, unlocks browser audio, and fades smoothly into the main landing page with the opening theme already playing.
+
 ### Career setup
 - **Two eras**: the 2013 V8 season (19 races, no sprints) or 2025 (24 races, six sprint weekends, fastest-lap point).
 - **Four difficulties** — Rookie, Professional, Expert, Ruthless — scaling your budget, part prices, failure rates, sponsor patience and how much information the sim reveals. Difficulty also sets how many **sponsor slots** you get: Rookie 7 · Professional 5 · Expert 4 · Ruthless 3.
@@ -41,6 +44,7 @@ Car and circuit images anywhere in the season open in a lightbox — click the i
 The Race tab's components panel mirrors the Garage at a glance, per car: every era part (V8/KERS or the seven-piece turbo-hybrid) with condition, Fresh/Worn/Broken status, age, mileage and damage notes, plus each car's own **performance form** (aero/chassis/power/reliability/tires/gearbox incl. that seat's upgrade bonuses — badges show where one-car dev has split the garage). **Tap any part card to jump straight to that hardware in the Garage**, where full specs and replacements live.
 
 ### Living systems
+- **Audio system**: Full audio management with separate volume controls and mute toggles for background music, sound effects, and UI interaction sounds. Settings persist in localStorage. Background music includes the opening theme (plays on landing screen until first GP) and post-race theme. Sound effects include box-box on pause/race decisions, radio notifications for alerts, race ambience during live simulation, and Charles Leclerc scream on forced retirement. UI interaction sounds from uisfx.com provide sci-fi tactile feedback for buttons, tabs, and notifications.
 - **Reputation (0–100)** moves every weekend: wins, podiums and points raise it; scoreless weekends and double DNFs cost it. Driver moods, garage trust, your management conduct and leading the championship all add drift — and reputation gates title sponsors **and star drivers**.
 - **Frustration has teeth**: angry drivers bleed lap time (up to ~0.5s), invite incidents, and at 72+ may publicly slam the team. Slumping stars can confront you with **podium-bonus demands** — accept and deliver for big mood gains, miss the window and trust detonates.
 - Driver morale swings harder during pointless streaks: consecutive scoreless weekends amplify confidence and morale drops (up to ×2), DNFs and broken hardware sting, and a designated lead driver changes how results are felt.
