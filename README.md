@@ -44,7 +44,7 @@ Car and circuit images anywhere in the season open in a lightbox — click the i
 The Race tab's components panel mirrors the Garage at a glance, per car: every era part (V8/KERS or the seven-piece turbo-hybrid) with condition, Fresh/Worn/Broken status, age, mileage and damage notes, plus each car's own **performance form** (aero/chassis/power/reliability/tires/gearbox incl. that seat's upgrade bonuses — badges show where one-car dev has split the garage). **Tap any part card to jump straight to that hardware in the Garage**, where full specs and replacements live.
 
 ### Living systems
-- **Audio system**: Full audio management with separate volume controls and mute toggles for background music, sound effects, and UI interaction sounds. Settings persist in localStorage. Background music includes the opening theme (plays on landing screen until first GP) and post-race theme. Sound effects include box-box on pause/race decisions, radio notifications for alerts, race ambience during live simulation, and Charles Leclerc scream on forced retirement. UI interaction sounds from uisfx.com provide sci-fi tactile feedback for buttons, tabs, and notifications.
+- **Audio system**: Full audio management with separate volume controls and mute toggles for background music, sound effects, and UI interaction sounds. Settings persist in localStorage. The opening theme loops continuously from splash through setup, expectations, testing, and season overview — fading only when the first GP Start is clicked. Race ambience loops during live races and stops cleanly on finish or skip, transitioning to the post-race theme. The 'Pit wall — decision required' pause triggers the radio notification SFX while ambience keeps playing. Sound effects include box-box on pause/race decisions, radio notifications for alerts, and Charles Leclerc's scream on forced retirement. The final season classification plays the post-race theme as background music. Sci-fi UI sounds from uisfx provide tactile feedback for constructor/driver/engine selection, hire/fire actions, part replacements, chat responses, sponsor signing, and team orders across all interactive screens.
 - **Reputation (0–100)** moves every weekend: wins, podiums and points raise it; scoreless weekends and double DNFs cost it. Driver moods, garage trust, your management conduct and leading the championship all add drift — and reputation gates title sponsors **and star drivers**.
 - **Frustration has teeth**: angry drivers bleed lap time (up to ~0.5s), invite incidents, and at 72+ may publicly slam the team. Slumping stars can confront you with **podium-bonus demands** — accept and deliver for big mood gains, miss the window and trust detonates.
 - Driver morale swings harder during pointless streaks: consecutive scoreless weekends amplify confidence and morale drops (up to ×2), DNFs and broken hardware sting, and a designated lead driver changes how results are felt.
@@ -110,7 +110,7 @@ public/assets/       # images (drivers, cars, sponsors, tracks…)
 
 ## Changelog
 
-See the in-game **Change log** button on the landing page — it renders `src/data/changelog.ts`. Current build: **v0.13** (24 August 2026 · 16:06).
+See the in-game **Change log** button on the landing page — it renders `src/data/changelog.ts`. Current build: **v0.16** (25 August 2026 · 19:30).
 
 ---
 

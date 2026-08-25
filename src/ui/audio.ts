@@ -20,6 +20,8 @@ class AudioManager {
   private uiMuted = false;
   private musicAudio: HTMLAudioElement | null = null;
   private currentMusic: string | null = null;
+  private ambienceAudio: HTMLAudioElement | null = null;
+  private currentAmbience: string | null = null;
 
   constructor() {
     this.loadSettings();
@@ -74,6 +76,7 @@ class AudioManager {
       case "music":
         this.musicVolume = clamped;
         if (this.musicAudio) this.musicAudio.volume = this.musicMuted ? 0 : clamped;
+        if (this.ambienceAudio) this.ambienceAudio.volume = this.musicMuted ? 0 : clamped * 0.8;
         break;
       case "sfx": this.sfxVolume = clamped; break;
       case "ui": this.uiVolume = clamped; break;
@@ -94,6 +97,7 @@ class AudioManager {
       case "music":
         this.musicMuted = !this.musicMuted;
         if (this.musicAudio) this.musicAudio.volume = this.musicMuted ? 0 : this.musicVolume;
+        if (this.ambienceAudio) this.ambienceAudio.volume = this.musicMuted ? 0 : this.musicVolume * 0.8;
         break;
       case "sfx": this.sfxMuted = !this.sfxMuted; break;
       case "ui": this.uiMuted = !this.uiMuted; break;
@@ -146,6 +150,32 @@ class AudioManager {
       this.musicAudio.src = "";
       this.musicAudio = null;
       this.currentMusic = null;
+    }
+  }
+
+  /** Start or switch looping ambience (separate from music channel). */
+  playAmbience(src: string) {
+    if (this.currentAmbience === src && this.ambienceAudio && !this.ambienceAudio.paused) return;
+    this.stopAmbience();
+    try {
+      const audio = new Audio(src);
+      audio.loop = true;
+      audio.volume = this.musicMuted ? 0 : this.musicVolume * 0.8;
+      audio.play().catch(() => {});
+      this.ambienceAudio = audio;
+      this.currentAmbience = src;
+    } catch {
+      // ignore
+    }
+  }
+
+  /** Stop looping ambience. */
+  stopAmbience() {
+    if (this.ambienceAudio) {
+      this.ambienceAudio.pause();
+      this.ambienceAudio.src = "";
+      this.ambienceAudio = null;
+      this.currentAmbience = null;
     }
   }
 

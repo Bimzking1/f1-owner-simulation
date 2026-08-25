@@ -21,6 +21,7 @@ import {
 import { Button, Card, Img, Modal, Money, Ovr, Rating, SeniorityBadge, Tag } from "@/ui/kit";
 import { driverImage } from "@/data/assets";
 import type { Act } from "./parts";
+import { audioManager, UI_SOUNDS } from "@/ui/audio";
 
 interface Props {
   state: SimulationState;
@@ -94,7 +95,7 @@ export function MarketTab({ state, act }: Props) {
                       <button
                         key={d.id}
                         type="button"
-                        onClick={() => setPending({ slot, driverId: d.id })}
+                        onClick={() => { audioManager.playUi(UI_SOUNDS.buttonClick); setPending({ slot, driverId: d.id }); }}
                         className="flex w-full items-center gap-2 rounded-sm border border-hairline px-2 py-1 text-left text-sm hover:border-telemetry"
                       >
                         <Img src={driverImage(d.id, state.season)} alt={d.shortName} className="h-6 w-6 rounded-sm object-cover" />
@@ -133,12 +134,12 @@ export function MarketTab({ state, act }: Props) {
                   <div className="flex items-center gap-2">
                     <span className="min-w-0 flex-1 truncate">{e.name}</span>
                     {hired ? (
-                      <Button small variant="danger" onClick={() => setStaffPick({ kind: "engineer", id: e.id, action: "fire" })}>Fire</Button>
+                      <Button small variant="danger" onClick={() => { audioManager.playUi(UI_SOUNDS.warning); setStaffPick({ kind: "engineer", id: e.id, action: "fire" }); }}>Fire</Button>
                     ) : (
                       <Button
                         small variant="ghost"
                         disabled={t.engineerIds.length >= 5}
-                        onClick={() => setStaffPick({ kind: "engineer", id: e.id, action: "hire" })}
+                        onClick={() => { audioManager.playUi(UI_SOUNDS.buttonClick); setStaffPick({ kind: "engineer", id: e.id, action: "hire" }); }}
                       >
                         Hire
                       </Button>
@@ -165,12 +166,12 @@ export function MarketTab({ state, act }: Props) {
                   <div className="flex items-center gap-2">
                     <span className="min-w-0 flex-1 truncate">{m.name}</span>
                     {hired ? (
-                      <Button small variant="danger" onClick={() => setStaffPick({ kind: "mechanic", id: m.id, action: "fire" })}>Fire</Button>
+                      <Button small variant="danger" onClick={() => { audioManager.playUi(UI_SOUNDS.warning); setStaffPick({ kind: "mechanic", id: m.id, action: "fire" }); }}>Fire</Button>
                     ) : (
                       <Button
                         small variant="ghost"
                         disabled={t.mechanicIds.length >= 5}
-                        onClick={() => setStaffPick({ kind: "mechanic", id: m.id, action: "hire" })}
+                        onClick={() => { audioManager.playUi(UI_SOUNDS.buttonClick); setStaffPick({ kind: "mechanic", id: m.id, action: "hire" }); }}
                       >
                         Hire
                       </Button>
@@ -292,6 +293,7 @@ function StaffConfirmModal({
             small
             variant={hiring ? "positive" : "danger"}
             onClick={() => {
+              audioManager.playUi(hiring ? UI_SOUNDS.success : UI_SOUNDS.warning);
               if (staffPick.kind === "engineer") {
                 act((s) => (hiring ? hireEngineer(s, staffPick.id) : fireEngineer(s, staffPick.id)).message);
               } else {
@@ -410,7 +412,7 @@ function SwapConfirm({
           <Button
             variant={quote.canAfford && !onTeam && !quote.reputationBlocked ? "primary" : "ghost"}
             disabled={!quote.canAfford || onTeam || quote.reputationBlocked}
-            onClick={onConfirm}
+            onClick={() => { audioManager.playUi(UI_SOUNDS.success); onConfirm(); }}
           >
             {onTeam ? "Already on the team" : quote.reputationBlocked ? "Reputation too low" : `Swap ${quote.target.shortName}`}
           </Button>

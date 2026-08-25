@@ -58,6 +58,7 @@ export default function SeasonScreen({
   const [tab, setTab] = useState<Tab>("Overview");
   const [confirmMenu, setConfirmMenu] = useState(false);
   const [repairOpen, setRepairOpen] = useState(false);
+  const openingThemeStopped = useRef(false);
 
   const openChats = state.news.filter((n) => n.kind === "chat" && !n.resolved).length;
 
@@ -86,12 +87,21 @@ export default function SeasonScreen({
       return;
     }
     if (raceBusy) return;
+    // Fade out opening theme on first GP start
+    if (!openingThemeStopped.current) {
+      openingThemeStopped.current = true;
+      audioManager.fadeOutMusic(1200);
+    }
     // Desktop manual runs go through the live race on the Race tab.
     setTab("Race");
     if (!onStartLive?.()) onRunRound();
   };
   const handleAutoRound = () => {
     if (repairs.length > 0 || raceBusy) return;
+    if (!openingThemeStopped.current) {
+      openingThemeStopped.current = true;
+      audioManager.fadeOutMusic(1200);
+    }
     onAutoRun?.();
   };
 

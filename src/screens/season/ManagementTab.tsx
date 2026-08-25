@@ -5,6 +5,7 @@ import { boostDesc, manageDriver, manageTeam, mgmtCooldown, teamCooldown, MGMT_I
 import { Bar, Button, Card, Empty, Img, Modal, Tag } from "@/ui/kit";
 import { driverImage } from "@/data/assets";
 import type { Act } from "./parts";
+import { audioManager, UI_SOUNDS } from "@/ui/audio";
 
 interface Props {
   state: SimulationState;
@@ -160,7 +161,7 @@ export function ManagementTab({ state, act, onNewsAction }: Props) {
                         <button
                           key={o.action}
                           type="button"
-                          onClick={() => onNewsAction(n.id, o.action)}
+                          onClick={() => { audioManager.playUi(UI_SOUNDS.notification); onNewsAction(n.id, o.action); }}
                           className="rounded-sm border border-telemetry/40 bg-telemetry/10 px-2 py-1 text-[11px] font-semibold uppercase tracking-wider text-telemetry hover:bg-telemetry/20"
                         >
                           {o.label}
@@ -223,6 +224,7 @@ export function ManagementTab({ state, act, onNewsAction }: Props) {
           pick={confirm}
           onClose={() => setConfirm(null)}
           onConfirm={() => {
+            audioManager.playUi(UI_SOUNDS.success);
             act((x) => manageDriver(x, confirm.driverId, confirm.action).message);
             setConfirm(null);
           }}
@@ -234,6 +236,7 @@ export function ManagementTab({ state, act, onNewsAction }: Props) {
           action={confirm.action}
           onClose={() => setConfirm(null)}
           onConfirm={() => {
+            audioManager.playUi(UI_SOUNDS.success);
             act((x) => manageTeam(x, confirm.action).message);
             setConfirm(null);
           }}
@@ -245,6 +248,7 @@ export function ManagementTab({ state, act, onNewsAction }: Props) {
           mode={ordersPick}
           onClose={() => setOrdersPick(null)}
           onConfirm={() => {
+            audioManager.playUi(UI_SOUNDS.success);
             act((s) => {
               s.team!.teamOrders = ordersPick;
               return `Team orders set: ${ORDERS_INFO[ordersPick].label}.`;

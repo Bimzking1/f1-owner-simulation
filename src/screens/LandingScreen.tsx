@@ -285,7 +285,6 @@ export default function LandingScreen({ onNewGame, onContinue, hasSave, onChange
       <div className="mt-8 flex flex-wrap items-center gap-3">
         <Button onClick={() => {
           audioManager.playUi(UI_SOUNDS.buttonClick);
-          audioManager.fadeOutMusic(1000);
           if (ownerReady) onNewGame({ ...cfg, seed, owner });
         }} disabled={!ownerReady}>
           Start Setup
@@ -293,7 +292,6 @@ export default function LandingScreen({ onNewGame, onContinue, hasSave, onChange
         {!ownerReady && <span className="text-xs uppercase tracking-wider text-signal">Enter your name to continue</span>}
         {hasSave && <Button variant="ghost" onClick={() => {
           audioManager.playUi(UI_SOUNDS.buttonClick);
-          audioManager.fadeOutMusic(1000);
           onContinue();
         }}>Continue save</Button>}
       </div>

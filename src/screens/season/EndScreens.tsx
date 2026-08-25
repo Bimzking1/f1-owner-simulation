@@ -3,6 +3,8 @@ import { constructorById, driverById, engineerById, mechanicById } from "@/data"
 import { ownerTitle } from "@/state";
 import { Button, Card, Money } from "@/ui/kit";
 import { exportReportImage } from "./reportImage";
+import { useEffect } from "react";
+import { audioManager, SFX } from "@/ui/audio";
 
 interface Props {
   state: SimulationState;
@@ -84,6 +86,13 @@ function staffVerdicts(state: SimulationState, pos: number): { shortName: string
 export function EndScreens({ state, onReset }: Props) {
   const t = state.team!;
   const ctor = constructorById(t.constructorId, state.season);
+
+  // Play post-race theme as background music on final classification
+  useEffect(() => {
+    audioManager.stopAmbience();
+    audioManager.playMusic(SFX.postRace);
+    return () => { audioManager.stopMusic(); };
+  }, []);
 
   if (state.phase === "bankrupt") {
     return (

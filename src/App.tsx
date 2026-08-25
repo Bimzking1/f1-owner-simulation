@@ -282,7 +282,7 @@ export default function App() {
     if (cmd.kind === "retire") {
       // Play Charles Leclerc scream if he's forced to retire
       const driverId = cmd.driverId;
-      if (driverId === "charles-leclerc") {
+      if (driverId === "leclerc") {
         audioManager.playSfx(SFX.charlesScream, 0.6);
       }
       setToast(`${who} RETIRED from the race — he takes it hard (+4 frustration, −2 trust).`);

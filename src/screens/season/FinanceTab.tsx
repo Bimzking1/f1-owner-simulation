@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { FinancialTransaction, SimulationState } from "@/simulation/types";
 import { Card, Modal, Money } from "@/ui/kit";
+import { audioManager, UI_SOUNDS } from "@/ui/audio";
 
 const CAT_DOT: Record<string, string> = {
   sponsor: "bg-positive",
@@ -56,7 +57,7 @@ export function FinanceTab({ state }: { state: SimulationState }) {
               return (
                 <div
                   key={r}
-                  onClick={() => setRoundOpen(r)}
+                  onClick={() => { audioManager.playUi(UI_SOUNDS.tabSwitch); setRoundOpen(r); }}
                   title="Show weekend income & expenses"
                   className="grid cursor-pointer grid-cols-[1fr_5rem_5rem_5rem] gap-2 py-1 text-sm transition hover:bg-raised/40"
                 >

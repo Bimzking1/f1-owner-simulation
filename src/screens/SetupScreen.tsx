@@ -38,6 +38,7 @@ import {
   MECHANIC_TIER_INFO,
   SENIORITY_INFO,
 } from "@/data/staff";
+import { audioManager, UI_SOUNDS } from "@/ui/audio";
 
 export interface SetupConfig {
   season: SeasonId;
@@ -231,6 +232,7 @@ export default function SetupScreen({ cfg, onStart, onBack }: Props) {
               key={c.id}
               type="button"
               onClick={() => {
+                audioManager.playUi(UI_SOUNDS.tabSwitch);
                 setConstructorId(c.id);
                 setDriver1Id("");
                 setDriver2Id("");
@@ -329,8 +331,8 @@ export default function SetupScreen({ cfg, onStart, onBack }: Props) {
                               </div>
                             </div>
                             <div className="flex gap-2 md:ml-auto md:shrink-0">
-                              <SeatButton active={in1} disabled={in2} label="S1" onClick={() => (in1 ? removeDriver(1) : assignDriver(1, d.id))} />
-                              <SeatButton active={in2} disabled={in1} label="S2" onClick={() => (in2 ? removeDriver(2) : assignDriver(2, d.id))} />
+                              <SeatButton active={in1} disabled={in2} label="S1" onClick={() => { audioManager.playUi(UI_SOUNDS.tabSwitch); if (in1) removeDriver(1); else assignDriver(1, d.id); }} />
+                              <SeatButton active={in2} disabled={in1} label="S2" onClick={() => { audioManager.playUi(UI_SOUNDS.tabSwitch); if (in2) removeDriver(2); else assignDriver(2, d.id); }} />
                             </div>
                           </div>
                         );
@@ -497,7 +499,7 @@ export default function SetupScreen({ cfg, onStart, onBack }: Props) {
             <button
               key={p.id}
               type="button"
-              onClick={() => setPhilosophy(p.id)}
+              onClick={() => { audioManager.playUi(UI_SOUNDS.tabSwitch); setPhilosophy(p.id); }}
               className={`rounded-md border p-4 text-left transition ${philosophy === p.id ? "border-signal bg-signal/10" : "border-hairline bg-surface hover:border-ink-faint"}`}
             >
               <div className="font-display text-lg font-bold">{p.label}</div>
@@ -515,7 +517,7 @@ export default function SetupScreen({ cfg, onStart, onBack }: Props) {
                   <button
                     key={o}
                     type="button"
-                    onClick={() => setOrders(o)}
+                    onClick={() => { audioManager.playUi(UI_SOUNDS.tabSwitch); setOrders(o); }}
                     className={`rounded-sm border px-3 py-2 text-xs font-semibold uppercase tracking-wider ${orders === o ? "border-signal bg-signal/15 text-signal" : "border-hairline text-ink-soft"}`}
                   >
                     {o === "equal" ? "Equal" : o === "priority1" ? "Driver 1 leads" : "Driver 2 leads"}
@@ -542,7 +544,7 @@ export default function SetupScreen({ cfg, onStart, onBack }: Props) {
                   key={s.id}
                   type="button"
                   disabled={!signed && full}
-                  onClick={() => setSponsorIds(signed ? sponsorIds.filter((x) => x !== s.id) : [...sponsorIds, s.id])}
+                  onClick={() => { audioManager.playUi(signed ? UI_SOUNDS.buttonClick : UI_SOUNDS.success); setSponsorIds(signed ? sponsorIds.filter((x) => x !== s.id) : [...sponsorIds, s.id]); }}
                   className={`rounded-md border p-3 text-left transition disabled:cursor-default ${
                     signed
                       ? "border-positive/50 bg-positive/10"
@@ -736,6 +738,7 @@ export default function SetupScreen({ cfg, onStart, onBack }: Props) {
 
       <div className="fixed inset-x-3 bottom-3 z-40 flex items-center justify-between gap-3">
         <Button variant="ghost" onClick={() => {
+          audioManager.playUi(UI_SOUNDS.buttonClick);
           if (stepIndex > 0) {
             setStep(STEPS[stepIndex - 1]);
             window.scrollTo({ top: 0, behavior: "smooth" });
@@ -747,7 +750,7 @@ export default function SetupScreen({ cfg, onStart, onBack }: Props) {
         </Button>
         <div className="flex items-center gap-3">
           {overBudget && <span className="text-xs font-semibold uppercase tracking-wider text-signal">Over budget</span>}
-          <Button onClick={next} disabled={!canContinue || overBudget}>
+          <Button onClick={() => { audioManager.playUi(step === "Review" ? UI_SOUNDS.success : UI_SOUNDS.buttonClick); next(); }} disabled={!canContinue || overBudget}>
             {step === "Review" ? "Start Season" : "Continue"}
           </Button>
         </div>
@@ -787,7 +790,7 @@ function TechPick({ active, onClick, title, stats, extra, cost, tip }: { active:
     <div
       role="button"
       tabIndex={0}
-      onClick={onClick}
+      onClick={() => { audioManager.playUi(UI_SOUNDS.tabSwitch); onClick(); }}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
@@ -846,7 +849,7 @@ function StaffCard({
       role="button"
       tabIndex={disabled ? -1 : 0}
       aria-disabled={disabled}
-      onClick={() => !disabled && onClick()}
+      onClick={() => { if (!disabled) { audioManager.playUi(hired ? UI_SOUNDS.buttonClick : UI_SOUNDS.tabSwitch); onClick(); } }}
       onKeyDown={(e) => {
         if (!disabled && (e.key === "Enter" || e.key === " ")) {
           e.preventDefault();

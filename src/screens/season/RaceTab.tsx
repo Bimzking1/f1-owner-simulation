@@ -244,20 +244,38 @@ function LiveRacePanel({
   onSkipToEnd?: () => void;
   onPause?: () => void;
 }) {
-  // Play race ambience when live race starts
+  // Play looping race ambience when live race starts; stop on finish.
+  const ambienceStarted = useRef(false);
   useEffect(() => {
-    if (live && !live.done) {
-      audioManager.playSfx(SFX.raceAmbience, 0.2);
+    if (live && !live.done && !ambienceStarted.current) {
+      ambienceStarted.current = true;
+      audioManager.playAmbience(SFX.raceAmbience);
     }
-  }, [live]);
+    if (live && live.done && ambienceStarted.current) {
+      ambienceStarted.current = false;
+      audioManager.stopAmbience();
+      audioManager.playMusic(SFX.postRace);
+    }
+  }, [live, live?.done]);
 
-  // Play post-race theme when race ends
+  // Play radio notification when pit wall opens (decision required)
+  const wasPausedRef = useRef(false);
   useEffect(() => {
-    if (live && live.done) {
-      audioManager.stopMusic();
-      audioManager.playSfx(SFX.postRace, 0.4);
+    if (live.paused && !wasPausedRef.current) {
+      wasPausedRef.current = true;
+      audioManager.playSfx(SFX.radioNotification, 0.4);
     }
-  }, [live]);
+    if (!live.paused) {
+      wasPausedRef.current = false;
+    }
+  }, [live.paused]);
+
+  // When user clicks "Skip to result", stop ambience and play post-race
+  const handleSkipToEnd = () => {
+    audioManager.stopAmbience();
+    audioManager.playMusic(SFX.postRace);
+    onSkipToEnd?.();
+  };
 
   return (
     <Card
@@ -281,7 +299,7 @@ function LiveRacePanel({
               ⏸ Pause
             </Button>
           )}
-          <Button small variant="ghost" onClick={onSkipToEnd}>
+          <Button small variant="ghost" onClick={handleSkipToEnd}>
             Skip to result ⏭
           </Button>
         </span>
