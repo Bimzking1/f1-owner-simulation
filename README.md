@@ -110,7 +110,7 @@ public/assets/       # images (drivers, cars, sponsors, tracks…)
 
 ## Changelog
 
-See the in-game **Change log** button on the landing page — it renders `src/data/changelog.ts`. Current build: **v0.16** (25 August 2026 · 19:30).
+See the in-game **Change log** button on the landing page — it renders `src/data/changelog.ts`. Current build: **v0.16** (25 August 2026 · 19:50).
 
 ---
 

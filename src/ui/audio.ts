@@ -9,7 +9,7 @@ import { createUISFX, type CueName } from 'uisfx';
 type AudioCategory = "music" | "sfx" | "ui";
 
 // Initialize uisfx with sci-fi feel
-const uiSfx = createUISFX({ pack: 'sci-fi' });
+const uiSfx = createUISFX({ pack: 'scifi' });
 
 class AudioManager {
   private musicVolume = 0.3; // 0-1
@@ -22,9 +22,21 @@ class AudioManager {
   private currentMusic: string | null = null;
   private ambienceAudio: HTMLAudioElement | null = null;
   private currentAmbience: string | null = null;
+  private unlocked = false;
 
   constructor() {
     this.loadSettings();
+  }
+
+  /** Unlock the uisfx AudioContext from a trusted user gesture (required by browsers). */
+  async unlock() {
+    if (this.unlocked) return;
+    try {
+      await uiSfx.unlock();
+      this.unlocked = true;
+    } catch {
+      // ignore
+    }
   }
 
   private loadSettings() {

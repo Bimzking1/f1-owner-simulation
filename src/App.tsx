@@ -116,7 +116,7 @@ export default function App() {
       gridPenaltyApplied: eng.prep.gridPenaltyApplied,
       paused: eng.paused,
       manualPaused: !!eng.userPaused,
-      done: false,
+      done: eng.prep.session.finished,
     };
   };
 
@@ -142,6 +142,9 @@ export default function App() {
     if (!eng) return;
     clearTimer();
     engineRef.current = null;
+    // Stop race ambience and start post-race theme
+    audioManager.stopAmbience();
+    audioManager.playMusic(SFX.postRace);
     const outcome = finalizeRound(eng.draft, eng.prep);
     if (outcome.phase === "finished") settleSeason(eng.draft);
     setSim(eng.draft);
@@ -209,6 +212,8 @@ export default function App() {
     const draft = structuredClone(sim);
     const prep = prepareRound(draft);
     if (!prep) return false;
+    // Stop post-race theme and start race ambience
+    audioManager.stopMusic();
     const laps = prep.session.laps;
     engineRef.current = {
       draft,
@@ -217,6 +222,7 @@ export default function App() {
       paused: false,
     };
     setLive(snapshotOf(engineRef.current));
+    audioManager.playAmbience(SFX.raceAmbience);
     scheduleNext();
     return true;
   };

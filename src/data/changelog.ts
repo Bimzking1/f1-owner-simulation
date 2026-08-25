@@ -24,7 +24,7 @@ export const CHANGE_LOG: ChangeLogEntry[] = [
   {
     version: "v0.16",
     title: "Audio polish, UI sounds across all screens, and driver easter egg fix",
-    when: "25 August 2026 · 19:30",
+    when: "25 August 2026 · 19:50",
     summary:
       "The audio system got a round of polish: the opening theme now loops continuously from the splash screen all the way through setup, expectations, testing, and the season overview — only fading out when the first GP Start button is clicked. Race ambience now properly loops and stops cleanly when the race ends or is skipped, transitioning seamlessly into the post-race theme. The 'Pit wall — decision required' pause now triggers the radio notification SFX while ambience keeps playing underneath. Charles Leclerc's forced-retirement scream now actually works (driver ID was wrong). The final season classification plays the post-race theme as background music. Sci-fi UI sounds from uisfx are now wired across all interactive screens: Setup wizard, Market, Garage, Sponsors, Management, and Finance tabs.",
     items: [
@@ -35,6 +35,10 @@ export const CHANGE_LOG: ChangeLogEntry[] = [
       { kind: "new", text: "Final season classification now plays the post-race theme as background music." },
       { kind: "new", text: "UISFX sci-fi sounds wired across all interactive screens: Setup wizard (constructor/driver/engine/philosophy/sponsor selection), MarketTab (hire/fire/swap), GarageTab (dev starts, part replacements, test runs), SponsorsTab (sign/terminate), ManagementTab (chat responses, driver/team actions, team orders), FinanceTab (round detail views)." },
       { kind: "improve", text: "Ambience audio channel added to AudioManager — ambience and music are now independently controllable, so ambience can stop while music continues and vice versa." },
+      { kind: "fix", text: "Pause button no longer double-plays box-box + radio notification — radio notification only fires on automatic pit wall pauses, not owner-initiated pauses." },
+      { kind: "fix", text: "Post-race theme now plays when the race finishes naturally (all laps complete) — previously it only played on 'Skip to Result'. Ambience stops and post-race theme starts via the App-level engine." },
+      { kind: "fix", text: "Post-race theme stops and ambience starts when the next GP is started — seamless audio transition between races." },
+      { kind: "fix", text: "UISFX AudioContext is now properly unlocked from the splash screen click, and the pack name was corrected from 'sci-fi' to 'scifi'. UI sounds now play on all interactive selections." },
     ],
   },
   {

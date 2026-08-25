@@ -244,38 +244,18 @@ function LiveRacePanel({
   onSkipToEnd?: () => void;
   onPause?: () => void;
 }) {
-  // Play looping race ambience when live race starts; stop on finish.
-  const ambienceStarted = useRef(false);
-  useEffect(() => {
-    if (live && !live.done && !ambienceStarted.current) {
-      ambienceStarted.current = true;
-      audioManager.playAmbience(SFX.raceAmbience);
-    }
-    if (live && live.done && ambienceStarted.current) {
-      ambienceStarted.current = false;
-      audioManager.stopAmbience();
-      audioManager.playMusic(SFX.postRace);
-    }
-  }, [live, live?.done]);
-
-  // Play radio notification when pit wall opens (decision required)
+  // Play radio notification when pit wall opens AUTOMATICALLY (decision required by sim)
+  // Manual pauses (owner clicks ⏸) only get box-box, not the notification.
   const wasPausedRef = useRef(false);
   useEffect(() => {
-    if (live.paused && !wasPausedRef.current) {
+    if (live.paused && !wasPausedRef.current && !live.manualPaused) {
       wasPausedRef.current = true;
       audioManager.playSfx(SFX.radioNotification, 0.4);
     }
     if (!live.paused) {
       wasPausedRef.current = false;
     }
-  }, [live.paused]);
-
-  // When user clicks "Skip to result", stop ambience and play post-race
-  const handleSkipToEnd = () => {
-    audioManager.stopAmbience();
-    audioManager.playMusic(SFX.postRace);
-    onSkipToEnd?.();
-  };
+  }, [live.paused, live.manualPaused]);
 
   return (
     <Card
@@ -299,7 +279,7 @@ function LiveRacePanel({
               ⏸ Pause
             </Button>
           )}
-          <Button small variant="ghost" onClick={handleSkipToEnd}>
+          <Button small variant="ghost" onClick={onSkipToEnd}>
             Skip to result ⏭
           </Button>
         </span>

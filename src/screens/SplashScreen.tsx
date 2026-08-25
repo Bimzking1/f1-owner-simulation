@@ -9,9 +9,10 @@ interface Props {
 export default function SplashScreen({ onReady }: Props) {
   const [fading, setFading] = useState(false);
 
-  const begin = () => {
+  const begin = async () => {
     if (fading) return;
-    // Click unlocks browser audio
+    // Click unlocks browser audio + uisfx AudioContext
+    await audioManager.unlock();
     audioManager.playSfx(SFX.boxBox, 0.5);
     setFading(true);
     // 3 seconds after box-box, start BG music and transition to landing
