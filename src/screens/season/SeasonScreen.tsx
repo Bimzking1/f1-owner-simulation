@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { SimulationState } from "@/simulation/types";
 import { constructorById } from "@/data";
 import { difficultyOf, ownerTitle } from "@/state";
@@ -14,6 +14,7 @@ import { FinanceTab } from "./FinanceTab";
 import { ManagementTab } from "./ManagementTab";
 import { UpcomingTab } from "./UpcomingTab";
 import { EndScreens } from "./EndScreens";
+import { audioManager, SFX, UI_SOUNDS } from "@/ui/audio";
 
 export type { Act };
 
@@ -57,6 +58,18 @@ export default function SeasonScreen({
   const [tab, setTab] = useState<Tab>("Overview");
   const [confirmMenu, setConfirmMenu] = useState(false);
   const [repairOpen, setRepairOpen] = useState(false);
+  const openingThemeStopped = useRef(false);
+
+  const openChats = state.news.filter((n) => n.kind === "chat" && !n.resolved).length;
+
+  // Play radio notification when there are new messages or alerts
+  const prevChatsRef = useRef(openChats);
+  useEffect(() => {
+    if (openChats > prevChatsRef.current) {
+      audioManager.playSfx(SFX.radioNotification, 0.3);
+    }
+    prevChatsRef.current = openChats;
+  }, [openChats]);
 
   if (state.phase === "bankrupt" || state.phase === "finished") {
     return <EndScreens state={state} onReset={onReset} />;
@@ -74,12 +87,21 @@ export default function SeasonScreen({
       return;
     }
     if (raceBusy) return;
+    // Fade out opening theme on first GP start
+    if (!openingThemeStopped.current) {
+      openingThemeStopped.current = true;
+      audioManager.fadeOutMusic(1200);
+    }
     // Desktop manual runs go through the live race on the Race tab.
     setTab("Race");
     if (!onStartLive?.()) onRunRound();
   };
   const handleAutoRound = () => {
     if (repairs.length > 0 || raceBusy) return;
+    if (!openingThemeStopped.current) {
+      openingThemeStopped.current = true;
+      audioManager.fadeOutMusic(1200);
+    }
     onAutoRun?.();
   };
 
@@ -101,8 +123,6 @@ export default function SeasonScreen({
     }
     onNewsAction(newsId, action);
   };
-
-  const openChats = state.news.filter((n) => n.kind === "chat" && !n.resolved).length;
 
   // Sponsors badge: green = objective met, yellow = closing in on it.
   const activeSps = t.sponsors.filter((s) => s.active && s.deadlineRound > 0);
@@ -202,7 +222,10 @@ export default function SeasonScreen({
               <button
                 key={tb}
                 type="button"
-                onClick={() => setTab(tb)}
+                onClick={() => {
+                  audioManager.playUi(UI_SOUNDS.tabSwitch);
+                  setTab(tb);
+                }}
                 className={`relative min-w-[4.6rem] flex-1 rounded-sm border px-2 py-2.5 text-xs font-bold uppercase tracking-widest transition sm:min-w-[5.5rem] sm:flex-initial sm:px-3.5 sm:py-2 ${
                   siren
                     ? `border-signal text-white shadow-lg shadow-signal/30 ${tab === tb ? "bg-signal/70" : "animate-pulse bg-signal"}`

@@ -3,6 +3,7 @@ import type { DifficultyId, GameLengthId, OwnerProfile, SeasonId } from "@/simul
 import { DIFFICULTIES, GAME_LENGTHS, SEASONS } from "@/data/config";
 import { Button, Img, Tag } from "@/ui/kit";
 import { makeSeed } from "@/simulation/rng";
+import { audioManager, UI_SOUNDS } from "@/ui/audio";
 
 interface Props {
   onNewGame: (cfg: { season: SeasonId; difficulty: DifficultyId; gameLength: GameLengthId; seed: string; owner: OwnerProfile }) => void;
@@ -282,11 +283,17 @@ export default function LandingScreen({ onNewGame, onContinue, hasSave, onChange
       </section>
 
       <div className="mt-8 flex flex-wrap items-center gap-3">
-        <Button onClick={() => ownerReady && onNewGame({ ...cfg, seed, owner })} disabled={!ownerReady}>
+        <Button onClick={() => {
+          audioManager.playUi(UI_SOUNDS.buttonClick);
+          if (ownerReady) onNewGame({ ...cfg, seed, owner });
+        }} disabled={!ownerReady}>
           Start Setup
         </Button>
         {!ownerReady && <span className="text-xs uppercase tracking-wider text-signal">Enter your name to continue</span>}
-        {hasSave && <Button variant="ghost" onClick={onContinue}>Continue save</Button>}
+        {hasSave && <Button variant="ghost" onClick={() => {
+          audioManager.playUi(UI_SOUNDS.buttonClick);
+          onContinue();
+        }}>Continue save</Button>}
       </div>
     </div>
   );

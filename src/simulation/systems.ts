@@ -739,6 +739,29 @@ export function applyMorale(state: SimulationState, weekend: RaceWeekendResult, 
       else if (pos > otherEntry.position + 1) { mor -= 3; frust += 2; }
     }
 
+    // Teammate mood factor: teammate achievements affect each other's morale
+    const otherDs = t.drivers.find((x) => x.driverId !== ds.driverId);
+    if (otherDs) {
+      // Teammate success inspires confidence
+      if (otherDs.confidence >= 70) {
+        conf += 2; // inspired by teammate's strong form
+      } else if (otherDs.confidence <= 30) {
+        frust += 1; // worried about teammate's poor form reflecting on team
+      }
+      // Teammate frustration can be contagious
+      if (otherDs.frustration >= 60) {
+        frust += 1; // teammate's negativity rubs off
+      }
+      // Driver gets mad if teammate gets upgrades they don't
+      const dsSeat = t.car.upgrades?.find((u) => u.driverId === ds.driverId && u.status === "installed");
+      const otherSeat = t.car.upgrades?.find((u) => u.driverId === otherDs.driverId && u.status === "installed");
+      if (dsSeat && !otherSeat) {
+        // Driver got upgrade but teammate didn't - no extra mood effect
+      } else if (!dsSeat && otherSeat) {
+        frust += 2; // teammate got upgrade, driver feels left behind
+      }
+    }
+
     // an accepted challenge turns every race into a pressure cooker
     const ch = t.driverChallenge;
     if (ch?.accepted && ch.driverId === ds.driverId) {

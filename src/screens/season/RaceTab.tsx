@@ -8,6 +8,7 @@ import { driverImage } from "@/data/assets";
 import { carParts, effectiveCarStats, urgentRepairs } from "@/simulation/systems";
 import { type LiveCommand, type LiveView } from "./parts";
 import { PositionChart } from "./PositionChart";
+import { audioManager, SFX } from "@/ui/audio";
 
 interface Props {
   state: SimulationState;
@@ -243,6 +244,19 @@ function LiveRacePanel({
   onSkipToEnd?: () => void;
   onPause?: () => void;
 }) {
+  // Play radio notification when pit wall opens AUTOMATICALLY (decision required by sim)
+  // Manual pauses (owner clicks ⏸) only get box-box, not the notification.
+  const wasPausedRef = useRef(false);
+  useEffect(() => {
+    if (live.paused && !wasPausedRef.current && !live.manualPaused) {
+      wasPausedRef.current = true;
+      audioManager.playSfx(SFX.radioNotification, 0.4);
+    }
+    if (!live.paused) {
+      wasPausedRef.current = false;
+    }
+  }, [live.paused, live.manualPaused]);
+
   return (
     <Card
       title={
@@ -258,7 +272,10 @@ function LiveRacePanel({
       right={
         <span className="flex gap-2">
           {!live.paused && !live.done && onPause && (
-            <Button small variant="ghost" onClick={onPause} title="Halt the race and open the pit wall for orders">
+            <Button small variant="ghost" onClick={() => {
+              audioManager.playSfx(SFX.boxBox, 0.5);
+              onPause();
+            }} title="Halt the race and open the pit wall for orders">
               ⏸ Pause
             </Button>
           )}
@@ -706,7 +723,7 @@ function RaceLogFeed({ events }: { events: import("@/simulation/types").RaceEven
 
 function WeekendClassification({ state, weekend }: { state: SimulationState; weekend: RaceWeekendResult }) {
   const t = state.team!;
-  const [view, setView] = useState<"quali" | "race" | "sprint">("quali");
+  const [view, setView] = useState<"quali" | "race" | "sprint">("race");
 
   const racePosOf: Record<string, string> = {};
   for (const e of weekend.race) racePosOf[e.driverId] = e.dnf ? "DNF" : `P${e.position}`;

@@ -82,7 +82,7 @@ export const CONSTRUCTORS: Constructor[] = [
   {
     id: "marussia", name: "Marussia", fullName: "Marussia F1 Team", season: 2013,
     nationality: "Russia", dna: { chassis: 66, aero: 60, factory: 58, engineering: 60, reliability: 70, developmentCapacity: 80, budgetEfficiency: 96, reputation: 21, sponsorAppeal: 15 },
-    allowedEngines: ["ferrari13-customer"], startCash: 68, operatingCost: 2.6,
+    allowedEngines: ["cosworth13-customer"], startCash: 68, operatingCost: 2.6,
     image: assetPaths.constructors.marussia, carImage: assetPaths.cars.marussia,
     colors: { primary: "#1e1e28", secondary: "#D40000" },
   },
@@ -191,6 +191,11 @@ export const ENGINES: EngineSpec[] = [
     id: "mercedes13-customer", name: "Mercedes FO108F (Customer)", supplier: "Mercedes-Benz", season: 2013, status: "customer",
     power: 89, reliability: 89, efficiency: 85, cost: 9, image: assetPaths.engines.mercedes13,
     description: "Brackley's finest at a customer price. The best value V8.",
+  },
+  {
+    id: "cosworth13-customer", name: "Cosworth CA2013", supplier: "Cosworth", season: 2013, status: "customer",
+    power: 85, reliability: 82, efficiency: 78, cost: 6, image: assetPaths.engines.renault13,
+    description: "The final year of Cosworth's F1 V8. Affordable but outdated.",
   },
 
   // ---------------- 2025 hybrid era

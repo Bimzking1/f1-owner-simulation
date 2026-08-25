@@ -6,6 +6,7 @@ import { signSponsor, terminateSponsor } from "@/actions";
 import { difficultyOf, sponsorSlotsOf } from "@/state";
 import { Button, Card, Empty, Img, Meter, Modal, Money, Tag } from "@/ui/kit";
 import type { Act } from "./parts";
+import { audioManager, UI_SOUNDS } from "@/ui/audio";
 
 interface Props {
   state: SimulationState;
@@ -193,6 +194,7 @@ export function SponsorsTab({ state, act }: Props) {
               <Button
                 small
                 onClick={() => {
+                  audioManager.playUi(UI_SOUNDS.success);
                   act((x) => signSponsor(x, confirm.id).message);
                   setConfirm(null);
                 }}
@@ -211,6 +213,7 @@ export function SponsorsTab({ state, act }: Props) {
           spec={terminating.spec}
           onClose={() => setTerminating(null)}
           onConfirm={() => {
+            audioManager.playUi(UI_SOUNDS.warning);
             act((x) => terminateSponsor(x, terminating.s.sponsorId).message);
             setTerminating(null);
           }}

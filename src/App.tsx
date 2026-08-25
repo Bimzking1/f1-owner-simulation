@@ -19,8 +19,11 @@ import ExpectationsScreen from "@/screens/ExpectationsScreen";
 import TestingScreen from "@/screens/TestingScreen";
 import SeasonScreen from "@/screens/season/SeasonScreen";
 import type { LiveCommand, LiveView } from "@/screens/season/parts";
+import { audioManager, SFX } from "@/ui/audio";
+import { AudioSettings } from "@/ui/AudioSettings";
+import SplashScreen from "@/screens/SplashScreen";
 
-type Screen = "landing" | "changelog" | "setup" | "expectations" | "testing" | "season";
+type Screen = "splash" | "landing" | "changelog" | "setup" | "expectations" | "testing" | "season";
 
 /** Mutable engine for a live race. NEVER part of SimulationState — the draft
  *  is only committed to React state once the weekend is finalized. */
@@ -40,13 +43,14 @@ const isDesktop = () =>
   typeof window !== "undefined" && window.matchMedia("(min-width: 1024px)").matches;
 
 export default function App() {
-  const [screen, setScreen] = useState<Screen>("landing");
+  const [screen, setScreen] = useState<Screen>("splash");
   const [cfg, setCfg] = useState<SetupConfig | null>(null);
   const [seed, setSeed] = useState("");
   const [sim, setSim] = useState<SimulationState | null>(null);
   const [toast, setToast] = useState<string>("");
   const [hasSave, setHasSave] = useState(() => !!loadState());
   const [live, setLive] = useState<LiveView | null>(null);
+  const [audioSettingsOpen, setAudioSettingsOpen] = useState(false);
 
   // Mutable live-race machinery lives entirely outside React state so renders
   // can never tear it apart: one engine object + one self-rescheduling timer.
@@ -112,7 +116,7 @@ export default function App() {
       gridPenaltyApplied: eng.prep.gridPenaltyApplied,
       paused: eng.paused,
       manualPaused: !!eng.userPaused,
-      done: false,
+      done: eng.prep.session.finished,
     };
   };
 
@@ -138,6 +142,9 @@ export default function App() {
     if (!eng) return;
     clearTimer();
     engineRef.current = null;
+    // Stop race ambience and start post-race theme
+    audioManager.stopAmbience();
+    audioManager.playMusic(SFX.postRace);
     const outcome = finalizeRound(eng.draft, eng.prep);
     if (outcome.phase === "finished") settleSeason(eng.draft);
     setSim(eng.draft);
@@ -205,6 +212,8 @@ export default function App() {
     const draft = structuredClone(sim);
     const prep = prepareRound(draft);
     if (!prep) return false;
+    // Stop post-race theme and start race ambience
+    audioManager.stopMusic();
     const laps = prep.session.laps;
     engineRef.current = {
       draft,
@@ -213,6 +222,7 @@ export default function App() {
       paused: false,
     };
     setLive(snapshotOf(engineRef.current));
+    audioManager.playAmbience(SFX.raceAmbience);
     scheduleNext();
     return true;
   };
@@ -276,6 +286,11 @@ export default function App() {
       return;
     }
     if (cmd.kind === "retire") {
+      // Play Charles Leclerc scream if he's forced to retire
+      const driverId = cmd.driverId;
+      if (driverId === "leclerc") {
+        audioManager.playSfx(SFX.charlesScream, 0.6);
+      }
       setToast(`${who} RETIRED from the race — he takes it hard (+4 frustration, −2 trust).`);
       return;
     }
@@ -427,6 +442,8 @@ export default function App() {
 
   const body = useMemo(() => {
     switch (screen) {
+      case "splash":
+        return <SplashScreen onReady={() => setScreen("landing")} />;
       case "landing":
         return (
           <LandingScreen
@@ -479,6 +496,20 @@ export default function App() {
           {toast}
         </div>
       )}
+      
+      {/* Audio settings button - fixed top right */}
+      <button
+        type="button"
+        onClick={() => setAudioSettingsOpen(true)}
+        className="fixed left-4 top-4 z-50 flex h-10 w-10 items-center justify-center rounded-full border border-hairline bg-surface/95 shadow-lg backdrop-blur transition hover:border-telemetry/50 hover:bg-raised"
+        title="Audio Settings"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-ink-soft" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+        </svg>
+      </button>
+      
+      <AudioSettings open={audioSettingsOpen} onClose={() => setAudioSettingsOpen(false)} />
     </div>
   );
 }

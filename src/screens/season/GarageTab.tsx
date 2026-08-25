@@ -27,6 +27,7 @@ import { replaceEngine, replaceGearbox, replacePuComponent, runTest, startDev, t
 import { Button, Card, Empty, Img, Meter, Modal, Money, ScrollText, Tag } from "@/ui/kit";
 import { ratingTone } from "@/ui/ratings";
 import type { Act } from "./parts";
+import { audioManager, UI_SOUNDS } from "@/ui/audio";
 
 interface Props {
   state: SimulationState;
@@ -129,7 +130,7 @@ export function GarageTab({ state, act }: Props) {
                         small
                         variant={devWindow && !running ? "primary" : "ghost"}
                         disabled={!devWindow || running}
-                        onClick={() => act((x) => startDev(x, o).message)}
+                        onClick={() => { audioManager.playUi(UI_SOUNDS.success); act((x) => startDev(x, o).message); }}
                       >
                         {running ? "In progress" : "Start"}
                       </Button>
@@ -155,7 +156,7 @@ export function GarageTab({ state, act }: Props) {
                               small
                               variant={devWindow && !running ? "primary" : "ghost"}
                               disabled={!devWindow || running}
-                              onClick={() => act((x) => startDev(x, o, seat).message)}
+                              onClick={() => { audioManager.playUi(UI_SOUNDS.success); act((x) => startDev(x, o, seat).message); }}
                             >
                               {d ? d.shortName : "Both cars"} · ${price}M
                             </Button>
@@ -278,6 +279,7 @@ export function GarageTab({ state, act }: Props) {
           seat={confirmSwap.seat}
           onClose={() => setConfirmSwap(null)}
           onConfirm={() => {
+            audioManager.playUi(UI_SOUNDS.success);
             act((s) =>
               confirmSwap.key === "engine"
                 ? replaceEngine(s, confirmSwap.seat).message
@@ -295,6 +297,7 @@ export function GarageTab({ state, act }: Props) {
           type={testPick}
           onClose={() => setTestPick(null)}
           onConfirm={() => {
+            audioManager.playUi(UI_SOUNDS.success);
             act((s) => {
               const r = runTest(s, testPick);
               return `${r.label}: ${r.value}/100 (${r.confidence}% confidence).`;

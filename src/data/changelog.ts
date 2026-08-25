@@ -22,6 +22,56 @@ export interface ChangeLogEntry {
 
 export const CHANGE_LOG: ChangeLogEntry[] = [
   {
+    version: "v0.16",
+    title: "Audio polish, UI sounds across all screens, and driver easter egg fix",
+    when: "25 August 2026 · 19:50",
+    summary:
+      "The audio system got a round of polish: the opening theme now loops continuously from the splash screen all the way through setup, expectations, testing, and the season overview — only fading out when the first GP Start button is clicked. Race ambience now properly loops and stops cleanly when the race ends or is skipped, transitioning seamlessly into the post-race theme. The 'Pit wall — decision required' pause now triggers the radio notification SFX while ambience keeps playing underneath. Charles Leclerc's forced-retirement scream now actually works (driver ID was wrong). The final season classification plays the post-race theme as background music. Sci-fi UI sounds from uisfx are now wired across all interactive screens: Setup wizard, Market, Garage, Sponsors, Management, and Finance tabs.",
+    items: [
+      { kind: "improve", text: "Opening theme now loops continuously from splash screen through setup, expectations, testing, and season overview — fades out only when the first GP Start button is clicked." },
+      { kind: "fix", text: "Race ambience now uses a dedicated looping audio channel separate from music. It stops cleanly when the race ends or is skipped, then the post-race theme starts." },
+      { kind: "new", text: "'Pit wall — decision required' pause now triggers the radio notification SFX while race ambience continues playing underneath." },
+      { kind: "fix", text: "Charles Leclerc forced-retirement scream now triggers correctly — driver ID was 'charles-leclerc' but the data uses 'leclerc'." },
+      { kind: "new", text: "Final season classification now plays the post-race theme as background music." },
+      { kind: "new", text: "UISFX sci-fi sounds wired across all interactive screens: Setup wizard (constructor/driver/engine/philosophy/sponsor selection), MarketTab (hire/fire/swap), GarageTab (dev starts, part replacements, test runs), SponsorsTab (sign/terminate), ManagementTab (chat responses, driver/team actions, team orders), FinanceTab (round detail views)." },
+      { kind: "improve", text: "Ambience audio channel added to AudioManager — ambience and music are now independently controllable, so ambience can stop while music continues and vice versa." },
+      { kind: "fix", text: "Pause button no longer double-plays box-box + radio notification — radio notification only fires on automatic pit wall pauses, not owner-initiated pauses." },
+      { kind: "fix", text: "Post-race theme now plays when the race finishes naturally (all laps complete) — previously it only played on 'Skip to Result'. Ambience stops and post-race theme starts via the App-level engine." },
+      { kind: "fix", text: "Post-race theme stops and ambience starts when the next GP is started — seamless audio transition between races." },
+      { kind: "fix", text: "UISFX AudioContext is now properly unlocked from the splash screen click, and the pack name was corrected from 'sci-fi' to 'scifi'. UI sounds now play on all interactive selections." },
+    ],
+  },
+  {
+    version: "v0.15",
+    title: "Splash screen, audio fixes and polish",
+    when: "25 August 2026 · 18:05",
+    summary:
+      "A sleek splash screen greets the player on launch — click anywhere to play the box-box SFX, which unlocks browser audio. Three seconds later the opening theme starts and the main landing page fades in. The audio settings button moved to top-right to avoid clashing with any buttons.",
+    items: [
+      { kind: "new", text: "Splash screen: dark cinematic landing with the F1 Owner logo, vignette overlay and pulsing glow. Click anywhere to play the box-box SFX (unlocks browser audio), then 3 seconds later the opening theme fades in and the landing page appears." },
+      { kind: "fix", text: "Opening theme now plays reliably on first page load — the splash screen click satisfies the browser autoplay policy so music starts immediately instead of requiring a round-trip through the setup screens." },
+      { kind: "fix", text: "Audio settings button moved from bottom-left to bottom-right to avoid overlapping the Setup wizard Back button." },
+      { kind: "docs", text: "README updated with splash screen documentation." },
+    ],
+  },
+  {
+    version: "v0.14",
+    title: "Full audio system, teammate mood dynamics, and quality-of-life fixes",
+    when: "25 August 2026 · 17:15",
+    summary:
+      "The game now has a complete audio system with separate volume controls for background music, sound effects, and UI interaction sounds. All six MP3 files are wired to their specific triggers, and sci-fi UI sounds from uisfx.com provide tactile feedback for buttons, tabs, and notifications. Driver morale now factors in teammate performance and upgrades, the Weekend classification defaults to race results, and the Setup wizard scrolls to top on every step change.",
+    items: [
+      { kind: "new", text: "Full audio management system with separate volume sliders and mute toggles for music, SFX, and UI sounds — settings persist in localStorage." },
+      { kind: "new", text: "SFX triggers wired: opening theme plays on landing until first GP, box-box on pause/race weekend decisions, radio notification on new management/sponsor/finance/garage alerts, post-race theme on classification screen, race ambience during live simulation, and Charles Leclerc scream on forced retirement." },
+      { kind: "new", text: "UI interaction sounds from uisfx.com (sci-fi feel): button clicks, tab switches, hover feedback, and notification alerts — generated at runtime, no MP3 files needed." },
+      { kind: "new", text: "Teammate mood dynamics: driver morale now factors in teammate confidence, frustration, and upgrade status — getting upgrades while your teammate doesn't causes frustration." },
+      { kind: "fix", text: "2013 Marussia now uses the correct Cosworth CA2013 engine instead of Ferrari customer spec." },
+      { kind: "fix", text: "Weekend classification now defaults to race results instead of qualifying." },
+      { kind: "fix", text: "Setup wizard: Technical→Staff and Review→Expectation step transitions now scroll the page to top." },
+      { kind: "docs", text: "README updated with audio system documentation." },
+    ],
+  },
+  {
     version: "v0.13",
     title: "Radio answers in real time — and no more clipped labels",
     when: "24 August 2026 · 16:06",
