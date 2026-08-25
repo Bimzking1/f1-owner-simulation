@@ -752,12 +752,14 @@ export function applyMorale(state: SimulationState, weekend: RaceWeekendResult, 
       if (otherDs.frustration >= 60) {
         frust += 1; // teammate's negativity rubs off
       }
-      // Driver gets mad if teammate gets upgrades they don't
-      const dsSeat = t.car.upgrades?.find((u) => u.driverId === ds.driverId && u.status === "installed");
-      const otherSeat = t.car.upgrades?.find((u) => u.driverId === otherDs.driverId && u.status === "installed");
-      if (dsSeat && !otherSeat) {
+      // Driver gets mad if teammate gets seat-specific upgrades they don't
+      const dsSeat = ds.driverId === t.driver1Id ? "car1" as const : "car2" as const;
+      const otherSeat = otherDs.driverId === t.driver1Id ? "car1" as const : "car2" as const;
+      const dsHasSeatUpgrade = t.seatUpgrades && Object.keys(t.seatUpgrades[dsSeat] ?? {}).length > 0;
+      const otherHasSeatUpgrade = t.seatUpgrades && Object.keys(t.seatUpgrades[otherSeat] ?? {}).length > 0;
+      if (dsHasSeatUpgrade && !otherHasSeatUpgrade) {
         // Driver got upgrade but teammate didn't - no extra mood effect
-      } else if (!dsSeat && otherSeat) {
+      } else if (!dsHasSeatUpgrade && otherHasSeatUpgrade) {
         frust += 2; // teammate got upgrade, driver feels left behind
       }
     }
