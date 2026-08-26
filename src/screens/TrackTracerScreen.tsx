@@ -10,6 +10,7 @@ interface Point {
   label: string | null;
   labelType: LabelType | null;
   turnOrder: number | null;
+  path: "race" | "pitlane";
 }
 
 type LabelType =
@@ -84,6 +85,7 @@ export default function TrackTracerScreen() {
   const [trackName, setTrackName] = useState("");
   const [imgSize, setImgSize] = useState<string>("\u2014");
   const [hasImage, setHasImage] = useState(false);
+  const [drawingMode, setDrawingMode] = useState<"race" | "pitlane">("race");
 
   // Context menu state
   const [ctxMenu, setCtxMenu] = useState<{
@@ -144,67 +146,94 @@ export default function TrackTracerScreen() {
     ctx.fillRect(0, 0, w, h);
     ctx.drawImage(img, 0, 0, w, h);
 
-    if (pts.length > 0) {
+    const racePts = pts.filter((p) => p.path === "race");
+    const pitPts = pts.filter((p) => p.path === "pitlane");
+
+    // Draw race line (cyan)
+    if (racePts.length > 0) {
       ctx.strokeStyle = "#29d3ff";
       ctx.lineWidth = 2.5;
       ctx.beginPath();
-      pts.forEach((p, i) => {
+      racePts.forEach((p, i) => {
         const cx = p.x * w;
         const cy = p.y * h;
         if (i === 0) ctx.moveTo(cx, cy);
         else ctx.lineTo(cx, cy);
       });
-      if (cl && pts.length > 2) {
-        ctx.lineTo(pts[0].x * w, pts[0].y * h);
+      if (cl && racePts.length > 2) {
+        ctx.lineTo(racePts[0].x * w, racePts[0].y * h);
       }
       ctx.stroke();
+    }
 
-      pts.forEach((p, i) => {
+    // Draw pitlane line (amber)
+    if (pitPts.length > 0) {
+      ctx.strokeStyle = "#f5a623";
+      ctx.lineWidth = 2;
+      ctx.setLineDash([6, 4]);
+      ctx.beginPath();
+      pitPts.forEach((p, i) => {
         const cx = p.x * w;
         const cy = p.y * h;
-        const hasLabel = !!p.labelType;
+        if (i === 0) ctx.moveTo(cx, cy);
+        else ctx.lineTo(cx, cy);
+      });
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
 
-        let fillColor: string;
+    // Draw all dots
+    pts.forEach((p, i) => {
+      const cx = p.x * w;
+      const cy = p.y * h;
+      const hasLabel = !!p.labelType;
+      const isPit = p.path === "pitlane";
+
+      let fillColor: string;
+      if (isPit) {
+        if (hasLabel) fillColor = DOT_COLORS[p.labelType!];
+        else fillColor = "#b8860b";
+      } else {
         if (i === 0 && !hasLabel) fillColor = "#3ddc84";
         else if (i === pts.length - 1 && !hasLabel) fillColor = "#ff4a2e";
         else if (hasLabel) fillColor = DOT_COLORS[p.labelType!];
         else fillColor = "#151920";
+      }
 
-        if (hasLabel) {
-          ctx.beginPath();
-          ctx.arc(cx, cy, POINT_R + 5, 0, Math.PI * 2);
-          ctx.fillStyle = fillColor + "33";
-          ctx.fill();
-        }
-
+      if (hasLabel) {
         ctx.beginPath();
-        ctx.arc(cx, cy, POINT_R, 0, Math.PI * 2);
-        ctx.fillStyle = fillColor;
+        ctx.arc(cx, cy, POINT_R + 5, 0, Math.PI * 2);
+        ctx.fillStyle = fillColor + "33";
         ctx.fill();
-        ctx.strokeStyle = "#29d3ff";
-        ctx.lineWidth = 2;
+      }
+
+      ctx.beginPath();
+      ctx.arc(cx, cy, POINT_R, 0, Math.PI * 2);
+      ctx.fillStyle = fillColor;
+      ctx.fill();
+      ctx.strokeStyle = isPit ? "#f5a623" : "#29d3ff";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      const shortLabel = hasLabel
+        ? SHORT_LABELS[p.labelType!](p.turnOrder ?? undefined)
+        : null;
+      const displayText = shortLabel
+        ? `${i} ${shortLabel}`
+        : `${i}`;
+
+      ctx.font = "bold 10px monospace";
+      ctx.fillStyle = hasLabel ? fillColor : "#f0f2f5";
+      ctx.fillText(displayText, cx + 10, cy - 8);
+
+      if (p.labelType === "turn") {
+        ctx.beginPath();
+        ctx.arc(cx, cy, POINT_R + 2, 0, Math.PI * 2);
+        ctx.strokeStyle = fillColor;
+        ctx.lineWidth = 1.5;
         ctx.stroke();
-
-        const shortLabel = hasLabel
-          ? SHORT_LABELS[p.labelType!](p.turnOrder ?? undefined)
-          : null;
-        const displayText = shortLabel
-          ? `${i} ${shortLabel}`
-          : `${i}`;
-
-        ctx.font = "bold 10px monospace";
-        ctx.fillStyle = hasLabel ? fillColor : "#f0f2f5";
-        ctx.fillText(displayText, cx + 10, cy - 8);
-
-        if (p.labelType === "turn") {
-          ctx.beginPath();
-          ctx.arc(cx, cy, POINT_R + 2, 0, Math.PI * 2);
-          ctx.strokeStyle = fillColor;
-          ctx.lineWidth = 1.5;
-          ctx.stroke();
-        }
-      });
-    }
+      }
+    });
   }, []);
 
   /* -------------------------------------------------------------- */
@@ -331,11 +360,11 @@ export default function TrackTracerScreen() {
         const ny = round(cy / h);
         setPoints((prev) => [
           ...prev,
-          { x: nx, y: ny, label: null, labelType: null, turnOrder: null },
+          { x: nx, y: ny, label: null, labelType: null, turnOrder: null, path: drawingMode },
         ]);
       }
     },
-    [hitTest, showCtxMenu],
+    [hitTest, showCtxMenu, drawingMode],
   );
 
   const onMouseMove = useCallback(
@@ -497,18 +526,44 @@ export default function TrackTracerScreen() {
 
   const jsonText = (() => {
     const name = trackName.trim() || "untitled-track";
-    const racingLine = points.map((p) => ({
+
+    const toObj = (p: Point) => ({
       x: p.x,
       y: p.y,
       label: p.label ?? null,
       is_turn: p.labelType === "turn",
       turn_order: p.turnOrder ?? null,
-    }));
-    return JSON.stringify(
-      { track: name, pointCount: points.length, closeLoop, racingLine },
-      null,
-      2,
-    );
+    });
+
+    const raceLine = points.filter((p) => p.path === "race").map(toObj);
+
+    // Pitlane: auto-sort so entry_pitstop is first, outro_pitstop_gate is last
+    const pitPoints = points.filter((p) => p.path === "pitlane");
+    const entryIdx = pitPoints.findIndex((p) => p.labelType === "entry_pitstop");
+    const outroIdx = pitPoints.findIndex((p) => p.labelType === "outro_pitstop_gate");
+    const sortedPit = [...pitPoints];
+    if (entryIdx > 0) {
+      const [entry] = sortedPit.splice(entryIdx, 1);
+      sortedPit.unshift(entry);
+    }
+    if (outroIdx >= 0) {
+      const actualOutro = sortedPit.findIndex((p) => p.labelType === "outro_pitstop_gate");
+      if (actualOutro >= 0 && actualOutro < sortedPit.length - 1) {
+        const [outro] = sortedPit.splice(actualOutro, 1);
+        sortedPit.push(outro);
+      }
+    }
+    const pitLine = sortedPit.map(toObj);
+
+    const obj: Record<string, unknown> = {
+      track: name,
+      closeLoop,
+      racingLine: raceLine,
+    };
+    if (pitLine.length > 0) {
+      obj.pitlane = pitLine;
+    }
+    return JSON.stringify(obj, null, 2);
   })();
 
   const copyJson = useCallback(() => {
@@ -528,6 +583,8 @@ export default function TrackTracerScreen() {
     URL.revokeObjectURL(url);
   }, [jsonText, trackName]);
 
+  const raceCount = points.filter((p) => p.path === "race").length;
+  const pitCount = points.filter((p) => p.path === "pitlane").length;
   const turnCount = points.filter((p) => p.labelType === "turn").length;
 
   /* -------------------------------------------------------------- */
@@ -559,6 +616,16 @@ export default function TrackTracerScreen() {
               onChange={onFileChange}
             />
           </label>
+          <button
+            onClick={() => setDrawingMode((v) => (v === "race" ? "pitlane" : "race"))}
+            className={`rounded-md border px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide ${
+              drawingMode === "pitlane"
+                ? "border-caution bg-caution/15 text-caution"
+                : "border-hairline bg-raised text-ink hover:border-ink-faint"
+            }`}
+          >
+            {drawingMode === "race" ? "Mode: Race track" : "Mode: Pitlane"}
+          </button>
           <button
             onClick={() => setCloseLoop((v) => !v)}
             className="rounded-md border border-hairline bg-raised px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-ink hover:border-ink-faint"
@@ -633,7 +700,8 @@ export default function TrackTracerScreen() {
               1. Load a clean track-layout image.
               <br />
               2. Click points along the driving line, in the direction of
-              travel.
+              travel. Use the <b>Mode</b> toggle to switch between race track
+              and pitlane.
               <br />
               3. Drag any point to nudge it. <b>Undo</b> removes the last
               point. Toggle <b>Close loop</b> to connect start ↔ end.
@@ -641,11 +709,7 @@ export default function TrackTracerScreen() {
               4. <b>Double-click a dot</b> to label it as a turn, finish line,
               pit entry, etc.
               <br />
-              5. Copy the JSON and paste it into your track data file as the{" "}
-              <code className="rounded bg-raised px-1 py-0.5 font-mono text-[10px] text-telemetry">
-                racingLine
-              </code>{" "}
-              array.
+              5. Copy the JSON — <code className="rounded bg-raised px-1 py-0.5 font-mono text-[10px] text-telemetry">racingLine[]</code> for the circuit, <code className="rounded bg-raised px-1 py-0.5 font-mono text-[10px] text-caution">pitlane[]</code> for the pit road.
             </p>
           </div>
           <div className="border-b border-hairline px-4 py-3.5">
@@ -653,8 +717,12 @@ export default function TrackTracerScreen() {
               Live stats
             </h2>
             <div className="flex justify-between text-xs text-ink-soft">
-              <span>Points placed</span>
-              <b className="font-mono text-ink">{points.length}</b>
+              <span>Race points</span>
+              <b className="font-mono text-ink">{raceCount}</b>
+            </div>
+            <div className="flex justify-between text-xs text-ink-soft">
+              <span>Pitlane points</span>
+              <b className="font-mono text-ink">{pitCount}</b>
             </div>
             <div className="flex justify-between text-xs text-ink-soft">
               <span>Image size</span>
