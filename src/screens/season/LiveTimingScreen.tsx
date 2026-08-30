@@ -314,6 +314,9 @@ export default function LiveTimingScreen({ state, live, active = true, onSetLive
   const prevGapsRef = useRef<Record<string, number>>({});
   const lastLapTimesRef = useRef<Record<string, number>>({});
   const bestLapTimesRef = useRef<Record<string, number>>({});
+  /* Per-driver previous position for overtake/undersake labeling. Updated
+   * on each table refresh so the next render can compare old vs new. */
+  const prevPositionsRef = useRef<Record<string, number>>({});
   /* Per-driver sector times for the table: the most recently COMPLETED lap's
    * S1/S2/S3. Each cell then shows the previous lap's value until the dot
    * crosses that sector's cut on the current lap, at which point it's replaced
@@ -414,17 +417,19 @@ export default function LiveTimingScreen({ state, live, active = true, onSetLive
 
   /* -- Lap-time tracking for live data. Records EVERY completed lap for every
    *    driver (1st → last) with deterministic fluctuation. BEST only overwrites
-   *    when the new lap beats the existing best. The first lap has no previous
-   *    gap to measure against, so the gap delta falls back to zero instead of
-   *    skipping the driver — without this, LAST/BEST/S1/S2/S3 would stay empty
-   *    after lap 1. -- */
+   *    when the new lap beats the existing best. Even the very first lap is
+   *    recorded so LAST/BEST/S1/S2/S3 fill after just one completed lap. -- */
   useEffect(() => {
     if (!live) return;
     const currentLapInt = Math.floor(live.currentLap);
-    if (currentLapInt > prevLiveLapRef.current) {
+    /* Record on every lap transition — when the lap integer increases from N to N+1.
+     * This ensures the first lap (0 → 1) is always captured so LAST/BEST/S1/S2/S3
+     * fill after just one completed lap. */
+    const lapJustCompleted = currentLapInt > prevLiveLapRef.current;
+    if (lapJustCompleted) {
       for (const [id, car] of Object.entries(live.cars)) {
-        const prevGap = prevGapsRef.current[id];
         if (live.retired?.[id]) continue;
+        const prevGap = prevGapsRef.current[id];
         const base = LAP_TIME_BASE + (car.pos - 1) * 0.12 + (car.gapS - (prevGap ?? car.gapS)) * 0.08;
         const clamped = Math.max(74, Math.min(82, base + lapNoise(id, currentLapInt, 0, 1.5)));
         lastLapTimesRef.current[id] = clamped;
@@ -507,7 +512,9 @@ export default function LiveTimingScreen({ state, live, active = true, onSetLive
       const from = resumeFracRef.current;
       resumeFracRef.current = null;
       lastTickTimeRef.current = now;
-      lastTickLapRef.current += 1;
+      /* NOTE: DO NOT increment lastTickLapRef.current here — doing so jumps
+       * the dot to the next lap on resume. Instead, keep the lap counter so
+       * the fraction resumes from the same position within the current lap. */
       const frac = Math.min((now - lastTickTimeRef.current) / 1000 / expectedInterval, 1.0);
       return lastTickLapRef.current - 1 + from + frac * (1 - from);
     }
@@ -1252,15 +1259,16 @@ function buildFromLive(
     let sector1 = 0;
     let sector2 = 0;
     let sector3 = 0;
-    if (lastLap > 0) {
-      sector1 = trackProgress >= cut1
-        ? Math.max(0, estClamped * cut1 + lapNoise(driverId, inProgLap, 1, 0.7))
-        : sec[0];
-      sector2 = trackProgress >= cut2
-        ? Math.max(0, estClamped * (cut2 - cut1) + lapNoise(driverId, inProgLap, 2, 0.7))
-        : sec[1];
-      sector3 = sec[2];
-    }
+    /* S1/S2/S3 update the instant the dot crosses each sector's end cut,
+     * based on the driver's own track progress — this runs on every refresh
+     * (33ms canvas redraw, 100ms table refresh), so there's no polling delay. */
+    sector1 = trackProgress >= cut1
+      ? Math.max(0, estClamped * cut1 + lapNoise(driverId, inProgLap, 1, 0.7))
+      : (sectorTimesMap?.[driverId]?.[0] ?? 0);
+    sector2 = trackProgress >= cut2
+      ? Math.max(0, estClamped * (cut2 - cut1) + lapNoise(driverId, inProgLap, 2, 0.7))
+      : (sectorTimesMap?.[driverId]?.[1] ?? 0);
+    sector3 = sectorTimesMap?.[driverId]?.[2] ?? 0;
 
     const gridEntry = live.qualifying.find((q) => q.driverId === driverId);
 

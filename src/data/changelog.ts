@@ -33,6 +33,7 @@ export const CHANGE_LOG: ChangeLogEntry[] = [
       { kind: "fix", text: "S1/S2/S3 now fill the exact moment the dot crosses the sector boundary — computed directly from each driver's track progress every refresh, not by a polling gate that could lag behind." },
       { kind: "fix", text: "No more phantom LEADER rows: the gap column shows LEADER only for the race leader, DNF for retired drivers, and the relative gap for everyone else." },
       { kind: "fix", text: "LAST, BEST, S1, S2 and S3 now fill after the FIRST completed lap for every driver — the first-lap transition records using a zero gap delta instead of skipping drivers that had no previous reading." },
+      { kind: "fix", text: "When pausing then resuming, the dot continues from its exact paused position on circuit instead of snapping back to the start/finish line — the interpolation clock re-anchors using the saved lap fraction without advancing the lap counter." },
       { kind: "improve", text: "Lap times fluctuate per driver, per lap and per sector (deterministic noise up to ~1.5s / ~0.7s), so the fastest S1, S2, S3, BEST and LAST can belong to different drivers and trade hands across laps." },
       { kind: "improve", text: "Fastest in each column highlighted red — BEST, LAST, S1, S2 and S3 show the quickest time in red, and a red dot sits beside the fastest BEST." },
     ],
