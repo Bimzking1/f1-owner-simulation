@@ -22,6 +22,19 @@ export interface ChangeLogEntry {
 
 export const CHANGE_LOG: ChangeLogEntry[] = [
   {
+    version: "v0.26",
+    title: "Seamless pause/resume dots, labelled corners, full-width timing tower",
+    when: "30 August 2026 · 16:45",
+    summary:
+      "Driver dots now resume exactly where they froze instead of snapping back to the start/finish line. Pausing captures the car's fraction of the lap; resuming pre-winds the interpolation clock by that fraction, so the dots carry on from their exact spot on the circuit (whether you resume from Live Timing or the Race tab) and reach the next lap boundary precisely when the engine ticks. Turn labels no longer overlap the racing line: each T-number is placed along the outward normal of the track at that corner, with a short leader line pointing at the corner itself, so labels sit cleanly beside the layout instead of on top of it. Sector boundary marks (S2/S3) got the same outward placement. The timing tower is now a single full-width grid on every screen size — POS and DRV widened again (40px/84px) and TEAM gets a flexible share, and on small screens the whole table scrolls horizontally (no more columns being squeezed or hidden).",
+    items: [
+      { kind: "fix", text: "Driver dots continue from their paused spot when you Resume — from Live Timing or the Race tab — instead of resetting to the finish line." },
+      { kind: "fix", text: "Turn labels are placed outside the track along the outward normal with a leader to the corner, so they never sit on top of the circuit layout." },
+      { kind: "improve", text: "Sector boundary marks (S2/S3) placed outward of the track line with a halo for readability." },
+      { kind: "improve", text: "Timing tower is one full-width grid everywhere: POS 40px, DRV 84px, TEAM flexible, and on mobile the table scrolls horizontally so no column is squeezed." },
+    ],
+  },
+  {
     version: "v0.25",
     title: "Circuit map aspect fix, wider timing tower, reliable pause/resume",
     when: "30 August 2026 · 16:10",

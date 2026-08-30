@@ -354,6 +354,14 @@ export default function LiveTimingScreen({ state, live, active = true, onSetLive
   const entryPitstop = useMemo(() => circuit?.racingLine.find((p) => p.label === "Entry pitstop") ?? null, [circuit]);
   const outroPitstopGate = useMemo(() => circuit?.racingLine.find((p) => p.label === "Outro pitstop gate") ?? null, [circuit]);
   const finishLine = useMemo(() => circuit?.racingLine.find((p) => p.label === "Finish line") ?? null, [circuit]);
+  /* Track centroid — used to push turn/sector labels OUTSIDE the loop so
+   * they never sit on top of the racing line. */
+  const trackCentroid = useMemo(() => {
+    if (!raceSpline.length) return { x: 0.5, y: 0.5 };
+    let sx = 0, sy = 0;
+    for (const p of raceSpline) { sx += p.x; sy += p.y; }
+    return { x: sx / raceSpline.length, y: sy / raceSpline.length };
+  }, [raceSpline]);
   const pitstopLanes = useMemo(
     () => (circuit?.pitlane ?? []).filter((p) => p.label === "Pitstop lane"),
     [circuit],
@@ -436,12 +444,14 @@ export default function LiveTimingScreen({ state, live, active = true, onSetLive
       const expectedInterval = LAP_TIME_BASE / speedRef.current;
       pausedFracRef.current = Math.min(elapsed / expectedInterval, 1.0);
     } else {
+      /* Resume: pre-wind the interpolation clock so the dots continue from
+       * exactly where they froze (pausedFrac) instead of snapping back to
+       * the lap-start/finish line. The next engine tick lands just as the
+       * interpolated lap reaches the next integer, making it a seamless lap. */
+      const expectedInterval = LAP_TIME_BASE / speedRef.current;
+      const frac = pausedFracRef.current ?? 0;
+      lastTickTimeRef.current = performance.now() - frac * expectedInterval * 1000;
       pausedFracRef.current = null;
-      /* Re-anchor the interpolation clock so the dots resume from the CURRENT
-       * lap instead of jumping to a full lap ahead: after a long pause the
-       * elapsed time since the last tick would otherwise clamp to 1 and park
-       * every dot at the finish line until the next engine tick. */
-      lastTickTimeRef.current = performance.now();
     }
   }, [live?.paused, live?.manualPaused]);
 
@@ -622,6 +632,22 @@ export default function LiveTimingScreen({ state, live, active = true, onSetLive
     }
 
     /* ---- Sector boundary ticks (use real cuts from circuit JSON) ---- */
+    /* Outward unit normal at a spline index — away from the track centroid,
+     * so labels park clear of the racing line instead of overlapping it. */
+    const outwardNormal = (idx: number): { nx: number; ny: number } => {
+      const prev = raceSpline[Math.max(0, idx - 1)];
+      const next = raceSpline[Math.min(raceSpline.length - 1, idx + 1)];
+      let tx = next.x - prev.x;
+      let ty = next.y - prev.y;
+      const tl = Math.hypot(tx, ty) || 1;
+      tx /= tl; ty /= tl;
+      let nx = -ty;
+      let ny = tx;
+      const px = raceSpline[idx].x - trackCentroid.x;
+      const py = raceSpline[idx].y - trackCentroid.y;
+      if (nx * px + ny * py < 0) { nx = -nx; ny = -ny; }
+      return { nx, ny };
+    };
     const sectorTick = (frac: number, label: string, color: string) => {
       if (!raceSpline.length) return;
       const si = Math.min(
@@ -629,29 +655,28 @@ export default function LiveTimingScreen({ state, live, active = true, onSetLive
         Math.max(0, Math.floor(frac * (raceSpline.length - 1))),
       );
       const sp = raceSpline[si];
-      const prev = raceSpline[Math.max(0, si - 1)];
-      const next = raceSpline[Math.min(raceSpline.length - 1, si + 1)];
-      const tdx = (next.x - prev.x) * drawW;
-      const tdy = (next.y - prev.y) * drawH;
-      const tlen = Math.hypot(tdx, tdy) || 1;
-      const nx = -tdy / tlen;
-      const ny = tdx / tlen;
+      const { nx, ny } = outwardNormal(si);
       const { x, y } = toCanvas(sp.x, sp.y);
       ctx.strokeStyle = color;
       ctx.lineWidth = 2;
       ctx.setLineDash([3, 2]);
       ctx.globalAlpha = 0.8;
       ctx.beginPath();
-      ctx.moveTo(x + nx * 8, y + ny * 8);
-      ctx.lineTo(x - nx * 8, y - ny * 8);
+      ctx.moveTo(x + nx * 6, y + ny * 6);
+      ctx.lineTo(x - nx * 6, y - ny * 6);
       ctx.stroke();
       ctx.setLineDash([]);
       ctx.globalAlpha = 1;
-      ctx.font = "bold 9px system-ui, sans-serif";
-      ctx.fillStyle = color;
-      ctx.textAlign = "left";
+      ctx.font = "700 10px system-ui, sans-serif";
+      ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillText(label, x + nx * 11, y + ny * 11);
+      const lx = x + nx * 17;
+      const ly = y + ny * 17;
+      ctx.strokeStyle = "#0f172a";
+      ctx.lineWidth = 3;
+      ctx.strokeText(label, lx, ly);
+      ctx.fillStyle = color;
+      ctx.fillText(label, lx, ly);
     };
     sectorTick(sectorCuts[0], "S2", SECTOR_LINE_COLORS[1]);
     sectorTick(sectorCuts[1], "S3", SECTOR_LINE_COLORS[2]);
@@ -688,26 +713,43 @@ export default function LiveTimingScreen({ state, live, active = true, onSetLive
       ctx.stroke();
     }
 
-    /* ---- Turn labels ---- */
+    /* ---- Turn labels (placed outside the track on the outward normal,
+       with a short leader to the actual corner) ---- */
     ctx.font = "700 11px system-ui, sans-serif";
     ctx.textAlign = "center";
-    ctx.textBaseline = "bottom";
+    ctx.textBaseline = "middle";
     circuit?.racingLine.forEach((cp) => {
-      if (cp.is_turn && cp.turn_order) {
-        const splineIdx = circuit.racingLine.indexOf(cp);
-        const frac = splineIdx / circuit.racingLine.length;
-        const si = Math.floor(frac * (raceSpline.length - 1));
-        const sp = raceSpline[Math.min(si, raceSpline.length - 1)];
-        if (sp) {
-          const { x, y } = toCanvas(sp.x, sp.y);
-          ctx.fillStyle = "#0f172a";
-          ctx.strokeStyle = "#0f172a";
-          ctx.lineWidth = 2.5;
-          ctx.strokeText(`T${cp.turn_order}`, x, y - 12);
-          ctx.fillStyle = "#f8fafc";
-          ctx.fillText(`T${cp.turn_order}`, x, y - 12);
-        }
+      if (!cp.is_turn || !cp.turn_order) return;
+      let bi = 0;
+      let bd = Infinity;
+      for (let i = 0; i < raceSpline.length; i++) {
+        const d = (raceSpline[i].x - cp.x) ** 2 + (raceSpline[i].y - cp.y) ** 2;
+        if (d < bd) { bd = d; bi = i; }
       }
+      const sp = raceSpline[bi];
+      const { nx, ny } = outwardNormal(bi);
+      const { x, y } = toCanvas(sp.x, sp.y);
+      const lx = x + nx * 24;
+      const ly = y + ny * 24;
+      /* anchor on the corner */
+      ctx.fillStyle = "rgba(226,232,240,0.9)";
+      ctx.beginPath();
+      ctx.arc(x, y, 2, 0, Math.PI * 2);
+      ctx.fill();
+      /* leader line */
+      ctx.strokeStyle = "rgba(226,232,240,0.55)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(lx, ly);
+      ctx.stroke();
+      /* label with dark outline for contrast over the map */
+      ctx.fillStyle = "#0f172a";
+      ctx.strokeStyle = "#0f172a";
+      ctx.lineWidth = 3;
+      ctx.strokeText(`T${cp.turn_order}`, lx, ly);
+      ctx.fillStyle = "#f8fafc";
+      ctx.fillText(`T${cp.turn_order}`, lx, ly);
     });
 
     /* ---- Driver dots ---- */
@@ -767,7 +809,7 @@ export default function LiveTimingScreen({ state, live, active = true, onSetLive
     });
 
     ctx.restore();
-  }, [raceSpline, pitSpline, circuit, mapCoord, entryPitstop, outroPitstopGate, finishLine, pitstopLanes, sectorCuts, getInterpLap, hasLiveRace, live, state, totalLaps]);
+  }, [raceSpline, pitSpline, circuit, mapCoord, entryPitstop, outroPitstopGate, finishLine, pitstopLanes, sectorCuts, trackCentroid, getInterpLap, hasLiveRace, live, state, totalLaps]);
 
   /* -- Canvas sizing: fit the circuit into its card while ALWAYS preserving
    *    the track's aspect ratio (a fixed 700px height would squish the
@@ -1022,25 +1064,19 @@ export default function LiveTimingScreen({ state, live, active = true, onSetLive
 
       {/* Timing Tower */}
       <div className="rounded-lg border border-hairline bg-surface overflow-x-auto">
-        {/* Desktop header */}
-        <div className="hidden sm:grid sm:grid-cols-[32px_68px_minmax(110px,1.4fr)_56px_64px_64px] md:grid-cols-[32px_68px_minmax(140px,1.5fr)_56px_64px_64px_44px_44px_44px] gap-x-1 gap-y-0 border-b border-hairline bg-raised/50 px-3 py-1.5 text-[9px] font-bold uppercase tracking-wider text-ink-faint">
+        {/* Header — one full-width grid at every breakpoint; on narrow
+            screens the whole table scrolls horizontally so no column is
+            squeezed. */}
+        <div className="grid min-w-[700px] grid-cols-[40px_84px_minmax(170px,1.6fr)_72px_76px_76px_56px_56px_56px] gap-x-1 gap-y-0 border-b border-hairline bg-raised/50 px-3 py-1.5 text-[9px] font-bold uppercase tracking-wider text-ink-faint">
           <span>POS</span>
           <span>DRV</span>
           <span>TEAM</span>
           <span className="text-right">GAP</span>
           <span className="text-right">LAST</span>
           <span className="text-right">BEST</span>
-          <span className="text-right hidden md:table-cell">S1</span>
-          <span className="text-right hidden md:table-cell">S2</span>
-          <span className="text-right hidden md:table-cell">S3</span>
-        </div>
-
-        {/* Mobile header */}
-        <div className="grid grid-cols-[28px_64px_1fr_48px] gap-x-1 gap-y-0 border-b border-hairline bg-raised/50 px-3 py-1.5 text-[9px] font-bold uppercase tracking-wider text-ink-faint sm:hidden">
-          <span>POS</span>
-          <span>DRV</span>
-          <span className="text-right">GAP</span>
-          <span className="text-right">LAST</span>
+          <span className="text-right">S1</span>
+          <span className="text-right">S2</span>
+          <span className="text-right">S3</span>
         </div>
 
         {/* Driver rows */}
@@ -1059,23 +1095,8 @@ export default function LiveTimingScreen({ state, live, active = true, onSetLive
 
             return (
               <div key={d.driverId}>
-                {/* Mobile row */}
                 <div
-                  className={`grid grid-cols-[28px_64px_1fr_48px] gap-x-1 items-center px-3 py-1.5 text-xs sm:hidden ${
-                    d.isPlayer ? "bg-telemetry/8" : ""
-                  } ${isDNF ? "opacity-50" : ""}`}
-                >
-                  <span className={`font-bold num-data ${d.position <= 3 ? "text-amber-400" : ""}`}>{d.position}</span>
-                  <span className="font-mono font-bold text-[11px] whitespace-nowrap" style={{ color: d.teamColor }}>
-                    {d.shortName}
-                  </span>
-                  <span className="text-right font-mono text-[11px] whitespace-nowrap">{formatGap(d.gapToLeader)}</span>
-                  <span className="text-right font-mono text-[10px] text-ink-soft whitespace-nowrap">{lastTime}</span>
-                </div>
-
-                {/* Tablet/Desktop row */}
-                <div
-                  className={`hidden sm:grid sm:grid-cols-[32px_68px_minmax(110px,1.4fr)_56px_64px_64px] md:grid-cols-[32px_68px_minmax(140px,1.5fr)_56px_64px_64px_44px_44px_44px] gap-x-1 items-center px-3 py-1.5 text-xs ${
+                  className={`grid min-w-[700px] grid-cols-[40px_84px_minmax(170px,1.6fr)_72px_76px_76px_56px_56px_56px] gap-x-1 items-center px-3 py-1.5 text-xs ${
                     d.isPlayer ? "bg-telemetry/8" : "hover:bg-raised/30"
                   } ${isDNF ? "opacity-50" : ""}`}
                 >
@@ -1091,9 +1112,9 @@ export default function LiveTimingScreen({ state, live, active = true, onSetLive
                   <span className="text-right font-mono text-[11px] whitespace-nowrap">{formatGap(d.gapToLeader)}</span>
                   <span className="text-right font-mono text-[10px] text-ink-soft whitespace-nowrap">{lastTime}</span>
                   <span className="text-right font-mono text-[10px] text-ink-soft whitespace-nowrap">{bestTime}</span>
-                  <span className={`text-right font-mono text-[10px] hidden md:table-cell whitespace-nowrap ${s1.cls || "text-ink-faint"}`}>{s1.text}</span>
-                  <span className={`text-right font-mono text-[10px] hidden md:table-cell whitespace-nowrap ${s2.cls || "text-ink-faint"}`}>{s2.text}</span>
-                  <span className={`text-right font-mono text-[10px] hidden md:table-cell whitespace-nowrap ${s3.cls || "text-ink-faint"}`}>{s3.text}</span>
+                  <span className={`text-right font-mono text-[10px] whitespace-nowrap ${s1.cls || "text-ink-faint"}`}>{s1.text}</span>
+                  <span className={`text-right font-mono text-[10px] whitespace-nowrap ${s2.cls || "text-ink-faint"}`}>{s2.text}</span>
+                  <span className={`text-right font-mono text-[10px] whitespace-nowrap ${s3.cls || "text-ink-faint"}`}>{s3.text}</span>
                 </div>
               </div>
             );
