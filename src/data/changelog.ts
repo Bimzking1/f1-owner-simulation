@@ -22,6 +22,37 @@ export interface ChangeLogEntry {
 
 export const CHANGE_LOG: ChangeLogEntry[] = [
   {
+    version: "v0.28",
+    title: "Dot-perfect sector fills, fluctuating lap times, no phantom LEADER rows",
+    when: "30 August 2026 · 18:05",
+    summary:
+      "Changing the speed multiplier no longer scrambles the driver dots — the interpolation clock is re-anchored on speed change so the current lap fraction is preserved exactly, and the same latent jump after a long pause/resume is fixed by re-anchoring at the moment of resume. Lap recording now covers the VERY FIRST completed lap for every driver (the 0→1 transition no longer skips everyone). Sector columns now fill the exact instant the dot crosses the colour boundary: instead of a polling loop that could lag the crossing, S1/S2/S3 are computed directly from each driver's own track progress every table refresh, so when the dot passes the end of the blue segment S1 flips to the current lap's estimate (same for S2 at the end of red), and S3 fills on lap completion. Lap times now fluctuate per driver and per lap — deterministic per-driver, per-lap variation (± up to ~1.5s per lap, ~0.7s per sector) — so the fastest S1, S2, S3, BEST and LAST can genuinely belong to different drivers and keep changing hands instead of everyone converging on the same base time. And no two drivers show LEADER anymore: the gap cell reads LEADER only for the actual race leader, shows DNF for retired drivers, and the relative gap for everyone else.",
+    items: [
+      { kind: "fix", text: "Changing the speed multiplier no longer throws driver dots to random wrapped positions — the in-lap fraction is preserved and only the wrapping speed changes." },
+      { kind: "fix", text: "Resuming after a long pause no longer leaves dots scattered around the track — the interpolation clock re-anchors at the moment of resume before scaling the frozen fraction across the next interval." },
+      { kind: "fix", text: "S1/S2/S3 now fill the exact moment the dot crosses the sector boundary — computed directly from each driver's track progress every refresh, not by a polling gate that could lag behind." },
+      { kind: "fix", text: "No more phantom LEADER rows: the gap column shows LEADER only for the race leader, DNF for retired drivers, and the relative gap for everyone else." },
+      { kind: "fix", text: "LAST, BEST, S1, S2 and S3 now fill after the FIRST completed lap for every driver — the first-lap transition records using a zero gap delta instead of skipping drivers that had no previous reading." },
+      { kind: "improve", text: "Lap times fluctuate per driver, per lap and per sector (deterministic noise up to ~1.5s / ~0.7s), so the fastest S1, S2, S3, BEST and LAST can belong to different drivers and trade hands across laps." },
+      { kind: "improve", text: "Fastest in each column highlighted red — BEST, LAST, S1, S2 and S3 show the quickest time in red, and a red dot sits beside the fastest BEST." },
+    ],
+  },
+  {
+    version: "v0.27",
+    title: "Dots keep moving in background, no finish-line parking, sectors fill correctly",
+    when: "30 August 2026 · 17:00",
+    summary:
+      "Driver dots no longer stop dead at the finish line after a completed lap, and they keep moving even when you switch to another tab or app. The map animation was driven by requestAnimationFrame, which the browser completely freezes while a tab is hidden — it now runs on a throttled setInterval, so background tabs still advance the dots at ~1 frame per second (wall-clock based, so they're always exactly where the race is when you return). The position clamp that made dots park on the line between engine ticks (and after resume) is gone while the race is running — interpolated progress now wraps around the circuit freely — and a resume now scales the frozen fraction across the engine's full next interval, so resumed dots reach the lap boundary at the exact moment the engine ticks instead of arriving early and idling. LAST and BEST were empty after the first completed lap because lap recording skipped the very first transition (0→1); the lap-tracking pass now records every completion, BEST still only overwrites an existing best. S1/S2/S3 no longer go blank mid-lap: on lap N+1 each sector shows lap N's time until the dot crosses that real sector cut, then flips to that driver's live estimate for the current lap. The DRV column is wider again (110px) so double-barrel driver tags fit without clipping.",
+    items: [
+      { kind: "fix", text: "Driver dots no longer park on the finish line — interpolated progress wraps instead of clamping while the race is running (the clamp is kept only once a race finishes)." },
+      { kind: "fix", text: "Dots keep advancing when you switch to another tab or app — the animation loop now uses setInterval, which browsers still throttle-run in the background instead of freezing like requestAnimationFrame." },
+      { kind: "fix", text: "Resume pacing fixed: after unpausing, dots scale the frozen fraction across the engine's full next tick interval, so they cross the lap line exactly when the engine ticks instead of arriving early and sitting there." },
+      { kind: "fix", text: "LAST and BEST now fill after the FIRST completed lap (lap recording previously skipped the 0→1 transition). BEST still updates only when a new lap beats the existing best." },
+      { kind: "fix", text: "S1/S2/S3 columns no longer go blank during a lap — each sector shows the previous lap's time until the dot crosses that sector's real cut, then switches to the driver's live estimate for the current lap." },
+      { kind: "improve", text: "DRV column widened to 110px so driver codes never clip; timing tower still scrolls horizontally on small screens." },
+    ],
+  },
+  {
     version: "v0.26",
     title: "Seamless pause/resume dots, labelled corners, full-width timing tower",
     when: "30 August 2026 · 16:45",

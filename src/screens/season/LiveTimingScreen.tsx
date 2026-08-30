@@ -173,13 +173,26 @@ function formatGap(gap: number): string {
 
 function formatSector(sec: number, best: number): { text: string; cls: string } {
   if (!sec || sec <= 0) return { text: "", cls: "" };
-  if (best > 0 && sec <= best + 0.001) return { text: sec.toFixed(3), cls: "text-purple-400 font-bold" };
+  if (best > 0 && sec <= best + 0.001) return { text: sec.toFixed(3), cls: "text-red-400 font-bold" };
   return { text: sec.toFixed(3), cls: "" };
 }
 
 function seededRng(seed: number): () => number {
   let s = Math.abs(Math.floor(seed)) || 1;
   return () => { s = (s * 16807) % 2147483647; return s / 2147483647; };
+}
+
+/* Deterministic per-driver, per-lap fluctuation so lap times — and therefore
+ * LAST, BEST and each sector — genuinely vary between laps and between drivers
+ * instead of clustering around the same base. Same (id, lap, sub) always
+ * returns the same offset, so a mid-lap sector estimate and the value recorded
+ * at lap completion agree. */
+function lapNoise(id: string, lap: number, sub: number, amp: number): number {
+  let h = 7;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) % 2147483647;
+  const seed = ((Math.abs(h) % 2147483000) + lap * 977 + sub * 131) % 2147483647;
+  const r = seededRng(seed)();
+  return (r - 0.5) * 2 * amp;
 }
 
 /* ------------------------------------------------------------------ */
@@ -255,7 +268,7 @@ function generateDemoState(lap: number, totalLaps: number): TimingData {
       position: pos,
       gridPos: meta.grid,
       gapToLeader: gap,
-      lastLap: !isDNF && lap > 1 ? lt : 0,
+      lastLap: !isDNF && lap >= 1 ? lt : 0,
       bestLap: !isDNF ? blt - 0.3 + rr() * 0.2 : 0,
       sector1: s1,
       sector2: s2,
@@ -296,12 +309,18 @@ export default function LiveTimingScreen({ state, live, active = true, onSetLive
   const [demoLap, setDemoLap] = useState(0);
   const [demoRunning, setDemoRunning] = useState(false);
 
-  const animRef = useRef<number>(0);
   const lastTickRef = useRef(0);
   const prevLiveLapRef = useRef(0);
   const prevGapsRef = useRef<Record<string, number>>({});
   const lastLapTimesRef = useRef<Record<string, number>>({});
   const bestLapTimesRef = useRef<Record<string, number>>({});
+  /* Per-driver sector times for the table: the most recently COMPLETED lap's
+   * S1/S2/S3. Each cell then shows the previous lap's value until the dot
+   * crosses that sector's cut on the current lap, at which point it's replaced
+   * by the current lap's live estimate (computed in buildFromLive directly
+   * from the driver's own track progress, so it updates the instant the dot
+   * passes the colour boundary). */
+  const sectorTimesRef = useRef<Record<string, [number, number, number]>>({});
   const demoLapRef = useRef(0);
   useEffect(() => { demoLapRef.current = demoLap; }, [demoLap]);
 
@@ -393,21 +412,29 @@ export default function LiveTimingScreen({ state, live, active = true, onSetLive
     return track?.laps ?? 58;
   }, [hasLiveRace, live, state.season]);
 
-  /* -- Lap-time tracking for live data -- */
+  /* -- Lap-time tracking for live data. Records EVERY completed lap for every
+   *    driver (1st → last) with deterministic fluctuation. BEST only overwrites
+   *    when the new lap beats the existing best. The first lap has no previous
+   *    gap to measure against, so the gap delta falls back to zero instead of
+   *    skipping the driver — without this, LAST/BEST/S1/S2/S3 would stay empty
+   *    after lap 1. -- */
   useEffect(() => {
     if (!live) return;
     const currentLapInt = Math.floor(live.currentLap);
-    if (currentLapInt > prevLiveLapRef.current && prevLiveLapRef.current > 0) {
+    if (currentLapInt > prevLiveLapRef.current) {
       for (const [id, car] of Object.entries(live.cars)) {
         const prevGap = prevGapsRef.current[id];
-        if (prevGap !== undefined && !live.retired?.[id]) {
-          const approxLap = LAP_TIME_BASE + (car.pos - 1) * 0.12 + (car.gapS - prevGap) * 0.08;
-          const clamped = Math.max(74, Math.min(82, approxLap));
-          lastLapTimesRef.current[id] = clamped;
-          if (!bestLapTimesRef.current[id] || clamped < bestLapTimesRef.current[id]) {
-            bestLapTimesRef.current[id] = clamped;
-          }
+        if (live.retired?.[id]) continue;
+        const base = LAP_TIME_BASE + (car.pos - 1) * 0.12 + (car.gapS - (prevGap ?? car.gapS)) * 0.08;
+        const clamped = Math.max(74, Math.min(82, base + lapNoise(id, currentLapInt, 0, 1.5)));
+        lastLapTimesRef.current[id] = clamped;
+        if (!bestLapTimesRef.current[id] || clamped < bestLapTimesRef.current[id]) {
+          bestLapTimesRef.current[id] = clamped;
         }
+        const s1 = Math.max(0, clamped * sectorCuts[0] + lapNoise(id, currentLapInt, 1, 0.7));
+        const s2 = Math.max(0, clamped * (sectorCuts[1] - sectorCuts[0]) + lapNoise(id, currentLapInt, 2, 0.7));
+        const s3 = Math.max(0, clamped - s1 - s2);
+        sectorTimesRef.current[id] = [s1, s2, s3];
         prevGapsRef.current[id] = car.gapS;
       }
     }
@@ -418,6 +445,7 @@ export default function LiveTimingScreen({ state, live, active = true, onSetLive
     prevGapsRef.current = {};
     lastLapTimesRef.current = {};
     bestLapTimesRef.current = {};
+    sectorTimesRef.current = {};
     prevLiveLapRef.current = 0;
   }, [live?.roundIdx]);
 
@@ -438,20 +466,27 @@ export default function LiveTimingScreen({ state, live, active = true, onSetLive
    * hidden (component stays mounted), so returning to Live Timing shows
    * the dots exactly where they should be. */
   const pausedFracRef = useRef<number | null>(null);
+  /* After Resume the engine schedules a FULL tick interval, so a plain
+   * linear interpolation would reach the lap boundary early and then sit
+   * on the finish line until the tick lands. Instead we scale the resumed
+   * fraction over that full interval (pausedFrac → 1.0) and drop this
+   * mode the moment the engine's first tick lands. */
+  const resumeFracRef = useRef<number | null>(null);
   useEffect(() => {
     if (live?.paused) {
       const elapsed = (performance.now() - lastTickTimeRef.current) / 1000;
       const expectedInterval = LAP_TIME_BASE / speedRef.current;
       pausedFracRef.current = Math.min(elapsed / expectedInterval, 1.0);
-    } else {
-      /* Resume: pre-wind the interpolation clock so the dots continue from
-       * exactly where they froze (pausedFrac) instead of snapping back to
-       * the lap-start/finish line. The next engine tick lands just as the
-       * interpolated lap reaches the next integer, making it a seamless lap. */
-      const expectedInterval = LAP_TIME_BASE / speedRef.current;
-      const frac = pausedFracRef.current ?? 0;
-      lastTickTimeRef.current = performance.now() - frac * expectedInterval * 1000;
+      resumeFracRef.current = null;
+    } else if (!live?.done) {
+      /* Resume: remember where the cars were frozen. The fraction is scaled
+       * from pausedFrac → 1.0 across the full engine interval so the dots
+       * hit the lap boundary exactly when the next engine tick pumps out. */
+      resumeFracRef.current = pausedFracRef.current ?? null;
       pausedFracRef.current = null;
+    } else {
+      pausedFracRef.current = null;
+      resumeFracRef.current = null;
     }
   }, [live?.paused, live?.manualPaused]);
 
@@ -462,10 +497,25 @@ export default function LiveTimingScreen({ state, live, active = true, onSetLive
       return lastTickLapRef.current + pausedFracRef.current;
     }
     const now = performance.now();
-    const elapsed = (now - lastTickTimeRef.current) / 1000;
     const expectedInterval = LAP_TIME_BASE / speedRef.current;
-    return lastTickLapRef.current + Math.min(elapsed / expectedInterval, 1.0);
-  }, [hasLiveRace]);
+    /* Resume: re-anchor the interpolation clock RIGHT NOW — any time accrued
+     * since the last pre-pause tick must not leak into this lap, or a long
+     * pause would make the resumed fraction huge and throw the dots to random
+     * wrapped positions. The frozen fraction then scales warmed → 1.0 across
+     * the full (new) interval, reaching the lap boundary at the engine tick. */
+    if (resumeFracRef.current != null) {
+      const from = resumeFracRef.current;
+      resumeFracRef.current = null;
+      lastTickTimeRef.current = now;
+      lastTickLapRef.current += 1;
+      const frac = Math.min((now - lastTickTimeRef.current) / 1000 / expectedInterval, 1.0);
+      return lastTickLapRef.current - 1 + from + frac * (1 - from);
+    }
+    const elapsed = (now - lastTickTimeRef.current) / 1000;
+    let frac = elapsed / expectedInterval;
+    if (isLiveDone) frac = Math.min(frac, 1.0);
+    return lastTickLapRef.current + frac;
+  }, [hasLiveRace, isLiveDone]);
 
   /* -- Timing data for the TABLE. Refreshed on engine ticks AND a ~7Hz
    *    interval so sector progress keeps filling while visible. -- */
@@ -473,7 +523,7 @@ export default function LiveTimingScreen({ state, live, active = true, onSetLive
 
   const refreshTiming = useCallback(() => {
     if (hasLiveRace && live) {
-      setTimingData(buildFromLive(live, state, lastLapTimesRef.current, bestLapTimesRef.current, getInterpLap(), sectorCuts));
+      setTimingData(buildFromLive(live, state, lastLapTimesRef.current, bestLapTimesRef.current, sectorTimesRef.current, getInterpLap(), prevGapsRef.current, sectorCuts));
     } else {
       setTimingData(generateDemoState(demoLapRef.current, totalLaps));
     }
@@ -482,7 +532,7 @@ export default function LiveTimingScreen({ state, live, active = true, onSetLive
   useEffect(() => {
     if (!active || (!hasLiveRace && !demoRunning)) return;
     refreshTiming();
-    const id = setInterval(refreshTiming, 150);
+    const id = setInterval(refreshTiming, 100);
     return () => clearInterval(id);
   }, [active, hasLiveRace, demoRunning, refreshTiming]);
 
@@ -519,7 +569,7 @@ export default function LiveTimingScreen({ state, live, active = true, onSetLive
     /* Build timing data for dots */
     let dotTiming: TimingData;
     if (hasLiveRace) {
-      dotTiming = buildFromLive(live!, state, lastLapTimesRef.current, bestLapTimesRef.current, interpLap, sectorCuts);
+      dotTiming = buildFromLive(live!, state, lastLapTimesRef.current, bestLapTimesRef.current, sectorTimesRef.current, interpLap, prevGapsRef.current, sectorCuts);
     } else {
       dotTiming = generateDemoState(demoLapRef.current, totalLaps);
     }
@@ -837,33 +887,32 @@ export default function LiveTimingScreen({ state, live, active = true, onSetLive
     return () => ro.disconnect();
   }, [CANVAS_W, canvasAspect, redraw]);
 
-  /* -- Animation loop (stops when the tab is hidden so it doesn't burn
-   *    CPU in the background — engine ticks still update the refs above) -- */
+  /* -- Animation loop. Driven by setInterval instead of requestAnimationFrame
+   *    so the dots keep advancing even when the browser tab is backgrounded
+   *    (rAF pauses entirely while hidden; a throttled setInterval still fires
+   *    ~once a second, and the interpolation is wall-clock based, so the race
+   *    never appears to stop when you switch apps). Engine ticks still land
+   *    on schedule regardless, so positions stay consistent. -- */
   useEffect(() => {
     if (!active || (!isLiveActive && !isLiveDone && !demoRunning)) {
       redraw();
       return;
     }
-    let running = true;
-    const tick = () => {
-      if (!running) return;
-      redraw();
-      animRef.current = requestAnimationFrame(tick);
-    };
-    animRef.current = requestAnimationFrame(tick);
-    return () => { running = false; cancelAnimationFrame(animRef.current); };
+    const id = setInterval(redraw, 33);
+    return () => clearInterval(id);
   }, [active, isLiveActive, isLiveDone, isLivePaused, demoRunning, redraw]);
 
   /* -- Demo animation loop -- */
   useEffect(() => {
     if (hasLiveRace || !demoRunning || !active) return;
     if (!raceSpline.length) return;
-    let running = true;
-    const tick = (now: number) => {
-      if (!running) return;
+    const tick = () => {
+      const now = performance.now();
       const dt = lastTickRef.current > 0 ? (now - lastTickRef.current) / 1000 : 0;
       lastTickRef.current = now;
-      if (dt > 0 && dt < 0.5) {
+      /* Allow big gaps between frames so the demo still progresses when the
+       * browser throttles timers in a background tab. */
+      if (dt > 0 && dt < 10) {
         const lapInc = (dt * speed) / LAP_TIME_BASE;
         setDemoLap((prev) => {
           const next = prev + lapInc;
@@ -871,20 +920,30 @@ export default function LiveTimingScreen({ state, live, active = true, onSetLive
           return next;
         });
       }
-      animRef.current = requestAnimationFrame(tick);
     };
     lastTickRef.current = performance.now();
-    animRef.current = requestAnimationFrame(tick);
-    return () => { running = false; cancelAnimationFrame(animRef.current); };
+    const id = setInterval(tick, 33);
+    return () => { clearInterval(id); };
   }, [raceSpline.length, speed, totalLaps, hasLiveRace, demoRunning, active]);
 
-  /* -- Speed control -- */
+  /* -- Speed control. Changing the multiplier must only change how fast dots
+   *    wrap the lap — never their position. The interpolation clock is
+   *    re-anchored so the CURRENT lap fraction survives the switch; without
+   *    this the fraction would be re-scored against the new tick interval and
+   *    every dot would jump backwards/forwards to a random spot. -- */
   const handleSpeedChange = useCallback((s: number) => {
+    const now = performance.now();
+    if (hasLiveRace && !isLivePaused) {
+      const oldIntervalMs = (LAP_TIME_BASE / speedRef.current) * 1000;
+      const newIntervalMs = (LAP_TIME_BASE / s) * 1000;
+      const frac = Math.max(0, Math.min(1, (now - lastTickTimeRef.current) / oldIntervalMs));
+      lastTickTimeRef.current = now - frac * newIntervalMs;
+    }
     setSpeed(s);
     speedRef.current = s;
     setShowSpeedMenu(false);
     onSetLiveSpeed?.(s);
-  }, [onSetLiveSpeed]);
+  }, [onSetLiveSpeed, hasLiveRace, isLivePaused]);
 
   const handleStartDemo = () => { setDemoLap(0); setDemoRunning(true); };
   const handleStopDemo = () => { setDemoRunning(false); setDemoLap(0); };
@@ -908,6 +967,16 @@ export default function LiveTimingScreen({ state, live, active = true, onSetLive
       if (d.sector3 > 0 && d.sector3 < best[2]) best[2] = d.sector3;
     }
     return best;
+  }, [timingData.drivers]);
+
+  /* Fastest LAST / BEST across the grid — highlighted red in their columns. */
+  const fastestLapTimes = useMemo(() => {
+    let best = 0, last = 0;
+    for (const d of timingData.drivers) {
+      if (d.bestLap > 0 && (best === 0 || d.bestLap < best)) best = d.bestLap;
+      if (d.lastLap > 0 && (last === 0 || d.lastLap < last)) last = d.lastLap;
+    }
+    return { best, last };
   }, [timingData.drivers]);
 
   /* ---- Empty state: race not started, no demo ---- */
@@ -1067,7 +1136,7 @@ export default function LiveTimingScreen({ state, live, active = true, onSetLive
         {/* Header — one full-width grid at every breakpoint; on narrow
             screens the whole table scrolls horizontally so no column is
             squeezed. */}
-        <div className="grid min-w-[700px] grid-cols-[40px_84px_minmax(170px,1.6fr)_72px_76px_76px_56px_56px_56px] gap-x-1 gap-y-0 border-b border-hairline bg-raised/50 px-3 py-1.5 text-[9px] font-bold uppercase tracking-wider text-ink-faint">
+        <div className="grid min-w-[726px] grid-cols-[40px_110px_minmax(170px,1.6fr)_72px_76px_76px_56px_56px_56px] gap-x-1 gap-y-0 border-b border-hairline bg-raised/50 px-3 py-1.5 text-[9px] font-bold uppercase tracking-wider text-ink-faint">
           <span>POS</span>
           <span>DRV</span>
           <span>TEAM</span>
@@ -1082,21 +1151,19 @@ export default function LiveTimingScreen({ state, live, active = true, onSetLive
         {/* Driver rows */}
         <div className="divide-y divide-hairline/50">
           {sortedDrivers.map((d) => {
-            const [cut1, cut2] = sectorCuts;
-            const prevSectorsAvail = d.lastLap > 0;
-            const s1Done = prevSectorsAvail && d.trackProgress >= cut1;
-            const s2Done = prevSectorsAvail && d.trackProgress >= cut2;
-            const s1 = s1Done ? formatSector(d.sector1, overallBestSector[0]) : { text: "", cls: "" };
-            const s2 = s2Done ? formatSector(d.sector2, overallBestSector[1]) : { text: "", cls: "" };
-            const s3 = prevSectorsAvail ? formatSector(d.sector3, overallBestSector[2]) : { text: "", cls: "" };
             const isDNF = d.status === "dnf" || d.status === "retired";
-            const lastTime = prevSectorsAvail ? formatLapTime(d.lastLap) : "";
+            const lastTime = d.lastLap > 0 ? formatLapTime(d.lastLap) : "";
             const bestTime = d.bestLap > 0 ? formatLapTime(d.bestLap) : "";
+            const isFastLast = d.lastLap > 0 && d.lastLap <= fastestLapTimes.last + 0.001;
+            const isFastBest = d.bestLap > 0 && d.bestLap <= fastestLapTimes.best + 0.001;
+            const s1 = formatSector(d.sector1, overallBestSector[0]);
+            const s2 = formatSector(d.sector2, overallBestSector[1]);
+            const s3 = formatSector(d.sector3, overallBestSector[2]);
 
             return (
               <div key={d.driverId}>
                 <div
-                  className={`grid min-w-[700px] grid-cols-[40px_84px_minmax(170px,1.6fr)_72px_76px_76px_56px_56px_56px] gap-x-1 items-center px-3 py-1.5 text-xs ${
+                  className={`grid min-w-[726px] grid-cols-[40px_110px_minmax(170px,1.6fr)_72px_76px_76px_56px_56px_56px] gap-x-1 items-center px-3 py-1.5 text-xs ${
                     d.isPlayer ? "bg-telemetry/8" : "hover:bg-raised/30"
                   } ${isDNF ? "opacity-50" : ""}`}
                 >
@@ -1109,9 +1176,14 @@ export default function LiveTimingScreen({ state, live, active = true, onSetLive
                     {d.teamName}
                     {isDNF && <span className="ml-1 text-signal font-bold">DNF</span>}
                   </span>
-                  <span className="text-right font-mono text-[11px] whitespace-nowrap">{formatGap(d.gapToLeader)}</span>
-                  <span className="text-right font-mono text-[10px] text-ink-soft whitespace-nowrap">{lastTime}</span>
-                  <span className="text-right font-mono text-[10px] text-ink-soft whitespace-nowrap">{bestTime}</span>
+                  <span className="text-right font-mono text-[11px] whitespace-nowrap">
+                    {isDNF ? "DNF" : d.position === 1 ? "LEADER" : formatGap(d.gapToLeader)}
+                  </span>
+                  <span className={`text-right font-mono text-[10px] whitespace-nowrap ${isFastLast ? "text-red-400 font-bold" : "text-ink-soft"}`}>{lastTime}</span>
+                  <span className={`flex items-center justify-end gap-1 text-right font-mono text-[10px] whitespace-nowrap ${isFastBest ? "text-red-400 font-bold" : "text-ink-soft"}`}>
+                    {isFastBest && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-red-500" aria-hidden />}
+                    <span>{bestTime}</span>
+                  </span>
                   <span className={`text-right font-mono text-[10px] whitespace-nowrap ${s1.cls || "text-ink-faint"}`}>{s1.text}</span>
                   <span className={`text-right font-mono text-[10px] whitespace-nowrap ${s2.cls || "text-ink-faint"}`}>{s2.text}</span>
                   <span className={`text-right font-mono text-[10px] whitespace-nowrap ${s3.cls || "text-ink-faint"}`}>{s3.text}</span>
@@ -1134,11 +1206,14 @@ function buildFromLive(
   state: SimulationState,
   lastLapMap: Record<string, number>,
   bestLapMap: Record<string, number>,
+  sectorTimesMap?: Record<string, [number, number, number]>,
   interpolatedLap?: number,
+  prevGaps?: Record<string, number>,
   cuts?: [number, number],
 ): TimingData {
   const t = state.team;
   const playerIds = t ? [t.driver1Id, t.driver2Id] : live.playerIds;
+
   const [cut1, cut2] = cuts ?? [
     SECTOR_WEIGHTS[0],
     SECTOR_WEIGHTS[0] + SECTOR_WEIGHTS[1],
@@ -1146,6 +1221,9 @@ function buildFromLive(
 
   const lapFrac = interpolatedLap ?? live.currentLap;
   const leaderProgress = ((lapFrac % 1) + 1) % 1;
+  /* The lap currently being timed (used to seed the same fluctuation the
+   * lap-tracking effect will use when it records this lap's result). */
+  const inProgLap = Math.floor(lapFrac) + 1;
 
   const drivers: DriverTiming[] = Object.entries(live.cars).map(([driverId, car]) => {
     const d = driverById(driverId, state.season);
@@ -1159,8 +1237,30 @@ function buildFromLive(
 
     const lastLap = lastLapMap[driverId] ?? 0;
     const bestLap = bestLapMap[driverId] ?? 0;
-    const approxS1 = lastLap > 0 ? lastLap * cut1 + (car.pos * 0.04) : 0;
-    const approxS2 = lastLap > 0 ? lastLap * (cut2 - cut1) + (car.pos * 0.03) : 0;
+    /* Sector cells are computed DIRECTLY from the driver's own track progress
+     * — the exact same value that positions the dot — so the moment the dot
+     * crosses a sector's end cut, the cell flips to that sector's live
+     * estimate for the current lap; until then it shows the previous lap's
+     * value. S1 fills once the dot passes the end of the blue (sector 1)
+     * segment, S2 once it passes the end of red (sector 2), S3 once the dot
+     * has completed a lap (sector 3 ends at the finish line). */
+    const sec = sectorTimesMap?.[driverId] ?? [0, 0, 0];
+    const estBase = LAP_TIME_BASE + (car.pos - 1) * 0.12
+      + (car.gapS - (prevGaps?.[driverId] ?? car.gapS)) * 0.08
+      + lapNoise(driverId, inProgLap, 0, 1.5);
+    const estClamped = Math.max(74, Math.min(82, estBase));
+    let sector1 = 0;
+    let sector2 = 0;
+    let sector3 = 0;
+    if (lastLap > 0) {
+      sector1 = trackProgress >= cut1
+        ? Math.max(0, estClamped * cut1 + lapNoise(driverId, inProgLap, 1, 0.7))
+        : sec[0];
+      sector2 = trackProgress >= cut2
+        ? Math.max(0, estClamped * (cut2 - cut1) + lapNoise(driverId, inProgLap, 2, 0.7))
+        : sec[1];
+      sector3 = sec[2];
+    }
 
     const gridEntry = live.qualifying.find((q) => q.driverId === driverId);
 
@@ -1176,9 +1276,9 @@ function buildFromLive(
       gapToLeader: isRetired ? 0 : gapS,
       lastLap,
       bestLap,
-      sector1: approxS1,
-      sector2: approxS2,
-      sector3: lastLap > 0 ? lastLap - approxS1 - approxS2 : 0,
+      sector1,
+      sector2,
+      sector3,
       tireLife: car.tire,
       trackProgress,
       status: isRetired ? "dnf" : "running",
