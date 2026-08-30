@@ -79,7 +79,7 @@ export function RaceTab({ state, onRunRound, live, sendCommand, onResume, onPaus
           />
         )}
         {live && (
-          <LiveRacePanel live={live} state={state} onSkipToEnd={onSkipToEnd} onPause={onPause} />
+          <LiveRacePanel live={live} state={state} onSkipToEnd={onSkipToEnd} onPause={onPause} onResume={onResume} />
         )}
 
         {!live && last?.lapOrder && last.lapOrder.length > 1 && (
@@ -238,11 +238,13 @@ function LiveRacePanel({
   state,
   onSkipToEnd,
   onPause,
+  onResume,
 }: {
   live: LiveView;
   state: SimulationState;
   onSkipToEnd?: () => void;
   onPause?: () => void;
+  onResume?: () => void;
 }) {
   // Play radio notification when pit wall opens AUTOMATICALLY (decision required by sim)
   // Manual pauses (owner clicks ⏸) only get box-box, not the notification.
@@ -277,6 +279,14 @@ function LiveRacePanel({
               onPause();
             }} title="Halt the race and open the pit wall for orders">
               ⏸ Pause
+            </Button>
+          )}
+          {live.paused && !live.done && onResume && (
+            <Button small onClick={() => {
+              audioManager.playSfx(SFX.boxBox, 0.5);
+              onResume();
+            }} title="Throw the green flag and resume the race">
+              🟢 Resume ▶
             </Button>
           )}
           <Button small variant="ghost" onClick={onSkipToEnd}>

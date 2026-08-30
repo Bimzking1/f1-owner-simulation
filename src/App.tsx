@@ -36,9 +36,13 @@ interface LiveEngine {
   paused: boolean;
   /** True when paused by the owner's pause button (not a checkpoint). */
   userPaused?: boolean;
+  /** "race" = fast 2-lap ticks; "live-timing" = realistic 1-lap ticks paced by lap time. */
+  raceMode: "race" | "live-timing";
 }
 
 const STEP_MS = 620;
+/** Base lap time in seconds (must match the value in LiveTimingScreen). */
+const LAP_TIME_BASE = 76.5;
 
 const isDesktop = () =>
   typeof window !== "undefined" && window.matchMedia("(min-width: 1024px)").matches;
@@ -61,6 +65,8 @@ export default function App() {
   const timerRef = useRef<number | null>(null);
   // Latest stepper for the pending timeout to call (updated every render).
   const stepRef = useRef<() => void>(() => {});
+  /** Speed multiplier for live-timing mode (controlled from LiveTimingScreen). */
+  const liveSpeedRef = useRef(1);
 
   useEffect(() => {
     saveState(sim);
@@ -134,10 +140,17 @@ export default function App() {
    *  paused or ended. The chain only ever dies through an explicit disarm. */
   const scheduleNext = () => {
     clearTimer();
+    const eng = engineRef.current;
+    /* In live-timing mode the tick fires once per lap — the interval scales
+     * with speed so that the on-screen interpolation covers exactly one full
+     * lap between ticks (no yo-yo jumps). */
+    const delay = eng?.raceMode === "live-timing"
+      ? Math.max(400, (LAP_TIME_BASE * 1000) / liveSpeedRef.current)
+      : STEP_MS;
     timerRef.current = window.setTimeout(() => {
       timerRef.current = null;
       stepRef.current();
-    }, STEP_MS);
+    }, delay);
   };
 
   const finishLive = () => {
@@ -168,7 +181,8 @@ export default function App() {
     if (!eng || eng.paused) return;
     const s = eng.prep.session;
     const target = eng.stops.length > 0 ? Math.min(eng.stops[0], s.laps) : s.laps;
-    advanceRace(s, Math.min(s.currentLap + 2, target));
+    const lapsToAdvance = eng.raceMode === "live-timing" ? 1 : 2;
+    advanceRace(s, Math.min(s.currentLap + lapsToAdvance, target));
     if (s.finished) {
       finishLive();
       return;
@@ -203,7 +217,7 @@ export default function App() {
 
   /** Try to start a live desktop race. Returns false when the platform or
    *  game state doesn't allow it (caller should fall back to instant sim). */
-  const startLiveRound = (): boolean => {
+  const startLiveRound = (raceMode: "race" | "live-timing" = "race"): boolean => {
     if (!isDesktop()) return false;
     if (!sim || sim.phase !== "season") return false;
     // A healthy engine for THIS round means a race is already running.
@@ -223,6 +237,7 @@ export default function App() {
       prep,
       stops: [Math.max(1, Math.floor(laps * 0.33)), Math.max(2, Math.floor(laps * 0.66))],
       paused: false,
+      raceMode,
     };
     setLive(snapshotOf(engineRef.current));
     audioManager.playAmbience(SFX.raceAmbience);
@@ -262,6 +277,13 @@ export default function App() {
     eng.paused = false;
     advanceRace(s, s.laps);
     finishLive();
+  };
+
+  const setLiveSpeed = (speed: number) => {
+    liveSpeedRef.current = speed;
+    /* Don't restart the timer here — the next scheduled tick will use the new
+     * speed automatically via liveSpeedRef. Restarting would cause the
+     * interpolation to reset and dots to jump backward. */
   };
 
   const sendLiveCommand = (cmd: LiveCommand) => {
@@ -483,6 +505,7 @@ export default function App() {
             onNewsAction={newsAction}
             act={act}
             onReset={reset}
+            onSetLiveSpeed={setLiveSpeed}
           />
         ) : null;
       case "track-tracer":

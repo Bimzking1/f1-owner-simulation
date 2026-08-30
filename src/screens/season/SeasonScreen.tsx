@@ -15,6 +15,7 @@ import { ManagementTab } from "./ManagementTab";
 import { UpcomingTab } from "./UpcomingTab";
 import { EndScreens } from "./EndScreens";
 import { audioManager, SFX, UI_SOUNDS } from "@/ui/audio";
+import LiveTimingScreen from "./LiveTimingScreen";
 
 export type { Act };
 
@@ -22,7 +23,7 @@ interface Props {
   state: SimulationState;
   onRunRound: () => void;
   /** Start a live desktop race; false → fall back to the instant sim. */
-  onStartLive?: () => boolean;
+  onStartLive?: (raceMode?: "race" | "live-timing") => boolean;
   onAutoRun?: () => void;
   live?: LiveView | null;
   sendCommand?: (cmd: LiveCommand) => void;
@@ -32,11 +33,12 @@ interface Props {
   onNewsAction: (newsId: string, action: string) => void;
   act: Act;
   onReset: () => void;
+  onSetLiveSpeed?: (speed: number) => void;
 }
 
-type Tab = "Overview" | "Race" | "Management" | "Market" | "Sponsors" | "Garage" | "Upcoming" | "Finance";
+type Tab = "Overview" | "Race" | "Live Timing" | "Management" | "Market" | "Sponsors" | "Garage" | "Upcoming" | "Finance";
 
-const TABS: Tab[] = ["Overview", "Race", "Management", "Market", "Sponsors", "Garage", "Finance", "Upcoming"];
+const TABS: Tab[] = ["Overview", "Race", "Live Timing", "Management", "Market", "Sponsors", "Garage", "Finance", "Upcoming"];
 
 export default function SeasonScreen({
   state,
@@ -51,6 +53,7 @@ export default function SeasonScreen({
   onNewsAction,
   act,
   onReset,
+  onSetLiveSpeed,
 }: Props) {
   const t = state.team!;
   const ctor = constructorById(t.constructorId, state.season);
@@ -58,6 +61,7 @@ export default function SeasonScreen({
   const [tab, setTab] = useState<Tab>("Overview");
   const [confirmMenu, setConfirmMenu] = useState(false);
   const [repairOpen, setRepairOpen] = useState(false);
+  const [runModeOpen, setRunModeOpen] = useState(false);
   const openingThemeStopped = useRef(false);
 
   const openChats = state.news.filter((n) => n.kind === "chat" && !n.resolved).length;
@@ -92,9 +96,13 @@ export default function SeasonScreen({
       openingThemeStopped.current = true;
       audioManager.fadeOutMusic(1200);
     }
-    // Desktop manual runs go through the live race on the Race tab.
-    setTab("Race");
-    if (!onStartLive?.()) onRunRound();
+    setRunModeOpen(true);
+  };
+
+  const handleRunMode = (raceMode: "race" | "live-timing") => {
+    setRunModeOpen(false);
+    setTab(raceMode === "live-timing" ? "Live Timing" : "Race");
+    if (!onStartLive?.(raceMode)) onRunRound();
   };
   const handleAutoRound = () => {
     if (repairs.length > 0 || raceBusy) return;
@@ -115,6 +123,7 @@ export default function SeasonScreen({
         market: "Market",
         finance: "Finance",
         race: "Race",
+        "live-timing": "Live Timing",
         management: "Management",
       };
       onNewsAction(newsId, action); // marks the item resolved in the sim
@@ -286,6 +295,12 @@ export default function SeasonScreen({
           onOpenGarage={() => setTab("Garage")}
         />
       )}
+      {/* Keep LiveTimingScreen mounted (hidden via CSS) so driver dot
+          interpolation state survives tab switches — it stays in sync with
+          the live engine even while you browse other tabs. */}
+      <div className={tab === "Live Timing" ? "contents" : "hidden"}>
+        <LiveTimingScreen state={state} live={live} active={tab === "Live Timing"} onSetLiveSpeed={onSetLiveSpeed} onResume={onResume} onPause={onPause} />
+      </div>
       {tab === "Management" && <ManagementTab state={state} act={act} onNewsAction={handleNewsAction} />}
       {tab === "Market" && <MarketTab state={state} act={act} />}
       {tab === "Sponsors" && <SponsorsTab state={state} act={act} />}
@@ -332,6 +347,36 @@ export default function SeasonScreen({
               To the garage →
             </Button>
           </div>
+        </div>
+      </Modal>
+
+      <Modal open={runModeOpen} onClose={() => setRunModeOpen(false)} title="Choose race pace">
+        <p className="text-sm leading-relaxed text-ink-soft">
+          How do you want to follow the {next?.grandPrix ?? "race"}?
+        </p>
+        <div className="mt-4 flex flex-col gap-2">
+          <button
+            type="button"
+            onClick={() => handleRunMode("live-timing")}
+            className="flex items-center gap-3 rounded-md border border-telemetry/40 bg-telemetry/8 p-3 text-left transition hover:border-telemetry hover:bg-telemetry/15"
+          >
+            <span className="text-lg">⏱</span>
+            <div className="min-w-0 flex-1">
+              <div className="text-sm font-bold text-ink">Follow LIVE TIMING</div>
+              <div className="text-[11px] text-ink-soft">Realistic pace — watch each lap unfold on the circuit map. Adjust speed with the multiplier.</div>
+            </div>
+          </button>
+          <button
+            type="button"
+            onClick={() => handleRunMode("race")}
+            className="flex items-center gap-3 rounded-md border border-hairline bg-raised/50 p-3 text-left transition hover:border-ink-faint hover:bg-raised"
+          >
+            <span className="text-lg">⏩</span>
+            <div className="min-w-0 flex-1">
+              <div className="text-sm font-bold text-ink">Follow RACE</div>
+              <div className="text-[11px] text-ink-soft">Fast sim — race completes in seconds. Issue pit-wall orders at checkpoints.</div>
+            </div>
+          </button>
         </div>
       </Modal>
     </div>

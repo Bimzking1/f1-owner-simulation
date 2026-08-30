@@ -22,6 +22,156 @@ export interface ChangeLogEntry {
 
 export const CHANGE_LOG: ChangeLogEntry[] = [
   {
+    version: "v0.25",
+    title: "Circuit map aspect fix, wider timing tower, reliable pause/resume",
+    when: "30 August 2026 · 16:10",
+    summary:
+      "The circuit map now always renders as a true top-down view. Previously the canvas had a fixed 700px-wide backing store while the CSS let it shrink to the card width at a fixed height — on narrower windows the layout got squished into a thin strip that looked like a broken circuit. The map now resizes itself to its container with a ResizeObserver, preserving the track's aspect ratio at every window size (backing store tracks devicePixelRatio, so it stays crisp). The timing tower gives POS, DRV and TEAM proper room — DRV is 68px (was 44px) and TEAM gets a flexible 110–140px+ share, so driver names and team names no longer crowd each other; LAST/BEST/GAP also widened. Race pause/resume is now rock-solid across tabs: if you pause from Live Timing and resume from the Race tab (or vice versa), the clock restarts cleanly. A long pause previously kept the interpolation clock anchored at the pre-pause engine tick, so after resuming, driver dots could jump a full lap ahead and sit parked at the finish line until the next lap tick — that anchor is now reset on pause and resume. The Race tab's live panel also gained its own 🟢 Resume button so the control is never hidden away.",
+    items: [
+      { kind: "fix", text: "Circuit map keeps its true top-down aspect ratio at any window size — ResizeObserver fits the canvas to the card instead of squishing a fixed-size canvas." },
+      { kind: "fix", text: "Dots no longer jump to the finish line and freeze after resuming from a long pause — the interpolation clock re-anchors on pause and resume." },
+      { kind: "improve", text: "Timing tower columns widened: POS 32px, DRV 68px, TEAM flexible 110–140px+, GAP/LAST/BEST wider — driver and team names no longer fight for space." },
+      { kind: "improve", text: "Race tab live panel now shows its own 🟢 Resume button when the race is paused, next to ⏸ Pause." },
+    ],
+  },
+  {
+    version: "v0.24",
+    title: "Tab-switch dot fix, live-filling sector table, sectors track, legend",
+    when: "30 August 2026 · 15:05",
+    summary:
+      "Driver dots no longer reset to the start line when you switch away from Live Timing and back. LiveTimingScreen now stays mounted across tab switches (hidden via CSS instead of unmounted), so its interpolation refs keep syncing with the live engine's ticks even while you're on other tabs, and the animation loops (plus the demo loop) stop while the tab is hidden to save CPU. The timing tower was not filling LAST/BEST/S1/S2/S3 — the table was being built from the integer lap so every driver's track progress looked like zero, and the columns only gated on it. Now the table uses the same interpolated lap progress as the canvas and refreshes at ~7Hz while visible, so S1/S2/S3 fill live as the dots cross each real sector cut, and pauses freeze progress instead of letting it creep. Live Timing now loads the newer Australian GP circuit file (australian-gp-track-racing-line-sectors.json) which carries real sector boundaries, pitstop lane, entry/outro gates, and turns. A track legend (sector colours, checkered finish, dashed pitlane) sits on the circuit map so the colours are self-explanatory.",
+    items: [
+      { kind: "fix", text: "Driver dots no longer reset to the start/finish line when switching tabs — LiveTimingScreen stays mounted (hidden via CSS) and its tick-refs keep updating from the engine while hidden, so dots appear exactly where the race is when you return." },
+      { kind: "fix", text: "Animation and demo loops now stop while the tab is hidden, avoiding background CPU burn." },
+      { kind: "fix", text: "Timing tower LAST/BEST/S1/S2/S3 columns now fill — the table uses the interpolated lap progress (same as the canvas) instead of the integer lap, so track progress is no longer stuck at zero." },
+      { kind: "fix", text: "Table updates at ~7Hz while visible, so S1/S2/S3 fill live as each driver crosses the real sector cut positions." },
+      { kind: "fix", text: "Paused races freeze interpolated progress — dots and table stay put at the pause moment instead of creeping toward the next tick." },
+      { kind: "new", text: "Live Timing now loads australian-gp-track-racing-line-sectors.json — Australian GP with real sector boundaries, pitstop lanes, pit entry/outro gates and labelled turns." },
+      { kind: "improve", text: "Track legend overlay on the circuit map: sector 1/2/3 colour swatches, checkered finish square and dashed pitlane key so the map is self-explanatory." },
+    ],
+  },
+  {
+    version: "v0.23",
+    title: "Sector-coloured track with black border",
+    when: "30 August 2026 · 14:40",
+    summary:
+      "The circuit map track line is now painted in the live sector colours — cyan #00CBFF for sector 1, red #FE0101 for sector 2, yellow #FEDE01 for sector 3 — with a black border drawn around the left and right edges of the track. Each segment inherits its colour from the sector cuts in the circuit JSON (falling back to the standard sector proportions when no markers exist), and contiguous same-sector runs are stroked as single smooth paths. The S2/S3 boundary ticks use the matching colours, and turn labels gained a dark outline so they stay readable over the bright track.",
+    items: [
+      { kind: "improve", text: "Circuit track line now coloured by sector: sector 1 cyan #00CBFF, sector 2 red #FE0101, sector 3 yellow #FEDE01 — matching the sector cuts from the circuit JSON." },
+      { kind: "new", text: "Black border drawn on the left and right edges of the circuit line — a wider black underlay strokes the full loop, then the sector colours are painted on top." },
+      { kind: "improve", text: "S2/S3 boundary ticks on the circuit map now use the new sector colours (red / yellow)." },
+      { kind: "fix", text: "Turn labels got a dark outline so white text stays readable over the bright cyan/red/yellow track." },
+    ],
+  },
+  {
+    version: "v0.22",
+    title: "Sector carving end-to-end: tracer colours + real timing boundaries",
+    when: "30 August 2026 · 14:10",
+    summary:
+      "Sector markers in the Track Tracer now drive everything. In the tracer, the racing line is coloured automatically by sector: cyan from start until the Sector 2 boundary (end of sector 1), purple until the Sector 3 boundary (end of sector 2), orange back to the finish line for sector 3. The sidebar shows a colour legend plus validation — the line needs exactly one S2 cut and one S3 cut with Close loop enabled to wrap properly; JSON marks each cut with is_sector: true, sector: N. Live Timing now reads those real boundary points from the circuit JSON and converts them to arc-length fractions on the track spline, replacing the old hardcoded 29.5%/64% sector weights. S1/S2/S3 columns fill as each driver crosses the true cut positions, sector times are split by the real boundary distances, and the circuit map draws small S2/S3 boundary ticks at the actual cut locations.",
+    items: [
+      { kind: "new", text: "Track tracer: racing line now coloured by sector between cut points — cyan (sector 1), purple (sector 2), orange (sector 3) auto-derived from the sector boundary markers." },
+      { kind: "new", text: "Track tracer: sidebar sector legend with the three sector colours and a validation banner — exactly one Sector 2 boundary and one Sector 3 boundary required, with a reminder to enable Close loop so sector 3 wraps back to sector 1." },
+      { kind: "new", text: "Live Timing: sector boundaries now read from the circuit JSON (is_sector/sector points) and converted to real arc-length fractions along the track spline, replacing hardcoded SECTOR_WEIGHTS." },
+      { kind: "new", text: "Live Timing: circuit map draws small S2/S3 boundary ticks with labels at the true cut positions, using the same cyan/purple/orange language." },
+      { kind: "improve", text: "S1/S2/S3 timing columns fill when each driver crosses the real sector cuts (arc-length fractions), not a fixed percentage." },
+      { kind: "improve", text: "Approximate sector times in live buildFromLive split by the real boundary distances (S1 = cut1, S2 = cut2−cut1, S3 = 1−cut2)." },
+      { kind: "docs", text: "README updated: sector boundary workflow documented in the Track Tracer feature description." },
+    ],
+  },
+  {
+    version: "v0.21",
+    title: "Pause freeze, progressive sectors, track tracer sectors, map restyle",
+    when: "26 August 2026 · 19:45",
+    summary:
+      "Driver dots now freeze in place when the race is paused — no more creeping forward. Timing tower columns refined: DRV column widened, S1/S2/S3 fill progressively as drivers cross each sector boundary in the current lap (based on trackProgress). LAST/BEST/S1/S2/S3 columns only appear once a driver has completed at least one lap. Track tracer gains sector flagging — three new label types (S1, S2, S3) let you mark sector boundaries on the racing line; these render as colored perpendicular dashed lines and export with is_sector/sector fields. Circuit map restyled: track line in clean silver-grey with slate glow, turn labels enlarged to 11px bold white, finish line replaced with a small checkered pattern (black/white squares), pitlane and pit labels in muted silver.",
+    items: [
+      { kind: "fix", text: "Driver dots freeze in place when the race is paused — animation loop stops rAF when isLivePaused is true, preventing dots from creeping forward." },
+      { kind: "fix", text: "DRV column widened from 36px to 44px in both mobile and desktop timing tower layouts." },
+      { kind: "fix", text: "S1/S2/S3 columns fill progressively during each lap — S1 appears when trackProgress crosses the first sector boundary, S2 at the second, S3 after lap completion. Based on previous lap's approximate sector times." },
+      { kind: "fix", text: "LAST/BEST columns only show when driver has completed at least one full lap (lastLap > 0), not just based on current race lap count." },
+      { kind: "new", text: "Track tracer: sector flagging — three new label types (S1/S2/S3) in context menu, each with a distinctive color (cyan/purple/orange). Sector markers render as perpendicular dashed lines across the track." },
+      { kind: "new", text: "Track tracer: sector data included in JSON export — is_sector: true, sector: 1/2/3 fields on racingLine points." },
+      { kind: "new", text: "Track tracer: sector marker count shown in sidebar stats." },
+      { kind: "improve", text: "Circuit map restyled: track line in clean silver (#cbd5e1) with slate glow, turn labels at 11px bold white for visibility, pitlane in muted silver, pit labels in slate-400." },
+      { kind: "improve", text: "Finish line replaced with small checkered pattern (3x5 black/white squares) instead of the X marker." },
+    ],
+  },
+  {
+    version: "v0.20",
+    title: "Table fit, smooth finish-line crossing, speed-change fix, map restyle",
+    when: "26 August 2026 · 19:12",
+    summary:
+      "Timing tower table now fills the full container width — TEAM column uses flexible sizing, all text columns use whitespace-nowrap to prevent wrapping. Dots now cross the finish line smoothly (frac goes 0→1, getSplinePos wraps via modulo). Speed multiplier changes no longer reset progress — the timer isn't restarted, just the speed ref updates. Circuit map restyled: track line uses cyan (#0e7490) with subtle glow, turn labels in slate grey, finish line in silver, pitlane in muted slate dashed line, pitstop markers as subtle circles.",
+    items: [
+      { kind: "fix", text: "Timing tower table fills full container width — TEAM column uses minmax(50px, 1fr), all text columns use whitespace-nowrap. No more wrapping or half-width tables." },
+      { kind: "fix", text: "Dots now cross the finish line smoothly — interpolation fraction goes 0→1.0 (not clamped to 0.99), getSplinePos wraps via modulo for seamless lap transitions." },
+      { kind: "fix", text: "Speed multiplier changes no longer reset dot progress — timer isn't restarted on speed change, just the speed ref updates." },
+      { kind: "improve", text: "Circuit map restyled: track line in cyan (#0e7490) with soft glow, turn labels in muted slate, finish line in silver, pitlane in slate dashed, pitstop markers as subtle circles." },
+    ],
+  },
+  {
+    version: "v0.19",
+    title: "Dot animation fix, pitwall sync, empty state, and table polish",
+    when: "26 August 2026 · 18:05",
+    summary:
+      "Fixed the yo-yo dot animation — engine ticks now fire once per lap at the correct interval (LAP_TIME_BASE / speed), so the interpolation covers exactly one full track traversal between ticks. No more teleporting backward mid-lap. Live Timing now shows a proper empty state when no race is running (no circuit map, just a message). Choosing 'Follow LIVE TIMING' from the run modal automatically switches to the Live Timing tab. The pit wall notification (pulsing red dot, pause/resume button) now appears on the Live Timing tab too, with radio notification SFX when the sim pauses automatically. Pause and Resume buttons are available directly on the Live Timing circuit map overlay. Timing tower hides LAST/BEST/S1/S2/S3 columns when no laps have been completed yet.",
+    items: [
+      { kind: "fix", text: "Fixed dot yo-yo animation — tick interval now matches lap time so interpolation completes a full lap between engine ticks. Dots move smoothly around the track without teleporting." },
+      { kind: "fix", text: "Pit wall notification now appears on the Live Timing tab — pulsing banner with pause/resume button, radio notification SFX on auto-pause." },
+      { kind: "new", text: "Pause and Resume buttons on the Live Timing circuit map overlay — pause the race directly from Live Timing." },
+      { kind: "new", text: "Empty state when no race is running — clean message with 'Run GP' instructions and a Demo button, no circuit map shown." },
+      { kind: "new", text: "Choosing 'Follow LIVE TIMING' from the run modal automatically switches to the Live Timing tab." },
+      { kind: "fix", text: "Timing tower hides LAST/BEST/S1/S2/S3 when no laps completed yet — no empty dash columns." },
+      { kind: "fix", text: "Timing tower columns properly responsive — mobile (POS/DRV/GAP/LAST), tablet adds TEAM/BEST, desktop adds S1/S2/S3." },
+    ],
+  },
+  {
+    version: "v0.18",
+    title: "Race mode modal, smooth dot animation, responsive timing tower",
+    when: "26 August 2026 · 17:22",
+    summary:
+      "Race mode selection modal lets the owner choose between 'Follow LIVE TIMING' (realistic pace, 1 lap per tick, adjustable speed multiplier) and 'Follow RACE' (fast sim, existing behavior). Dot animation fixed — canvas redraws directly in requestAnimationFrame without going through React state, producing smooth continuous movement. Timing tower is now fully responsive: mobile shows POS/DRV/GAP/LAST, tablet adds TEAM/BEST, desktop adds S1/S2/S3. TEAM column now shows actual constructor name. Pitlane renders as a linear path from Entry pitstop through Pitstop lane markers to Outro pitstop gate. Circuit map shows empty/waiting state when no race is running. Speed multiplier changes propagate to the live engine tick rate.",
+    items: [
+      { kind: "new", text: "Race mode selection modal — clicking Run GP opens a choice between 'Follow LIVE TIMING' (realistic pace) and 'Follow RACE' (fast sim)." },
+      { kind: "new", text: "Live-timing mode advances 1 lap per engine tick (4s base) instead of 2, scaled by speed multiplier." },
+      { kind: "new", text: "Speed multiplier changes now propagate to the engine via onSetLiveSpeed — tick interval dynamically adjusts." },
+      { kind: "new", text: "Pitlane path now renders as a linear connection from Entry pitstop through Pitstop lane markers to Outro pitstop gate, with pitstop lane circles marking allowed stopping positions." },
+      { kind: "new", text: "Empty/waiting state on Live Timing — circuit map dims with 'No race in progress' overlay when idle." },
+      { kind: "fix", text: "Driver dots now animate smoothly — canvas redraw runs directly in requestAnimationFrame without React state overhead. No more frozen or jumpy dots." },
+      { kind: "fix", text: "Timing tower now fully responsive — mobile shows POS/DRV/GAP/LAST, tablet adds TEAM/BEST, desktop shows all S1/S2/S3 columns." },
+      { kind: "fix", text: "TEAM column now shows actual constructor/team name." },
+      { kind: "fix", text: "Pitlane no longer renders as a rounded loop — draws a straight-line path from entry to exit." },
+      { kind: "fix", text: "Speed multiplier dropdown only shown during active race, not when idle." },
+    ],
+  },
+  {
+    version: "v0.17",
+    title: "Live Timing page with circuit map and timing tower",
+    when: "26 August 2026 · 15:36",
+    summary:
+      "Live Timing now connects to the real race engine — positions, gaps, DNF status, and retirement reasons all sync with the Race tab in real time. When a race is not running, the Live Timing tab shows a demo mode with Start/Stop controls. Dot positions on the circuit map accurately reflect real timing gaps (3s gap = 3/76.5s of track separation). The tab pauses and shows chequered flag when the race ends or is paused. Catmull-Rom splines produce smooth track rendering. Demo mode lap times corrected to Australian GP range (1:15-1:18).",
+    items: [
+      { kind: "new", text: "New 'Live Timing' tab in the season screen — renders the circuit track from JSON coordinates with driver dots moving along the racing line in real time." },
+      { kind: "new", text: "F1-style timing tower below the circuit map showing position, driver code, team color, gap to leader, last lap, best lap, S1/S2/S3 sector times, tyre compound and tyre age." },
+      { kind: "new", text: "Speed multiplier overlay on the circuit map — 1x, 1.5x, 2x, 4x, 8x, 16x to control simulation speed." },
+      { kind: "new", text: "Flag state banner (green/yellow/VSC/safety car/red/chequered) and weather indicator on the live timing page." },
+      { kind: "new", text: "Connected to real race engine — positions, gaps, DNF status, and retirement reasons sync with the Race tab. If a driver DNFs or pits in RACE, it reflects in LIVE TIMING." },
+      { kind: "improve", text: "Circuit map now uses Catmull-Rom splines for smooth, accurate track rendering instead of linear interpolation." },
+      { kind: "improve", text: "Canvas aspect ratio auto-calculated from coordinate bounding box — track renders with correct proportions." },
+      { kind: "improve", text: "Pitlane rendering connects Entry pitstop through pitlane path to Outro pitstop gate with labeled pit-in/pit-out markers." },
+      { kind: "improve", text: "Finish line (FL) marker and grid position indicators on the circuit map." },
+      { kind: "improve", text: "Dynamic timing tower — positions update with overtakes, gaps change in real time, sector times highlight purple for overall best." },
+      { kind: "improve", text: "Demo mode lap times corrected to Australian GP range (1:15-1:18)." },
+      { kind: "fix", text: "Context menu popup now only closes via Escape key or clicking a menu item." },
+      { kind: "fix", text: "Track tracer empty-state overlay no longer blocks navbar buttons." },
+      { kind: "fix", text: "Live Timing no longer runs before a race starts — shows Start/Stop demo controls when idle." },
+      { kind: "fix", text: "Live Timing pauses when race is paused and shows final classification when race ends." },
+      { kind: "fix", text: "Dot positions on circuit map accurately reflect real timing gaps — 3s gap shows as correct track separation, not uniform spacing." },
+      { kind: "new", text: "Track tracer pitlane mode with auto-sorted pitlane points in JSON output." },
+    ],
+  },
+  {
     version: "v0.16",
     title: "Audio polish, UI sounds across all screens, and driver easter egg fix",
     when: "25 August 2026 · 19:50",

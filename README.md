@@ -24,8 +24,9 @@ Built with **React 19 + TypeScript + Vite**, styled with **Tailwind CSS 4**. No 
 
 ### Race weekends
 - Practice forecast → qualifying → race (with sprint sessions in 2025), weather and track chaos.
-- **Live racing on desktop**: RUN GP streams the race on the Race tab — the position chart builds lap by lap while the race-control log scrolls. At two checkpoints the pit wall is yours: a loud decision panel takes over with big order buttons per driver (**Push** for pace at real mechanical/accident risk, **Steady**, **Conserve** to save car and tires, a one-shot **Motivate** pep talk, or **Retire** the car), then throw the green flag — or hit **⏸ Pause any time** to halt the race and open the pit wall on your own schedule. Retiring a car opens a **briefing modal** first: live context (position, gap, laps left, tires, health, frustration), a paddock verdict on your call (*Wise call → Out of mind*), a driver-rage forecast and the cost of a refusal. Retired cars dim into a RETIRED card that explains why they're out ("forced to retire by the team owner", accident or mechanical failure), every order answers with a toast confirmation, and each live car shows its own telemetry strip (position, gap, tyre life, car health, form, frustration — which moves **instantly** when a driver answers a retirement call: +7 if he refuses, +4 if he obeys). Skip to the result any time; mobile keeps instant simulation.
+- **Live racing on desktop**: RUN GP opens a mode picker — **Follow LIVE TIMING** streams the race lap-by-lap with a live circuit map (a sector-coloured track — cyan/red/yellow with a black border — driver dots moving around it at realistic pace, adjustable 1x–16x speed), a full timing tower, and a **pause/resume button** directly on the circuit map. The **pit wall notification** appears on the Live Timing tab too — when the sim pauses for checkpoint orders or you pause manually, a pulsing banner with resume button shows up and the radio notification SFX plays. **Follow RACE** runs the fast sim with checkpoint orders. The Race tab's position chart builds lap by lap while the race-control log scrolls. At two checkpoints the pit wall is yours: a loud decision panel takes over with big order buttons per driver (**Push** for pace at real mechanical/accident risk, **Steady**, **Conserve** to save car and tires, a one-shot **Motivate** pep talk, or **Retire** the car), then throw the green flag — or hit **⏸ Pause any time** to halt the race and open the pit wall on your own schedule. Retiring a car opens a **briefing modal** first: live context (position, gap, laps left, tires, health, frustration), a paddock verdict on your call (*Wise call → Out of mind*), a driver-rage forecast and the cost of a refusal. Retired cars dim into a RETIRED card that explains why they're out ("forced to retire by the team owner", accident or mechanical failure), every order answers with a toast confirmation, and each live car shows its own telemetry strip (position, gap, tyre life, car health, form, frustration — which moves **instantly** when a driver answers a retirement call: +7 if he refuses, +4 if he obeys). Skip to the result any time; mobile keeps instant simulation.
 - While the race runs, the **Race tab button pulses like a siren** and every other tab shows a race-in-progress strip (live lap counter, pause alerts) — one click jumps you back to the action.
+- **Track Racing-Line Tracer** (at `http://localhost:5174/track-tracer`): interactive canvas tool for tracing racing lines and pitlane paths on track layout images. Points auto-normalize to 0–1 coordinates. Modes for race track and pitlane, close-loop toggle, drag to nudge dots. Double-click to label turns (auto-numbered), finish line, pit entry/exit, pitstop lane, paddock area, and sector boundaries (S1/S2/S3). Sector markers carve the track: mark where **sector 2 begins** as "Sector 2 boundary" and where **sector 3 begins** as "Sector 3 boundary", and the racing line colours itself cyan/red/yellow per sector (close the loop so sector 3 wraps back to 1). Full JSON export with racingLine[] and pitlane[] arrays including is_sector/sector fields — Live Timing reads those same markers to place the real sector cut lines on the circuit map and fill the S1/S2/S3 timing columns as drivers cross them.
 - After the flag, the desktop Race tab keeps the **position-movement chart** (playback + scrubber, click a line to isolate a driver) and the full race log without opening Replay. During the race the chart spans the full GP distance and fills in lap by lap, with a **★ marking each of your drivers' lines**. The result card only appears once the GP is actually finished, and the weekend classification hides while a race runs.
 - **AUTO** simulates weekends until something needs its owner — broken parts, a driver demanding a meeting, bankruptcy or the flag.
 - Points, podiums, fastest laps, sprint points and prize money all feed the championship and your accounts.
@@ -99,8 +100,9 @@ src/
 │   ├── SetupScreen        # step-by-step team draft
 │   ├── ExpectationsScreen # pre-season projections report
 │   ├── TestingScreen      # pre-season test programme
-│   └── season/            # SeasonScreen + tabs (Overview, Race, Management,
-│                         #   Market, Sponsors, Garage, Finance, Upcoming) & end screens
+│   └── season/            # SeasonScreen + tabs (Overview, Race, Live Timing,
+│                         #   Management, Market, Sponsors, Garage, Finance, Upcoming) & end screens
+├── TrackTracerScreen     # interactive track racing-line tracer (pitlane mode, sector markers, JSON export)
 ├── ui/              # design kit (cards, modals, tags, meters), hooks, formatters
 ├── actions.ts       # player actions on top of the sim layer
 ├── state.ts         # draft factory, buildSimulation, save/load
@@ -110,7 +112,7 @@ public/assets/       # images (drivers, cars, sponsors, tracks…)
 
 ## Changelog
 
-See the in-game **Change log** button on the landing page — it renders `src/data/changelog.ts`. Current build: **v0.16** (25 August 2026 · 19:50).
+See the in-game **Change log** button on the landing page — it renders `src/data/changelog.ts`. Current build: **v0.25** (30 August 2026 · 16:10).
 
 ---
 

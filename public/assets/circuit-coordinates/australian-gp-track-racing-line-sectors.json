@@ -1,0 +1,845 @@
+{
+  "track": "untitled-track",
+  "closeLoop": true,
+  "racingLine": [
+    {
+      "x": 0.773,
+      "y": 0.533,
+      "label": "Finish line",
+      "is_turn": false,
+      "turn_order": null,
+      "is_sector": false,
+      "sector": null
+    },
+    {
+      "x": 0.743,
+      "y": 0.584,
+      "label": "Outro pitstop gate",
+      "is_turn": false,
+      "turn_order": null,
+      "is_sector": false,
+      "sector": null
+    },
+    {
+      "x": 0.696,
+      "y": 0.67,
+      "label": null,
+      "is_turn": false,
+      "turn_order": null,
+      "is_sector": false,
+      "sector": null
+    },
+    {
+      "x": 0.688,
+      "y": 0.678,
+      "label": "Turn 1",
+      "is_turn": true,
+      "turn_order": 1,
+      "is_sector": false,
+      "sector": null
+    },
+    {
+      "x": 0.673,
+      "y": 0.679,
+      "label": null,
+      "is_turn": false,
+      "turn_order": null,
+      "is_sector": false,
+      "sector": null
+    },
+    {
+      "x": 0.642,
+      "y": 0.679,
+      "label": null,
+      "is_turn": false,
+      "turn_order": null,
+      "is_sector": false,
+      "sector": null
+    },
+    {
+      "x": 0.626,
+      "y": 0.682,
+      "label": "Turn 2",
+      "is_turn": true,
+      "turn_order": 2,
+      "is_sector": false,
+      "sector": null
+    },
+    {
+      "x": 0.611,
+      "y": 0.694,
+      "label": null,
+      "is_turn": false,
+      "turn_order": null,
+      "is_sector": false,
+      "sector": null
+    },
+    {
+      "x": 0.605,
+      "y": 0.708,
+      "label": null,
+      "is_turn": false,
+      "turn_order": null,
+      "is_sector": false,
+      "sector": null
+    },
+    {
+      "x": 0.594,
+      "y": 0.731,
+      "label": null,
+      "is_turn": false,
+      "turn_order": null,
+      "is_sector": false,
+      "sector": null
+    },
+    {
+      "x": 0.572,
+      "y": 0.771,
+      "label": null,
+      "is_turn": false,
+      "turn_order": null,
+      "is_sector": false,
+      "sector": null
+    },
+    {
+      "x": 0.547,
+      "y": 0.813,
+      "label": null,
+      "is_turn": false,
+      "turn_order": null,
+      "is_sector": false,
+      "sector": null
+    },
+    {
+      "x": 0.536,
+      "y": 0.831,
+      "label": null,
+      "is_turn": false,
+      "turn_order": null,
+      "is_sector": false,
+      "sector": null
+    },
+    {
+      "x": 0.451,
+      "y": 0.917,
+      "label": null,
+      "is_turn": false,
+      "turn_order": null,
+      "is_sector": false,
+      "sector": null
+    },
+    {
+      "x": 0.432,
+      "y": 0.932,
+      "label": "Turn 3",
+      "is_turn": true,
+      "turn_order": 3,
+      "is_sector": false,
+      "sector": null
+    },
+    {
+      "x": 0.42,
+      "y": 0.926,
+      "label": null,
+      "is_turn": false,
+      "turn_order": null,
+      "is_sector": false,
+      "sector": null
+    },
+    {
+      "x": 0.394,
+      "y": 0.886,
+      "label": null,
+      "is_turn": false,
+      "turn_order": null,
+      "is_sector": false,
+      "sector": null
+    },
+    {
+      "x": 0.382,
+      "y": 0.879,
+      "label": "Turn 4",
+      "is_turn": true,
+      "turn_order": 4,
+      "is_sector": false,
+      "sector": null
+    },
+    {
+      "x": 0.365,
+      "y": 0.881,
+      "label": null,
+      "is_turn": false,
+      "turn_order": null,
+      "is_sector": false,
+      "sector": null
+    },
+    {
+      "x": 0.329,
+      "y": 0.894,
+      "label": null,
+      "is_turn": false,
+      "turn_order": null,
+      "is_sector": false,
+      "sector": null
+    },
+    {
+      "x": 0.28,
+      "y": 0.912,
+      "label": null,
+      "is_turn": false,
+      "turn_order": null,
+      "is_sector": false,
+      "sector": null
+    },
+    {
+      "x": 0.266,
+      "y": 0.913,
+      "label": "Turn 5",
+      "is_turn": true,
+      "turn_order": 5,
+      "is_sector": false,
+      "sector": null
+    },
+    {
+      "x": 0.244,
+      "y": 0.904,
+      "label": null,
+      "is_turn": false,
+      "turn_order": null,
+      "is_sector": false,
+      "sector": null
+    },
+    {
+      "x": 0.217,
+      "y": 0.887,
+      "label": null,
+      "is_turn": false,
+      "turn_order": null,
+      "is_sector": false,
+      "sector": null
+    },
+    {
+      "x": 0.173,
+      "y": 0.858,
+      "label": null,
+      "is_turn": false,
+      "turn_order": null,
+      "is_sector": false,
+      "sector": null
+    },
+    {
+      "x": 0.137,
+      "y": 0.826,
+      "label": null,
+      "is_turn": false,
+      "turn_order": null,
+      "is_sector": false,
+      "sector": null
+    },
+    {
+      "x": 0.118,
+      "y": 0.802,
+      "label": "Sector 2 boundary",
+      "is_turn": false,
+      "turn_order": null,
+      "is_sector": true,
+      "sector": 2
+    },
+    {
+      "x": 0.103,
+      "y": 0.794,
+      "label": null,
+      "is_turn": false,
+      "turn_order": null,
+      "is_sector": false,
+      "sector": null
+    },
+    {
+      "x": 0.082,
+      "y": 0.783,
+      "label": "Turn 6",
+      "is_turn": true,
+      "turn_order": 6,
+      "is_sector": false,
+      "sector": null
+    },
+    {
+      "x": 0.081,
+      "y": 0.766,
+      "label": null,
+      "is_turn": false,
+      "turn_order": null,
+      "is_sector": false,
+      "sector": null
+    },
+    {
+      "x": 0.093,
+      "y": 0.748,
+      "label": null,
+      "is_turn": false,
+      "turn_order": null,
+      "is_sector": false,
+      "sector": null
+    },
+    {
+      "x": 0.098,
+      "y": 0.733,
+      "label": "Turn 7",
+      "is_turn": true,
+      "turn_order": 7,
+      "is_sector": false,
+      "sector": null
+    },
+    {
+      "x": 0.093,
+      "y": 0.717,
+      "label": null,
+      "is_turn": false,
+      "turn_order": null,
+      "is_sector": false,
+      "sector": null
+    },
+    {
+      "x": 0.087,
+      "y": 0.694,
+      "label": null,
+      "is_turn": false,
+      "turn_order": null,
+      "is_sector": false,
+      "sector": null
+    },
+    {
+      "x": 0.081,
+      "y": 0.664,
+      "label": null,
+      "is_turn": false,
+      "turn_order": null,
+      "is_sector": false,
+      "sector": null
+    },
+    {
+      "x": 0.083,
+      "y": 0.643,
+      "label": "Turn 8",
+      "is_turn": true,
+      "turn_order": 8,
+      "is_sector": false,
+      "sector": null
+    },
+    {
+      "x": 0.095,
+      "y": 0.624,
+      "label": null,
+      "is_turn": false,
+      "turn_order": null,
+      "is_sector": false,
+      "sector": null
+    },
+    {
+      "x": 0.114,
+      "y": 0.611,
+      "label": null,
+      "is_turn": false,
+      "turn_order": null,
+      "is_sector": false,
+      "sector": null
+    },
+    {
+      "x": 0.151,
+      "y": 0.59,
+      "label": null,
+      "is_turn": false,
+      "turn_order": null,
+      "is_sector": false,
+      "sector": null
+    },
+    {
+      "x": 0.206,
+      "y": 0.56,
+      "label": null,
+      "is_turn": false,
+      "turn_order": null,
+      "is_sector": false,
+      "sector": null
+    },
+    {
+      "x": 0.263,
+      "y": 0.534,
+      "label": "Turn 9",
+      "is_turn": true,
+      "turn_order": 9,
+      "is_sector": false,
+      "sector": null
+    },
+    {
+      "x": 0.276,
+      "y": 0.543,
+      "label": null,
+      "is_turn": false,
+      "turn_order": null,
+      "is_sector": false,
+      "sector": null
+    },
+    {
+      "x": 0.294,
+      "y": 0.559,
+      "label": "Turn 10",
+      "is_turn": true,
+      "turn_order": 10,
+      "is_sector": false,
+      "sector": null
+    },
+    {
+      "x": 0.311,
+      "y": 0.563,
+      "label": null,
+      "is_turn": false,
+      "turn_order": null,
+      "is_sector": false,
+      "sector": null
+    },
+    {
+      "x": 0.338,
+      "y": 0.562,
+      "label": null,
+      "is_turn": false,
+      "turn_order": null,
+      "is_sector": false,
+      "sector": null
+    },
+    {
+      "x": 0.38,
+      "y": 0.557,
+      "label": null,
+      "is_turn": false,
+      "turn_order": null,
+      "is_sector": false,
+      "sector": null
+    },
+    {
+      "x": 0.423,
+      "y": 0.55,
+      "label": null,
+      "is_turn": false,
+      "turn_order": null,
+      "is_sector": false,
+      "sector": null
+    },
+    {
+      "x": 0.464,
+      "y": 0.536,
+      "label": null,
+      "is_turn": false,
+      "turn_order": null,
+      "is_sector": false,
+      "sector": null
+    },
+    {
+      "x": 0.502,
+      "y": 0.517,
+      "label": null,
+      "is_turn": false,
+      "turn_order": null,
+      "is_sector": false,
+      "sector": null
+    },
+    {
+      "x": 0.534,
+      "y": 0.492,
+      "label": null,
+      "is_turn": false,
+      "turn_order": null,
+      "is_sector": false,
+      "sector": null
+    },
+    {
+      "x": 0.551,
+      "y": 0.46,
+      "label": null,
+      "is_turn": false,
+      "turn_order": null,
+      "is_sector": false,
+      "sector": null
+    },
+    {
+      "x": 0.573,
+      "y": 0.411,
+      "label": "Sector 3 boundary",
+      "is_turn": false,
+      "turn_order": null,
+      "is_sector": true,
+      "sector": 3
+    },
+    {
+      "x": 0.585,
+      "y": 0.382,
+      "label": null,
+      "is_turn": false,
+      "turn_order": null,
+      "is_sector": false,
+      "sector": null
+    },
+    {
+      "x": 0.587,
+      "y": 0.37,
+      "label": "Turn 11",
+      "is_turn": true,
+      "turn_order": 11,
+      "is_sector": false,
+      "sector": null
+    },
+    {
+      "x": 0.582,
+      "y": 0.35,
+      "label": null,
+      "is_turn": false,
+      "turn_order": null,
+      "is_sector": false,
+      "sector": null
+    },
+    {
+      "x": 0.573,
+      "y": 0.332,
+      "label": null,
+      "is_turn": false,
+      "turn_order": null,
+      "is_sector": false,
+      "sector": null
+    },
+    {
+      "x": 0.568,
+      "y": 0.314,
+      "label": "Turn 12",
+      "is_turn": true,
+      "turn_order": 12,
+      "is_sector": false,
+      "sector": null
+    },
+    {
+      "x": 0.57,
+      "y": 0.296,
+      "label": null,
+      "is_turn": false,
+      "turn_order": null,
+      "is_sector": false,
+      "sector": null
+    },
+    {
+      "x": 0.581,
+      "y": 0.27,
+      "label": null,
+      "is_turn": false,
+      "turn_order": null,
+      "is_sector": false,
+      "sector": null
+    },
+    {
+      "x": 0.597,
+      "y": 0.239,
+      "label": null,
+      "is_turn": false,
+      "turn_order": null,
+      "is_sector": false,
+      "sector": null
+    },
+    {
+      "x": 0.627,
+      "y": 0.174,
+      "label": null,
+      "is_turn": false,
+      "turn_order": null,
+      "is_sector": false,
+      "sector": null
+    },
+    {
+      "x": 0.64,
+      "y": 0.163,
+      "label": null,
+      "is_turn": false,
+      "turn_order": null,
+      "is_sector": false,
+      "sector": null
+    },
+    {
+      "x": 0.67,
+      "y": 0.143,
+      "label": null,
+      "is_turn": false,
+      "turn_order": null,
+      "is_sector": false,
+      "sector": null
+    },
+    {
+      "x": 0.715,
+      "y": 0.115,
+      "label": null,
+      "is_turn": false,
+      "turn_order": null,
+      "is_sector": false,
+      "sector": null
+    },
+    {
+      "x": 0.767,
+      "y": 0.082,
+      "label": null,
+      "is_turn": false,
+      "turn_order": null,
+      "is_sector": false,
+      "sector": null
+    },
+    {
+      "x": 0.784,
+      "y": 0.071,
+      "label": null,
+      "is_turn": false,
+      "turn_order": null,
+      "is_sector": false,
+      "sector": null
+    },
+    {
+      "x": 0.797,
+      "y": 0.067,
+      "label": "Turn 13",
+      "is_turn": true,
+      "turn_order": 13,
+      "is_sector": false,
+      "sector": null
+    },
+    {
+      "x": 0.814,
+      "y": 0.075,
+      "label": null,
+      "is_turn": false,
+      "turn_order": null,
+      "is_sector": false,
+      "sector": null
+    },
+    {
+      "x": 0.839,
+      "y": 0.099,
+      "label": null,
+      "is_turn": false,
+      "turn_order": null,
+      "is_sector": false,
+      "sector": null
+    },
+    {
+      "x": 0.866,
+      "y": 0.126,
+      "label": null,
+      "is_turn": false,
+      "turn_order": null,
+      "is_sector": false,
+      "sector": null
+    },
+    {
+      "x": 0.894,
+      "y": 0.154,
+      "label": null,
+      "is_turn": false,
+      "turn_order": null,
+      "is_sector": false,
+      "sector": null
+    },
+    {
+      "x": 0.898,
+      "y": 0.169,
+      "label": "Turn 14",
+      "is_turn": true,
+      "turn_order": 14,
+      "is_sector": false,
+      "sector": null
+    },
+    {
+      "x": 0.893,
+      "y": 0.186,
+      "label": null,
+      "is_turn": false,
+      "turn_order": null,
+      "is_sector": false,
+      "sector": null
+    },
+    {
+      "x": 0.868,
+      "y": 0.21,
+      "label": null,
+      "is_turn": false,
+      "turn_order": null,
+      "is_sector": false,
+      "sector": null
+    },
+    {
+      "x": 0.829,
+      "y": 0.25,
+      "label": null,
+      "is_turn": false,
+      "turn_order": null,
+      "is_sector": false,
+      "sector": null
+    },
+    {
+      "x": 0.82,
+      "y": 0.267,
+      "label": "Turn 15",
+      "is_turn": true,
+      "turn_order": 15,
+      "is_sector": false,
+      "sector": null
+    },
+    {
+      "x": 0.833,
+      "y": 0.276,
+      "label": null,
+      "is_turn": false,
+      "turn_order": null,
+      "is_sector": false,
+      "sector": null
+    },
+    {
+      "x": 0.849,
+      "y": 0.28,
+      "label": null,
+      "is_turn": false,
+      "turn_order": null,
+      "is_sector": false,
+      "sector": null
+    },
+    {
+      "x": 0.864,
+      "y": 0.285,
+      "label": "Entry pitstop",
+      "is_turn": false,
+      "turn_order": null,
+      "is_sector": false,
+      "sector": null
+    },
+    {
+      "x": 0.88,
+      "y": 0.292,
+      "label": null,
+      "is_turn": false,
+      "turn_order": null,
+      "is_sector": false,
+      "sector": null
+    },
+    {
+      "x": 0.891,
+      "y": 0.305,
+      "label": "Turn 16",
+      "is_turn": true,
+      "turn_order": 16,
+      "is_sector": false,
+      "sector": null
+    },
+    {
+      "x": 0.888,
+      "y": 0.324,
+      "label": null,
+      "is_turn": false,
+      "turn_order": null,
+      "is_sector": false,
+      "sector": null
+    },
+    {
+      "x": 0.861,
+      "y": 0.371,
+      "label": null,
+      "is_turn": false,
+      "turn_order": null,
+      "is_sector": false,
+      "sector": null
+    }
+  ],
+  "pitlane": [
+    {
+      "x": 0.863,
+      "y": 0.302,
+      "label": "Pitstop lane",
+      "is_turn": false,
+      "turn_order": null,
+      "is_sector": false,
+      "sector": null
+    },
+    {
+      "x": 0.854,
+      "y": 0.32,
+      "label": "Pitstop lane",
+      "is_turn": false,
+      "turn_order": null,
+      "is_sector": false,
+      "sector": null
+    },
+    {
+      "x": 0.838,
+      "y": 0.351,
+      "label": "Pitstop lane",
+      "is_turn": false,
+      "turn_order": null,
+      "is_sector": false,
+      "sector": null
+    },
+    {
+      "x": 0.819,
+      "y": 0.359,
+      "label": "Pitstop lane",
+      "is_turn": false,
+      "turn_order": null,
+      "is_sector": false,
+      "sector": null
+    },
+    {
+      "x": 0.815,
+      "y": 0.396,
+      "label": "Pitstop lane",
+      "is_turn": false,
+      "turn_order": null,
+      "is_sector": false,
+      "sector": null
+    },
+    {
+      "x": 0.804,
+      "y": 0.417,
+      "label": "Stop paddock area",
+      "is_turn": false,
+      "turn_order": null,
+      "is_sector": false,
+      "sector": null
+    },
+    {
+      "x": 0.764,
+      "y": 0.489,
+      "label": "Stop paddock area",
+      "is_turn": false,
+      "turn_order": null,
+      "is_sector": false,
+      "sector": null
+    },
+    {
+      "x": 0.742,
+      "y": 0.524,
+      "label": "Pitstop lane",
+      "is_turn": false,
+      "turn_order": null,
+      "is_sector": false,
+      "sector": null
+    },
+    {
+      "x": 0.741,
+      "y": 0.545,
+      "label": "Pitstop lane",
+      "is_turn": false,
+      "turn_order": null,
+      "is_sector": false,
+      "sector": null
+    },
+    {
+      "x": 0.741,
+      "y": 0.564,
+      "label": "Pitstop lane",
+      "is_turn": false,
+      "turn_order": null,
+      "is_sector": false,
+      "sector": null
+    }
+  ]
+}

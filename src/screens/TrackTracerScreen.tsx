@@ -19,7 +19,10 @@ type LabelType =
   | "entry_pitstop"
   | "pitstop_lane"
   | "stop_paddock_area"
-  | "outro_pitstop_gate";
+  | "outro_pitstop_gate"
+  | "sector_1"
+  | "sector_2"
+  | "sector_3";
 
 /* ------------------------------------------------------------------ */
 /*  Constants                                                          */
@@ -34,6 +37,9 @@ const LABELS: Record<LabelType, (n?: number) => string> = {
   pitstop_lane: () => "Pitstop lane",
   stop_paddock_area: () => "Stop paddock area",
   outro_pitstop_gate: () => "Outro pitstop gate",
+  sector_1: () => "Sector 1 boundary",
+  sector_2: () => "Sector 2 boundary",
+  sector_3: () => "Sector 3 boundary",
 };
 
 const SHORT_LABELS: Record<LabelType, (n?: number) => string> = {
@@ -43,6 +49,9 @@ const SHORT_LABELS: Record<LabelType, (n?: number) => string> = {
   pitstop_lane: () => "PIT",
   stop_paddock_area: () => "PAD",
   outro_pitstop_gate: () => "OUT",
+  sector_1: () => "S1",
+  sector_2: () => "S2",
+  sector_3: () => "S3",
 };
 
 const DOT_COLORS: Record<LabelType, string> = {
@@ -52,6 +61,9 @@ const DOT_COLORS: Record<LabelType, string> = {
   pitstop_lane: "#a78bfa",
   stop_paddock_area: "#a78bfa",
   outro_pitstop_gate: "#a78bfa",
+  sector_1: "#00CBFF",
+  sector_2: "#FE0101",
+  sector_3: "#FEDE01",
 };
 
 const LABEL_MENU_ITEMS: { type: LabelType; icon: string; shortcut?: string }[] =
@@ -62,6 +74,9 @@ const LABEL_MENU_ITEMS: { type: LabelType; icon: string; shortcut?: string }[] =
     { type: "pitstop_lane", icon: "\u{1F527}" },
     { type: "stop_paddock_area", icon: "\u{1F17F}\uFE0F" },
     { type: "outro_pitstop_gate", icon: "\u2B06\uFE0F" },
+    { type: "sector_1", icon: "\u{1F7E3}" },
+    { type: "sector_2", icon: "\u{1F7E4}" },
+    { type: "sector_3", icon: "\u{1F7E0}" },
   ];
 
 /* ------------------------------------------------------------------ */
@@ -149,21 +164,64 @@ export default function TrackTracerScreen() {
     const racePts = pts.filter((p) => p.path === "race");
     const pitPts = pts.filter((p) => p.path === "pitlane");
 
-    // Draw race line (cyan)
+    // Draw race line, colored by sector between cut points.
+    // Segment k (point k → point k+1) inherits the sector of the last
+    // boundary cut at or before k (default sector 1 before the first cut).
+    const segSector: number[] = [];
     if (racePts.length > 0) {
-      ctx.strokeStyle = "#29d3ff";
-      ctx.lineWidth = 2.5;
-      ctx.beginPath();
-      racePts.forEach((p, i) => {
-        const cx = p.x * w;
-        const cy = p.y * h;
-        if (i === 0) ctx.moveTo(cx, cy);
-        else ctx.lineTo(cx, cy);
-      });
-      if (cl && racePts.length > 2) {
-        ctx.lineTo(racePts[0].x * w, racePts[0].y * h);
+      const K = cl && racePts.length > 2 ? racePts.length : racePts.length - 1;
+      let active = 1;
+      for (let k = 0; k < K; k++) {
+        if (racePts[k].labelType === "sector_1") active = 1;
+        else if (racePts[k].labelType === "sector_2") active = 2;
+        else if (racePts[k].labelType === "sector_3") active = 3;
+        segSector.push(active);
       }
-      ctx.stroke();
+      const hasCuts = segSector.some((s) => s !== 1) || racePts.some((p) => p.labelType === "sector_1");
+      if (!hasCuts) {
+        ctx.strokeStyle = "#29d3ff";
+        ctx.lineWidth = 2.5;
+        ctx.lineJoin = "round";
+        ctx.beginPath();
+        racePts.forEach((p, i) => {
+          const cx = p.x * w;
+          const cy = p.y * h;
+          if (i === 0) ctx.moveTo(cx, cy);
+          else ctx.lineTo(cx, cy);
+        });
+        if (cl && racePts.length > 2) {
+          ctx.lineTo(racePts[0].x * w, racePts[0].y * h);
+        }
+        ctx.stroke();
+      } else {
+        const sectorColors: Record<number, string> = {
+          1: "#00CBFF",
+          2: "#FE0101",
+          3: "#FEDE01",
+        };
+        ctx.lineWidth = 3;
+        ctx.lineJoin = "round";
+        ctx.lineCap = "round";
+        for (const sect of [1, 2, 3]) {
+          ctx.strokeStyle = sectorColors[sect];
+          ctx.beginPath();
+          let inPath = false;
+          for (let k = 0; k < segSector.length; k++) {
+            if (segSector[k] !== sect) {
+              inPath = false;
+              continue;
+            }
+            const p1 = racePts[k];
+            const p2 = racePts[(k + 1) % racePts.length];
+            if (!inPath) {
+              ctx.moveTo(p1.x * w, p1.y * h);
+              inPath = true;
+            }
+            ctx.lineTo(p2.x * w, p2.y * h);
+          }
+          ctx.stroke();
+        }
+      }
     }
 
     // Draw pitlane line (amber)
@@ -180,6 +238,46 @@ export default function TrackTracerScreen() {
       });
       ctx.stroke();
       ctx.setLineDash([]);
+    }
+
+    // Draw sector boundary markers (dashed perpendicular lines)
+    const sectorTypes: LabelType[] = ["sector_1", "sector_2", "sector_3"];
+    const sectorColors: Record<string, string> = {
+      sector_1: "#22d3ee",
+      sector_2: "#a78bfa",
+      sector_3: "#f97316",
+    };
+    for (const st of sectorTypes) {
+      const idx = racePts.findIndex((p) => p.labelType === st);
+      if (idx < 0) continue;
+      const p = racePts[idx];
+      const cx = p.x * w;
+      const cy = p.y * h;
+      // Compute tangent from neighbors
+      const prev = racePts[(idx - 1 + racePts.length) % racePts.length];
+      const next = racePts[(idx + 1) % racePts.length];
+      const dx = (next.x - prev.x) * w;
+      const dy = (next.y - prev.y) * h;
+      const len = Math.hypot(dx, dy) || 1;
+      // Perpendicular unit vector
+      const nx = -dy / len;
+      const ny = dx / len;
+      const halfLen = 14;
+      ctx.strokeStyle = sectorColors[st] ?? "#ffffff";
+      ctx.lineWidth = 2;
+      ctx.setLineDash([4, 3]);
+      ctx.beginPath();
+      ctx.moveTo(cx + nx * halfLen, cy + ny * halfLen);
+      ctx.lineTo(cx - nx * halfLen, cy - ny * halfLen);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      // Label
+      const label = SHORT_LABELS[st]();
+      ctx.font = "bold 8px monospace";
+      ctx.fillStyle = sectorColors[st] ?? "#ffffff";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "bottom";
+      ctx.fillText(label, cx, cy - halfLen - 3);
     }
 
     // Draw all dots
@@ -533,6 +631,8 @@ export default function TrackTracerScreen() {
       label: p.label ?? null,
       is_turn: p.labelType === "turn",
       turn_order: p.turnOrder ?? null,
+      is_sector: p.labelType?.startsWith("sector_") ?? false,
+      sector: p.labelType === "sector_1" ? 1 : p.labelType === "sector_2" ? 2 : p.labelType === "sector_3" ? 3 : null,
     });
 
     const raceLine = points.filter((p) => p.path === "race").map(toObj);
@@ -586,6 +686,7 @@ export default function TrackTracerScreen() {
   const raceCount = points.filter((p) => p.path === "race").length;
   const pitCount = points.filter((p) => p.path === "pitlane").length;
   const turnCount = points.filter((p) => p.labelType === "turn").length;
+  const sectorCount = points.filter((p) => p.labelType?.startsWith("sector_")).length;
 
   /* -------------------------------------------------------------- */
   /*  Render                                                         */
@@ -707,9 +808,12 @@ export default function TrackTracerScreen() {
               point. Toggle <b>Close loop</b> to connect start ↔ end.
               <br />
               4. <b>Double-click a dot</b> to label it as a turn, finish line,
-              pit entry, etc.
+              pit entry, or sector boundary. Mark the dot where <b>sector 2
+              begins</b> as "Sector 2 boundary" and where <b>sector 3 begins</b>
+              as "Sector 3 boundary" — the line colours itself cyan/purple/orange
+              per sector automatically.
               <br />
-              5. Copy the JSON — <code className="rounded bg-raised px-1 py-0.5 font-mono text-[10px] text-telemetry">racingLine[]</code> for the circuit, <code className="rounded bg-raised px-1 py-0.5 font-mono text-[10px] text-caution">pitlane[]</code> for the pit road.
+              5. Copy the JSON — <code className="rounded bg-raised px-1 py-0.5 font-mono text-[10px] text-telemetry">racingLine[]</code> for the circuit, <code className="rounded bg-raised px-1 py-0.5 font-mono text-[10px] text-caution">pitlane[]</code> for the pit road. Sector boundaries marked as <code className="rounded bg-raised px-1 py-0.5 font-mono text-[10px] text-purple-400">is_sector: true</code>.
             </p>
           </div>
           <div className="border-b border-hairline px-4 py-3.5">
@@ -735,6 +839,44 @@ export default function TrackTracerScreen() {
             <div className="flex justify-between text-xs text-ink-soft">
               <span>Turns labelled</span>
               <b className="font-mono text-ink">{turnCount}</b>
+            </div>
+            <div className="flex justify-between text-xs text-ink-soft">
+              <span>Sector markers</span>
+              <b className="font-mono text-ink">{sectorCount}</b>
+            </div>
+            {/* Sector colouring legend + validation */}
+            <div className="mt-2.5 space-y-1.5 text-xs">
+              <div className="flex items-center gap-2 text-ink-soft">
+                <span className="inline-block h-1.5 w-4 rounded" style={{ backgroundColor: "#00CBFF" }} />
+                <span>sector 1 — before the S2 cut</span>
+              </div>
+              <div className="flex items-center gap-2 text-ink-soft">
+                <span className="inline-block h-1.5 w-4 rounded" style={{ backgroundColor: "#FE0101" }} />
+                <span>sector 2 — cut → next cut</span>
+              </div>
+              <div className="flex items-center gap-2 text-ink-soft">
+                <span className="inline-block h-1.5 w-4 rounded" style={{ backgroundColor: "#FEDE01" }} />
+                <span>sector 3 — cut → finish/wrap</span>
+              </div>
+              {(() => {
+                const s2 = points.filter((p) => p.labelType === "sector_2").length;
+                const s3 = points.filter((p) => p.labelType === "sector_3").length;
+                if (!closeLoop) {
+                  return (
+                    <div className="rounded border border-caution/40 bg-caution/10 px-2 py-1 text-[10px] leading-snug text-caution">
+                      Enable <b>Close loop</b> so sector colours can wrap back to sector 1.
+                    </div>
+                  );
+                }
+                if (s2 !== 1 || s3 !== 1) {
+                  return (
+                    <div className="rounded border border-caution/40 bg-caution/10 px-2 py-1 text-[10px] leading-snug text-caution">
+                      Place exactly one <b>Sector 2 boundary</b> (end of sector 1) and one <b>Sector 3 boundary</b> (end of sector 2) to colour all three sectors. Currently: S2 cut {s2}, S3 cut {s3}.
+                    </div>
+                  );
+                }
+                return null;
+              })()}
             </div>
           </div>
           <div className="flex flex-1 flex-col min-h-0 border-b border-hairline px-4 py-3.5">
